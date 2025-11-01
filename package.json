@@ -11,6 +11,16 @@
     "url": "git+https://github.com/sumimakito/emscripten-data-loader.git"
   },
   "keywords": [],
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsdown"
   },
