@@ -4,8 +4,12 @@
   "version": "0.0.1",
   "packageManager": "pnpm@10.18.2",
   "description": "",
-  "author": "",
-  "license": "ISC",
+  "author": "Makito <i@maki.to>",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sumimakito/emscripten-data-loader.git"
+  },
   "keywords": [],
   "scripts": {
     "build": "tsdown"
