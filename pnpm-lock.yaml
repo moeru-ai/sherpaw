@@ -24,6 +24,15 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  packages/asr:
+    devDependencies:
+      tsdown:
+        specifier: ^0.15.12
+        version: 0.15.12(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
 packages:
 
   '@antfu/eslint-config@6.2.0':

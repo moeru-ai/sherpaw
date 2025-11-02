@@ -1,14 +1,15 @@
 {
-  "name": "emscripten-data-loader",
+  "name": "@sherpa-onnx-wasm/workspace",
   "type": "module",
   "version": "0.0.1",
+  "private": true,
   "packageManager": "pnpm@10.18.2",
   "description": "",
   "author": "Makito <i@maki.to>",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sumimakito/emscripten-data-loader.git"
+    "url": "git+https://github.com/sumimakito/sherpa-onnx-wasm-es.git"
   },
   "keywords": [],
   "exports": {
