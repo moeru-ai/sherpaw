@@ -1,4 +1,4 @@
-# Emscripten Data Loader
+# Sherpa ONNX WASM Kit
 
 ## License
 
