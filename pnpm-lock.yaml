@@ -26,6 +26,27 @@ importers:
 
   packages/asr:
     devDependencies:
+      '@sherpa-onnx-wasm/preloader':
+        specifier: workspace:^
+        version: link:../preloader
+      tsdown:
+        specifier: ^0.15.12
+        version: 0.15.12(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/preloader:
+    devDependencies:
+      '@antfu/eslint-config':
+        specifier: ^6.2.0
+        version: 6.2.0(@vue/compiler-sfc@3.5.22)(eslint@9.38.0(jiti@2.6.1))(typescript@5.9.3)
+      bumpp:
+        specifier: ^10.3.1
+        version: 10.3.1
+      eslint:
+        specifier: ^9.38.0
+        version: 9.38.0(jiti@2.6.1)
       tsdown:
         specifier: ^0.15.12
         version: 0.15.12(typescript@5.9.3)

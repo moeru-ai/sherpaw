@@ -25,6 +25,7 @@
     "build": "tsdown"
   },
   "devDependencies": {
+    "@sherpa-onnx-wasm/preloader": "workspace:^",
     "tsdown": "^0.15.12",
     "typescript": "^5.9.3"
   }
