@@ -1,0 +1,7 @@
+sherpa-onnx
+Copyright [yyyy] The sherpa-onnx authors
+
+The following files originally came from sherpa-onnx:
+- packages/asr/src/sherpa-onnx-asr.js
+- packages/asr/src/sherpa-onnx-wasm-main-asr.js
+- packages/asr/src/sherpa-onnx-wasm-main-asr.wasm
