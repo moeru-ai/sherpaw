@@ -23,7 +23,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsdown"
+    "build": "pnpm -r run build"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^6.2.0",
