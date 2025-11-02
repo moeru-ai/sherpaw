@@ -1,7 +1,14 @@
 {
-  "references": [
-    { "path": "./tsconfig.config.json" },
-    { "path": "./tsconfig.lib.json" }
-  ],
-  "files": []
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "strict": false,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "skipLibCheck": true
+  },
+  "include": ["eslint.config.ts"]
 }
