@@ -38,6 +38,9 @@ importers:
       '@sherpa-onnx-wasm/shared':
         specifier: workspace:^
         version: link:../shared
+      '@types/emscripten':
+        specifier: ^1.41.5
+        version: 1.41.5
       tsdown:
         specifier: ^0.15.12
         version: 0.15.12(typescript@5.9.3)(vue-tsc@3.1.2(typescript@5.9.3))
@@ -50,6 +53,9 @@ importers:
       '@antfu/eslint-config':
         specifier: ^6.2.0
         version: 6.2.0(@vue/compiler-sfc@3.5.22)(eslint@9.38.0(jiti@2.6.1))(typescript@5.9.3)
+      '@sherpa-onnx-wasm/shared':
+        specifier: workspace:^
+        version: link:../shared
       '@types/emscripten':
         specifier: ^1.41.5
         version: 1.41.5
@@ -78,6 +84,9 @@ importers:
         specifier: ^3.5.22
         version: 3.5.22(typescript@5.9.3)
     devDependencies:
+      '@types/emscripten':
+        specifier: ^1.41.5
+        version: 1.41.5
       '@types/node':
         specifier: ^24.6.0
         version: 24.9.2
