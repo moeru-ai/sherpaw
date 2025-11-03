@@ -2,4 +2,4 @@
 // @ts-nocheck
 
 export * from './sherpa-onnx-asr'
-export * as AsrModule from './sherpa-onnx-wasm-main-asr'
+export { default as initASRModule } from './sherpa-onnx-wasm-main-asr'
