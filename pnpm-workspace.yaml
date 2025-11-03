@@ -1,3 +1,5 @@
 packages:
   - packages/asr
   - packages/preloader
+  - packages/sandbox
+  - packages/shared

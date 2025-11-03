@@ -1,0 +1,35 @@
+{
+  "files": [
+    {
+      "filename": "/.gitignore",
+      "start": 0,
+      "end": 0
+    },
+    {
+      "filename": "/README.md",
+      "start": 0,
+      "end": 3033
+    },
+    {
+      "filename": "/decoder.onnx",
+      "start": 3033,
+      "end": 13879485
+    },
+    {
+      "filename": "/encoder.onnx",
+      "start": 13879485,
+      "end": 195774517
+    },
+    {
+      "filename": "/joiner.onnx",
+      "start": 195774517,
+      "end": 199002921
+    },
+    {
+      "filename": "/tokens.txt",
+      "start": 199002921,
+      "end": 199059238
+    }
+  ],
+  "remote_package_size": 199059238
+}
