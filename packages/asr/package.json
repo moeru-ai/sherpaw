@@ -29,6 +29,7 @@
     "@sherpa-onnx-wasm/asr": "workspace:^",
     "@sherpa-onnx-wasm/preloader": "workspace:^",
     "@sherpa-onnx-wasm/shared": "workspace:^",
+    "@types/emscripten": "^1.41.5",
     "tsdown": "^0.15.12",
     "typescript": "^5.9.3"
   }
