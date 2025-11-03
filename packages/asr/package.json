@@ -13,7 +13,8 @@
   "keywords": [],
   "exports": {
     ".": "./dist/index.js",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./module.wasm": "./dist/sherpa-onnx-wasm-main-asr.wasm"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -25,7 +26,9 @@
     "build": "tsdown"
   },
   "devDependencies": {
+    "@sherpa-onnx-wasm/asr": "workspace:^",
     "@sherpa-onnx-wasm/preloader": "workspace:^",
+    "@sherpa-onnx-wasm/shared": "workspace:^",
     "tsdown": "^0.15.12",
     "typescript": "^5.9.3"
   }
