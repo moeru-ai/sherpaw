@@ -2,12 +2,12 @@ import type { Metadata, Module } from './types'
 
 export * from './types'
 
-export function loadData(module: Module, metadata: Metadata, data: ArrayBuffer, dependencyId: string) {
+export function loadData(module: Module, metadata: Metadata, data: ArrayBuffer, dependencyId: string, parent: string | FS.FSNode = '/') {
   function createDataFiles() {
     const bytes = new Uint8Array(data)
     for (const { filename, start, end } of metadata.files) {
       const data = bytes.subarray(start, end)
-      module.FS_createDataFile(filename, null, data, true, true, true)
+      module.FS_createDataFile(parent, filename, data, true, true, true)
     }
     module.removeRunDependency(dependencyId)
   }

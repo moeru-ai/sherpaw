@@ -1,9 +1,9 @@
 export interface Module {
   calledRun?: boolean
-  preRun?: Array<(...args: any[]) => any>
-  addRunDependency: (id: string) => void
-  removeRunDependency: (id: string) => void
-  FS_createDataFile: (parent: string | null, name: string | null, data: Uint8Array, canRead: boolean, canWrite: boolean, canOwn: boolean) => void
+  preRun?: EmscriptenModule['preRun']
+  addRunDependency: typeof addRunDependency
+  removeRunDependency: typeof removeRunDependency
+  FS_createDataFile: typeof FS['createDataFile']
 }
 
 export interface File {
