@@ -11,6 +11,11 @@
   "dependencies": {
     "@sherpa-onnx-wasm/asr": "workspace:^",
     "@sherpa-onnx-wasm/preloader": "workspace:^",
+    "@unocss/reset": "^66.5.4",
+    "@vueuse/core": "^14.0.0",
+    "pretty-bytes": "^7.1.0",
+    "reka-ui": "^2.6.0",
+    "unocss": "^66.5.4",
     "vue": "^3.5.22"
   },
   "devDependencies": {
