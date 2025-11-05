@@ -6,6 +6,8 @@ words:
   - bumpp
   - emscripten
   - onnx
+  - reka
   - tsdown
+  - vueuse
 ignoreWords: []
 import: []
