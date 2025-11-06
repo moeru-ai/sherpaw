@@ -3,3 +3,4 @@
 
 export * from './sherpa-onnx-asr'
 export { default as initASRModule } from './sherpa-onnx-wasm-main-asr'
+export type * from './sherpa-onnx-wasm-main-asr'

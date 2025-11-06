@@ -1,8 +1,8 @@
 /// <reference types="emscripten" />
 
-import type { WasmModule as SharedWasmModule, WasmModuleOptions } from '@sherpa-onnx-wasm/shared'
+import type { WasmModule, WasmModuleOptions } from '@sherpa-onnx-wasm/shared'
 
-interface WasmModule extends SharedWasmModule {
+export interface MainModule extends WasmModule {
   _MyPrint(_0: number): void;
   _CopyHeap(_0: number, _1: number, _2: number): void;
   _SherpaOnnxCreateOnlineRecognizer(_0: number): number;
@@ -24,5 +24,4 @@ interface WasmModule extends SharedWasmModule {
   _free(_0: number): void;
 }
 
-export type MainModule = WasmModule & typeof RuntimeExports;
 export default function MainModuleFactory (options?: WasmModuleOptions): Promise<MainModule>;
