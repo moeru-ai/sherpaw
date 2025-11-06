@@ -3,11 +3,15 @@ ignorePaths: []
 dictionaryDefinitions: []
 dictionaries: []
 words:
+  - audioworklet
   - bumpp
+  - downsample
   - emscripten
   - onnx
+  - paraformer
   - reka
   - tsdown
   - vueuse
+  - worklet
 ignoreWords: []
 import: []
