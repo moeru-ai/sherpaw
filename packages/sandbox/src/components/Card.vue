@@ -10,7 +10,7 @@
       <slot name="title" />
     </div>
 
-    <div py-2 w-full flex="~ col items-start justify-center">
+    <div py-2 w-full>
       <slot />
     </div>
   </div>

@@ -271,6 +271,8 @@ async function requestMicrophone() {
     setupRecorder(new AudioContext({ sampleRate: expectedSampleRate }), stream)
 }
 
+const isRecording = ref(false)
+
 async function startRecording() {
   await requestMicrophone()
 
@@ -278,6 +280,7 @@ async function startRecording() {
     return
   mediaStreamSource.connect(recorderNode)
   recorderNode.connect(audioCtx.destination)
+  isRecording.value = true
 }
 
 function stopRecording() {
@@ -320,106 +323,129 @@ onBeforeUnmount(() => {
 <template>
   <div
     p-4 max-w-2xl mx-auto font-sans
-    flex="~ col items-start gap-4"
+    flex="~ col items-center gap-4"
   >
+    <div text-center>
+      <div text-3xl font-black>
+        Sherpa-ONNX WASM
+      </div>
+      <div font-semibold>
+        ASR Sandbox
+      </div>
+    </div>
+
     <Card>
       <template #title>
         Model
       </template>
 
-      <div
-        ref="metadataDropZone"
-        b="b-1 dashed dark-300/20"
-        flex="~ col items-center gap-2"
-        w-full
-        p-4
-      >
-        <div font-bold uppercase>
-          (Metadata)
+      <div flex="~ col items-start" w-full>
+        <div
+          ref="metadataDropZone"
+          b="b-1 dashed dark-300/20"
+          flex="~ col items-center gap-2"
+          w-full
+          py-4
+        >
+          <div font-bold uppercase>
+            (Metadata)
+          </div>
+
+          <div
+            v-if="metadata"
+            w-full h-96
+            b="1 neutral-300"
+            rounded-xl overflow-hidden
+          >
+            <textarea
+              id="metadata"
+              :value="metadataStringified"
+              readonly
+              w-full font-mono
+              vertical-bottom
+              p-3
+              outline-none
+              text-sm
+              h-full
+            />
+          </div>
+
+          <div text-lg text-center>
+            <template v-if="!isOverMetadataDropZone">
+              Drop a metadata file here, or
+              <span
+                text-dark underline mt-2
+                role="button"
+                @click="metadataFileInputRef?.click()"
+              >choose a file</span><span v-if="metadata"> to replace</span>.
+            </template>
+            <template v-else>
+              Release to use this file.
+            </template>
+          </div>
+
+          <input
+            ref="metadataFileInput"
+            type="file"
+            hidden
+            @change="handleMetadataFileInput"
+          >
         </div>
 
-        <textarea
-          v-if="metadata"
-          v-model="metadataStringified"
-          readonly
-          w-full overflow-auto font-mono
-          p-3
-          outline-none
-          b="2 neutral/50"
-          text-sm
-          h-96
-        />
+        <div
+          ref="dataDropZone"
+          flex="~ col items-center gap-2"
+          py-4
+          w-full
+        >
+          <div font-bold uppercase>
+            (Data)
+          </div>
 
-        <div text-lg text-center>
-          <template v-if="!isOverMetadataDropZone">
-            Drop a metadata file here, or
-            <span
-              text-dark underline mt-2
-              role="button"
-              @click="metadataFileInputRef?.click()"
-            >choose a file</span><span v-if="metadata"> to replace</span>.
+          <div v-if="data" text-center>
+            <div text-3xl font-semibold>
+              {{ prettyBytes(data.byteLength) }}
+            </div>
+            <div text-lg>
+              loaded
+            </div>
+          </div>
+
+          <div text-lg text-center>
+            <template v-if="!isOverDataDropZone">
+              Drop a data file here, or
+              <span
+                text-dark underline mt-2
+                role="button"
+                @click="dataFileInputRef?.click()"
+              >choose a file</span><span v-if="data"> to replace</span>.
+            </template>
+            <template v-else>
+              Release to use this file.
+            </template>
+          </div>
+
+          <input
+            ref="dataFileInput"
+            type="file"
+            hidden
+            @change="handleDataFileInput"
+          >
+        </div>
+
+        <Button
+          self-end
+          :disabled="!metadata || !data"
+          @click="handleInitASRModule"
+        >
+          <template v-if="!asrModule">
+            Initialize ASR Module
           </template>
           <template v-else>
-            Release to use this file.
+            Re-initialize ASR Module
           </template>
-        </div>
-
-        <input
-          ref="metadataFileInput"
-          type="file"
-          hidden
-          @change="handleMetadataFileInput"
-        >
+        </Button>
       </div>
-
-      <div
-        ref="dataDropZone"
-        flex="~ col items-center gap-2"
-        p-4
-        w-full
-      >
-        <div font-bold uppercase>
-          (Data)
-        </div>
-
-        <div v-if="data" text-center>
-          <div text-3xl font-semibold>
-            {{ prettyBytes(data.byteLength) }}
-          </div>
-          <div text-lg>
-            loaded
-          </div>
-        </div>
-
-        <div text-lg text-center>
-          <template v-if="!isOverDataDropZone">
-            Drop a data file here, or
-            <span
-              text-dark underline mt-2
-              role="button"
-              @click="dataFileInputRef?.click()"
-            >choose a file</span><span v-if="data"> to replace</span>.
-          </template>
-          <template v-else>
-            Release to use this file.
-          </template>
-        </div>
-
-        <input
-          ref="dataFileInput"
-          type="file"
-          hidden
-          @change="handleDataFileInput"
-        >
-      </div>
-
-      <Button
-        self-end
-        :disabled="!metadata || !data"
-        @click="handleInitASRModule"
-      >
-        Initialize ASR
-      </Button>
     </Card>
 
     <Card>
@@ -427,8 +453,28 @@ onBeforeUnmount(() => {
         Transcription
       </template>
 
-      <div flex="~ col gap-2 items-start">
+      <div flex="~ col items-start gap-2" w-full>
+        <div
+          w-full
+          b="1 neutral-300"
+          rounded-xl overflow-hidden
+        >
+          <textarea
+            ref="textAreaRef"
+            :value="getDisplayResult()"
+            readonly
+            w-full overflow-auto font-mono
+            p-3
+            outline-none
+            vertical-bottom
+            text-sm
+            h-96
+          />
+        </div>
+
         <Button
+          v-if="!isRecording"
+          self-end
           @click="startRecording()"
         >
           Start
@@ -436,47 +482,44 @@ onBeforeUnmount(() => {
       </div>
     </Card>
 
-    <!-- Transcription Results Section -->
-    <section class="section">
-      <div class="section-header">
-        <Label for="transcription-output" class="section-label">
-          Transcription Results
-        </Label>
-      </div>
-      <textarea
-        id="transcription-output"
-        ref="textAreaRef"
-        :value="getDisplayResult()"
-        class="transcription-output"
-        rows="8"
-        readonly
-      />
-    </section>
+    <div hidden>
+      <!-- Transcription Results Section -->
+      <section class="section">
+        <textarea
+          id="transcription-output"
+          ref="textAreaRef"
+          :value="getDisplayResult()"
+          class="transcription-output"
+          rows="8"
+          readonly
+        />
+      </section>
 
-    <Separator class="separator" />
+      <Separator class="separator" />
 
-    <!-- Recordings List Section -->
-    <section class="section">
-      <div class="section-header">
-        <Label class="section-label">Previous Audio Slices</Label>
-        <span class="recordings-count">{{ recordings.length }} recording(s)</span>
-      </div>
-      <div v-if="recordings.length === 0" class="empty-state">
-        No recordings yet. Start and stop recording to create audio slices.
-      </div>
-      <ul v-else class="recordings-list">
-        <li v-for="(r, idx) in recordings" :key="r.url" class="recording-item">
-          <div class="recording-content">
-            <audio :src="r.url" controls class="audio-player" />
-            <div class="recording-info">
-              <span class="recording-name">{{ r.name }}</span>
-              <button class="btn btn-delete" @click="removeRecording(idx)">
-                Delete
-              </button>
+      <!-- Recordings List Section -->
+      <section class="section">
+        <div class="section-header">
+          <Label class="section-label">Previous Audio Slices</Label>
+          <span class="recordings-count">{{ recordings.length }} recording(s)</span>
+        </div>
+        <div v-if="recordings.length === 0" class="empty-state">
+          No recordings yet. Start and stop recording to create audio slices.
+        </div>
+        <ul v-else class="recordings-list">
+          <li v-for="(r, idx) in recordings" :key="r.url" class="recording-item">
+            <div class="recording-content">
+              <audio :src="r.url" controls class="audio-player" />
+              <div class="recording-info">
+                <span class="recording-name">{{ r.name }}</span>
+                <button class="btn btn-delete" @click="removeRecording(idx)">
+                  Delete
+                </button>
+              </div>
             </div>
-          </div>
-        </li>
-      </ul>
-    </section>
+          </li>
+        </ul>
+      </section>
+    </div>
   </div>
 </template>
