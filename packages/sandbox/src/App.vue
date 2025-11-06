@@ -1,9 +1,93 @@
 <script setup lang="ts">
+import type { MainModule } from '@sherpa-onnx-wasm/asr'
+import type { Metadata } from '@sherpa-onnx-wasm/preloader'
 import { createOnlineRecognizer, initASRModule } from '@sherpa-onnx-wasm/asr'
 import wasmUrl from '@sherpa-onnx-wasm/asr/module.wasm?url'
 import { loadData } from '@sherpa-onnx-wasm/preloader'
-import { onBeforeUnmount, onMounted, ref } from 'vue'
-import metadata from './assets/metadata/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20.json'
+import { useDropZone } from '@vueuse/core'
+import prettyBytes from 'pretty-bytes'
+import { Label, Separator } from 'reka-ui'
+import { computed, onBeforeUnmount, ref, shallowRef, useTemplateRef } from 'vue'
+import Button from './components/Button.vue'
+import Card from './components/Card.vue'
+
+const metadata = shallowRef<Metadata>()
+const metadataStringified = computed(() => JSON.stringify(metadata.value, null, 2))
+const data = shallowRef<ArrayBuffer>()
+
+const metadataDropZoneRef = useTemplateRef<HTMLDivElement>('metadataDropZone')
+const dataDropZoneRef = useTemplateRef<HTMLDivElement>('dataDropZone')
+
+const metadataFileInputRef = useTemplateRef('metadataFileInput')
+const dataFileInputRef = useTemplateRef('dataFileInput')
+
+const asrModule = shallowRef<MainModule>()
+
+async function readFileAsArrayBuffer(file: File) {
+  return new Promise<ArrayBuffer>((resolve) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      resolve(e.target?.result as ArrayBuffer)
+    }
+    reader.readAsArrayBuffer(file)
+  })
+}
+
+async function readFileAsText(file: File) {
+  return new Promise<string>((resolve) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      resolve(e.target?.result as string)
+    }
+    reader.readAsText(file)
+  })
+}
+
+async function readMetadataFile(file: File) {
+  const text = await readFileAsText(file)
+  metadata.value = JSON.parse(text)
+}
+
+async function readDataFile(file: File) {
+  const arrayBuffer = await readFileAsArrayBuffer(file)
+  data.value = arrayBuffer
+}
+
+function handleMetadataFileInput(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file)
+    return
+  readMetadataFile(file)
+}
+
+function handleDataFileInput(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file)
+    return
+  readDataFile(file)
+}
+
+const { isOverDropZone: isOverMetadataDropZone } = useDropZone(metadataDropZoneRef, {
+  onDrop: (files: File[] | null) => {
+    if (!files || files.length === 0 || !files[0])
+      return
+
+    readMetadataFile(files[0])
+  },
+  multiple: false,
+  preventDefaultForUnhandled: false,
+})
+
+const { isOverDropZone: isOverDataDropZone } = useDropZone(dataDropZoneRef, {
+  onDrop: (files: File[] | null) => {
+    if (!files || files.length === 0 || !files[0])
+      return
+
+    readDataFile(files[0])
+  },
+  multiple: false,
+  preventDefaultForUnhandled: false,
+})
 
 // UI refs
 const textAreaRef = ref<HTMLTextAreaElement | null>(null)
@@ -163,27 +247,18 @@ function setupRecorder(audioContext: AudioContext, stream: MediaStream) {
   }
 }
 
-async function initASR() {
-  // Initialize the WASM module and await the returned Module instance.
-  // Use the resolved module object directly instead of relying on `this` in
-  // the onRuntimeInitialized callback to avoid binding/race issues.
-  const asrModule = await initASRModule({
+async function handleInitASRModule() {
+  if (!metadata.value || !data.value)
+    return
+
+  asrModule.value = await initASRModule({
     locateFile() {
       return wasmUrl
     },
-    onRuntimeInitialized() {
-      console.warn('ASR runtime initialized', this)
-    },
   })
 
-  const res = await fetch('/data/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20.data')
-  const data = await res.arrayBuffer()
-
-  loadData(asrModule, metadata, data, 'streaming-zipformer-bilingual-zh-en-2023-02-20')
-
-  // Create recognizer using the resolved module instance
-  recognizerRef.value = createOnlineRecognizer(asrModule)
-  console.warn('Recognizer created')
+  loadData(asrModule.value, metadata.value, data.value, 'streaming-zipformer-bilingual-zh-en-2023-02-20')
+  recognizerRef.value = createOnlineRecognizer(asrModule.value)
 }
 
 async function requestMicrophone() {
@@ -196,7 +271,9 @@ async function requestMicrophone() {
     setupRecorder(new AudioContext({ sampleRate: expectedSampleRate }), stream)
 }
 
-function startRecording() {
+async function startRecording() {
+  await requestMicrophone()
+
   if (!mediaStreamSource || !recorderNode || !audioCtx)
     return
   mediaStreamSource.connect(recorderNode)
@@ -230,11 +307,6 @@ function removeRecording(idx: number) {
   }
 }
 
-onMounted(async () => {
-  await initASR()
-  await requestMicrophone()
-})
-
 onBeforeUnmount(() => {
   if (audioCtx) {
     try {
@@ -246,44 +318,165 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="recorder">
-    <div style="display:flex; gap:8px; margin: 1rem 0;">
-      <button @click="startRecording">
-        Start
-      </button>
-      <button @click="stopRecording">
-        Stop
-      </button>
-    </div>
+  <div
+    p-4 max-w-2xl mx-auto font-sans
+    flex="~ col items-start gap-4"
+  >
+    <Card>
+      <template #title>
+        Model
+      </template>
 
-    <textarea ref="textAreaRef" :value="getDisplayResult()" rows="6" style="width:100%" readonly />
-
-    <h3>Recordings</h3>
-    <ul>
-      <li v-for="(r, idx) in recordings" :key="r.url" style="margin-bottom:0.5rem;">
-        <audio :src="r.url" controls />
-        <div style="display:inline-block; margin-left:8px; vertical-align:middle;">
-          <div>{{ r.name }}</div>
-          <button @click="removeRecording(idx)">
-            Delete
-          </button>
+      <div
+        ref="metadataDropZone"
+        b="b-1 dashed dark-300/20"
+        flex="~ col items-center gap-2"
+        w-full
+        p-4
+      >
+        <div font-bold uppercase>
+          (Metadata)
         </div>
-      </li>
-    </ul>
-  </section>
-</template>
 
-<style scoped>
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.vue:hover {
-  filter: drop-shadow(0 0 2em #42b883aa);
-}
-</style>
+        <textarea
+          v-if="metadata"
+          v-model="metadataStringified"
+          readonly
+          w-full overflow-auto font-mono
+          p-3
+          outline-none
+          b="2 neutral/50"
+          text-sm
+          h-96
+        />
+
+        <div text-lg text-center>
+          <template v-if="!isOverMetadataDropZone">
+            Drop a metadata file here, or
+            <span
+              text-dark underline mt-2
+              role="button"
+              @click="metadataFileInputRef?.click()"
+            >choose a file</span><span v-if="metadata"> to replace</span>.
+          </template>
+          <template v-else>
+            Release to use this file.
+          </template>
+        </div>
+
+        <input
+          ref="metadataFileInput"
+          type="file"
+          hidden
+          @change="handleMetadataFileInput"
+        >
+      </div>
+
+      <div
+        ref="dataDropZone"
+        flex="~ col items-center gap-2"
+        p-4
+        w-full
+      >
+        <div font-bold uppercase>
+          (Data)
+        </div>
+
+        <div v-if="data" text-center>
+          <div text-3xl font-semibold>
+            {{ prettyBytes(data.byteLength) }}
+          </div>
+          <div text-lg>
+            loaded
+          </div>
+        </div>
+
+        <div text-lg text-center>
+          <template v-if="!isOverDataDropZone">
+            Drop a data file here, or
+            <span
+              text-dark underline mt-2
+              role="button"
+              @click="dataFileInputRef?.click()"
+            >choose a file</span><span v-if="data"> to replace</span>.
+          </template>
+          <template v-else>
+            Release to use this file.
+          </template>
+        </div>
+
+        <input
+          ref="dataFileInput"
+          type="file"
+          hidden
+          @change="handleDataFileInput"
+        >
+      </div>
+
+      <Button
+        self-end
+        :disabled="!metadata || !data"
+        @click="handleInitASRModule"
+      >
+        Initialize ASR
+      </Button>
+    </Card>
+
+    <Card>
+      <template #title>
+        Transcription
+      </template>
+
+      <div flex="~ col gap-2 items-start">
+        <Button
+          @click="startRecording()"
+        >
+          Start
+        </Button>
+      </div>
+    </Card>
+
+    <!-- Transcription Results Section -->
+    <section class="section">
+      <div class="section-header">
+        <Label for="transcription-output" class="section-label">
+          Transcription Results
+        </Label>
+      </div>
+      <textarea
+        id="transcription-output"
+        ref="textAreaRef"
+        :value="getDisplayResult()"
+        class="transcription-output"
+        rows="8"
+        readonly
+      />
+    </section>
+
+    <Separator class="separator" />
+
+    <!-- Recordings List Section -->
+    <section class="section">
+      <div class="section-header">
+        <Label class="section-label">Previous Audio Slices</Label>
+        <span class="recordings-count">{{ recordings.length }} recording(s)</span>
+      </div>
+      <div v-if="recordings.length === 0" class="empty-state">
+        No recordings yet. Start and stop recording to create audio slices.
+      </div>
+      <ul v-else class="recordings-list">
+        <li v-for="(r, idx) in recordings" :key="r.url" class="recording-item">
+          <div class="recording-content">
+            <audio :src="r.url" controls class="audio-player" />
+            <div class="recording-info">
+              <span class="recording-name">{{ r.name }}</span>
+              <button class="btn btn-delete" @click="removeRecording(idx)">
+                Delete
+              </button>
+            </div>
+          </div>
+        </li>
+      </ul>
+    </section>
+  </div>
+</template>
