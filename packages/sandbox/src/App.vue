@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import type { MainModule } from '@sherpa-onnx-wasm/asr'
 import type { Metadata } from '@sherpa-onnx-wasm/preloader'
+import type { AudioProcessorMessage } from './audio-processor.protocol'
 import { createOnlineRecognizer, initASRModule } from '@sherpa-onnx-wasm/asr'
 import wasmUrl from '@sherpa-onnx-wasm/asr/module.wasm?url'
 import { loadData } from '@sherpa-onnx-wasm/preloader'
 import { useDropZone } from '@vueuse/core'
 import prettyBytes from 'pretty-bytes'
-import { Label, Separator } from 'reka-ui'
 import { computed, onBeforeUnmount, ref, shallowRef, useTemplateRef } from 'vue'
+import audioProcessor from './audio-processor.worklet?url'
 import Button from './components/Button.vue'
 import Card from './components/Card.vue'
+import { readFileAsArrayBuffer, readFileAsText } from './helpers'
 
 const metadata = shallowRef<Metadata>()
 const metadataStringified = computed(() => JSON.stringify(metadata.value, null, 2))
@@ -21,27 +23,9 @@ const dataDropZoneRef = useTemplateRef<HTMLDivElement>('dataDropZone')
 const metadataFileInputRef = useTemplateRef('metadataFileInput')
 const dataFileInputRef = useTemplateRef('dataFileInput')
 
+const transcriptionsDisplayRef = useTemplateRef<HTMLDivElement>('transcriptionsDisplay')
+
 const asrModule = shallowRef<MainModule>()
-
-async function readFileAsArrayBuffer(file: File) {
-  return new Promise<ArrayBuffer>((resolve) => {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      resolve(e.target?.result as ArrayBuffer)
-    }
-    reader.readAsArrayBuffer(file)
-  })
-}
-
-async function readFileAsText(file: File) {
-  return new Promise<string>((resolve) => {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      resolve(e.target?.result as string)
-    }
-    reader.readAsText(file)
-  })
-}
 
 async function readMetadataFile(file: File) {
   const text = await readFileAsText(file)
@@ -89,161 +73,95 @@ const { isOverDropZone: isOverDataDropZone } = useDropZone(dataDropZoneRef, {
   preventDefaultForUnhandled: false,
 })
 
-// UI refs
 const textAreaRef = ref<HTMLTextAreaElement | null>(null)
+const SAMPLE_RATE = 16000
 
-// recordings list for template rendering
-const recordings = ref<Array<{ name: string, url: string }>>([])
-
-// ASR / audio state
-const expectedSampleRate = 16000
 let audioCtx: AudioContext | null = null
 let mediaStreamSource: MediaStreamAudioSourceNode | null = null
-let recordSampleRate = 0
-let recorderNode: ScriptProcessorNode | null = null
-let leftchannel: Int16Array[] = []
+let workletNode: AudioWorkletNode | null = null
 
-// recognizer state
 const recognizerRef: { value: any | null } = { value: null }
 let recognizerStream: any = null
-const resultList = ref<string[]>([])
-const lastResult = ref('')
 
-function getDisplayResult() {
-  return `${resultList.value.join('\n')}${lastResult.value ? `\n${lastResult.value}` : ''}`
-}
+const previousTranscriptions = ref<{ id: string, text: string }[]>([])
+const liveTranscription = ref<{ id: string, text: string }>()
 
-function flatten(listOfSamples: Int16Array[]) {
-  let n = 0
-  for (let i = 0; i < listOfSamples.length; ++i) n += listOfSamples[i]!.length
-  const ans = new Int16Array(n)
-  let offset = 0
-  for (let i = 0; i < listOfSamples.length; ++i) {
-    const chunk = listOfSamples[i]!
-    ans.set(chunk, offset)
-    offset += chunk.length
+const transcriptions = computed(() => {
+  return [
+    ...previousTranscriptions.value,
+    ...(liveTranscription.value ? [liveTranscription.value] : []),
+  ]
+})
+
+function processAudioData(samples: Float32Array, sampleRate: number) {
+  if (sampleRate !== SAMPLE_RATE) {
+    console.warn(`Expected sample rate: ${SAMPLE_RATE}Hz, but actually received: ${sampleRate}Hz`)
   }
-  return ans
-}
 
-function toWav(samples: Int16Array) {
-  const buf = new ArrayBuffer(44 + samples.length * 2)
-  const view = new DataView(buf)
-
-  view.setUint32(0, 0x46464952, true)
-  view.setUint32(4, 36 + samples.length * 2, true)
-  view.setUint32(8, 0x45564157, true)
-  view.setUint32(12, 0x20746D66, true)
-  view.setUint32(16, 16, true)
-  view.setUint32(20, 1, true)
-  view.setUint16(22, 1, true)
-  view.setUint32(24, expectedSampleRate, true)
-  view.setUint32(28, expectedSampleRate * 2, true)
-  view.setUint16(32, 2, true)
-  view.setUint16(34, 16, true)
-  view.setUint32(36, 0x61746164, true)
-  view.setUint32(40, samples.length * 2, true)
-
-  let offset = 44
-  for (let i = 0; i < samples.length; ++i) {
-    view.setInt16(offset, samples[i] ?? 0, true)
-    offset += 2
-  }
-  return new Blob([view], { type: 'audio/wav' })
-}
-
-function downsampleBuffer(buffer: Float32Array, exportSampleRate: number): Float32Array {
-  if (!recordSampleRate || exportSampleRate === recordSampleRate)
-    return buffer
-  const sampleRateRatio = recordSampleRate / exportSampleRate
-  const newLength = Math.round(buffer.length / sampleRateRatio)
-  const result = new Float32Array(newLength)
-  let offsetResult = 0
-  let offsetBuffer = 0
-  while (offsetResult < result.length) {
-    const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio)
-    let accum = 0
-    let count = 0
-    for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
-      accum += buffer[i] ?? 0
-      count++
+  if (recognizerRef.value) {
+    if (recognizerStream == null)
+      recognizerStream = recognizerRef.value.createStream()
+    recognizerStream.acceptWaveform(SAMPLE_RATE, samples)
+    while (recognizerRef.value.isReady(recognizerStream)) {
+      recognizerRef.value.decode(recognizerStream)
     }
-    result[offsetResult] = accum / (count || 1)
-    offsetResult++
-    offsetBuffer = nextOffsetBuffer
-  }
-  return result
-}
 
-function setupRecorder(audioContext: AudioContext, stream: MediaStream) {
-  if (audioCtx)
-    return
-  audioCtx = audioContext
-  recordSampleRate = audioCtx.sampleRate
-  mediaStreamSource = audioCtx.createMediaStreamSource(stream)
+    const isEndpoint = recognizerRef.value.isEndpoint(recognizerStream)
+    let result = recognizerRef.value.getResult(recognizerStream).text
 
-  const bufferSize = 4096
-  const numberOfInputChannels = 1
-  const numberOfOutputChannels = 1
-  recorderNode = audioCtx.createScriptProcessor(
-    bufferSize,
-    numberOfInputChannels,
-    numberOfOutputChannels,
-  )
-
-  recorderNode.onaudioprocess = function (e: AudioProcessingEvent) {
-    const floatSamples = new Float32Array(e.inputBuffer.getChannelData(0))
-    const samples = downsampleBuffer(floatSamples, expectedSampleRate)
-
-    // ASR processing (if recognizer is ready)
-    if (recognizerRef.value) {
-      if (recognizerStream == null)
-        recognizerStream = recognizerRef.value.createStream()
-      recognizerStream.acceptWaveform(expectedSampleRate, samples)
+    if (recognizerRef.value.config?.modelConfig?.paraformer?.encoder !== '') {
+      const tailPaddings = new Float32Array(SAMPLE_RATE)
+      recognizerStream.acceptWaveform(SAMPLE_RATE, tailPaddings)
       while (recognizerRef.value.isReady(recognizerStream)) {
         recognizerRef.value.decode(recognizerStream)
       }
+      result = recognizerRef.value.getResult(recognizerStream).text
+    }
 
-      const isEndpoint = recognizerRef.value.isEndpoint(recognizerStream)
-      let result = recognizerRef.value.getResult(recognizerStream).text
-
-      if (recognizerRef.value.config?.modelConfig?.paraformer?.encoder !== '') {
-        const tailPaddings = new Float32Array(expectedSampleRate)
-        recognizerStream.acceptWaveform(expectedSampleRate, tailPaddings)
-        while (recognizerRef.value.isReady(recognizerStream)) {
-          recognizerRef.value.decode(recognizerStream)
-        }
-        result = recognizerRef.value.getResult(recognizerStream).text
+    if (result.length > 0 && (!liveTranscription.value || liveTranscription.value.text !== result)) {
+      if (!liveTranscription.value) {
+        liveTranscription.value = { id: crypto.randomUUID(), text: '' }
       }
-
-      if (result.length > 0 && lastResult.value !== result)
-        lastResult.value = result
-      if (isEndpoint) {
-        if (lastResult.value.length > 0) {
-          resultList.value.push(lastResult.value)
-          lastResult.value = ''
-        }
-        recognizerRef.value.reset(recognizerStream)
+      else {
+        liveTranscription.value.text = result
       }
     }
-
-    // update UI text area
-    if (textAreaRef.value) {
-      textAreaRef.value.value = getDisplayResult()
-      textAreaRef.value.scrollTop = textAreaRef.value.scrollHeight
+    if (isEndpoint) {
+      if (liveTranscription.value && liveTranscription.value.text.length > 0) {
+        previousTranscriptions.value.push(liveTranscription.value)
+        liveTranscription.value = { id: crypto.randomUUID(), text: '' }
+      }
+      recognizerRef.value.reset(recognizerStream)
     }
+  }
 
-    // prepare wav buffer
-    const buf = new Int16Array(samples.length)
-    for (let i = 0; i < samples.length; ++i) {
-      let s = samples[i] ?? 0
-      if (s >= 1)
-        s = 1
-      else if (s <= -1)
-        s = -1
-      buf[i] = s * 32767
+  if (transcriptionsDisplayRef.value) {
+    transcriptionsDisplayRef.value.scrollTop = transcriptionsDisplayRef.value.scrollHeight
+  }
+}
+
+async function setupRecorder(audioContext: AudioContext, stream: MediaStream) {
+  if (audioCtx)
+    return
+  audioCtx = audioContext
+  mediaStreamSource = audioCtx.createMediaStreamSource(stream)
+
+  // Load and setup AudioWorklet
+  try {
+    await audioCtx.audioWorklet.addModule(audioProcessor)
+    workletNode = new AudioWorkletNode(audioCtx, 'audio-processor')
+
+    workletNode.port.onmessage = (event) => {
+      const message: AudioProcessorMessage = event.data
+      switch (message.type) {
+        case 'data':
+          processAudioData(new Float32Array(message.data), message.sampleRate)
+          break
+      }
     }
-    leftchannel.push(buf)
+  }
+  catch (error) {
+    console.error('Failed to load audio worklet:', error)
   }
 }
 
@@ -268,7 +186,7 @@ async function requestMicrophone() {
   }
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
   if (!audioCtx)
-    setupRecorder(new AudioContext({ sampleRate: expectedSampleRate }), stream)
+    await setupRecorder(new AudioContext({ sampleRate: SAMPLE_RATE }), stream)
 }
 
 const isRecording = ref(false)
@@ -276,38 +194,24 @@ const isRecording = ref(false)
 async function startRecording() {
   await requestMicrophone()
 
-  if (!mediaStreamSource || !recorderNode || !audioCtx)
+  if (!mediaStreamSource || !workletNode || !audioCtx)
     return
-  mediaStreamSource.connect(recorderNode)
-  recorderNode.connect(audioCtx.destination)
+  mediaStreamSource.connect(workletNode)
+  workletNode.connect(audioCtx.destination)
   isRecording.value = true
 }
 
 function stopRecording() {
-  if (recorderNode && mediaStreamSource && audioCtx) {
+  if (workletNode && mediaStreamSource && audioCtx) {
     try {
-      recorderNode.disconnect(audioCtx.destination)
-      mediaStreamSource.disconnect(recorderNode)
+      workletNode.disconnect(audioCtx.destination)
+      mediaStreamSource.disconnect(workletNode)
     }
     catch {
       // ignore if already disconnected
     }
-
-    const clipName = new Date().toISOString()
-    const samples = flatten(leftchannel)
-    const blob = toWav(samples)
-    leftchannel = []
-    const audioURL = window.URL.createObjectURL(blob)
-    recordings.value.push({ name: clipName, url: audioURL })
   }
-}
-
-function removeRecording(idx: number) {
-  const r = recordings.value[idx]
-  if (r) {
-    URL.revokeObjectURL(r.url)
-    recordings.value.splice(idx, 1)
-  }
+  isRecording.value = false
 }
 
 onBeforeUnmount(() => {
@@ -322,7 +226,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div
-    p-4 max-w-2xl mx-auto font-sans
+    p-4 max-w-screen-md mx-auto font-sans mt-4
     flex="~ col items-center gap-4"
   >
     <div text-center>
@@ -333,7 +237,61 @@ onBeforeUnmount(() => {
         ASR Sandbox
       </div>
     </div>
+  </div>
 
+  <div
+    p-4 max-w-screen-xl mx-auto font-sans
+    flex="~ col items-center gap-4"
+  >
+    <Card>
+      <template #title>
+        Transcription
+      </template>
+
+      <div flex="~ col items-start gap-2" w-full>
+        <div
+          ref="transcriptionsDisplayRef" w-full max-h-96
+          overflow-auto
+        >
+          <div
+            v-for="transcription in transcriptions"
+            :key="transcription.id"
+            transition="all 300"
+            :class="{
+              'text-base op-50': transcription.id !== (liveTranscription && liveTranscription.id),
+              'text-xl font-semibold': transcription.id === (liveTranscription && liveTranscription.id),
+            }"
+          >
+            {{ transcription.text }}
+            <span
+              v-if="transcription.id === (liveTranscription && liveTranscription.id)"
+              animate-pulse
+            >|</span>
+          </div>
+        </div>
+
+        <div self-end flex="~ gap-2">
+          <Button
+            v-if="!isRecording"
+            @click="startRecording()"
+          >
+            Start transcription
+          </Button>
+          <Button
+            v-else
+            @click="stopRecording()"
+          >
+            Stop transcription
+          </Button>
+        </div>
+      </div>
+    </Card>
+  </div>
+
+  <div
+    p-4 max-w-screen-md mx-auto font-sans
+    flex="~ col items-center gap-4"
+  >
     <Card>
       <template #title>
         Model
@@ -447,79 +405,5 @@ onBeforeUnmount(() => {
         </Button>
       </div>
     </Card>
-
-    <Card>
-      <template #title>
-        Transcription
-      </template>
-
-      <div flex="~ col items-start gap-2" w-full>
-        <div
-          w-full
-          b="1 neutral-300"
-          rounded-xl overflow-hidden
-        >
-          <textarea
-            ref="textAreaRef"
-            :value="getDisplayResult()"
-            readonly
-            w-full overflow-auto font-mono
-            p-3
-            outline-none
-            vertical-bottom
-            text-sm
-            h-96
-          />
-        </div>
-
-        <Button
-          v-if="!isRecording"
-          self-end
-          @click="startRecording()"
-        >
-          Start
-        </Button>
-      </div>
-    </Card>
-
-    <div hidden>
-      <!-- Transcription Results Section -->
-      <section class="section">
-        <textarea
-          id="transcription-output"
-          ref="textAreaRef"
-          :value="getDisplayResult()"
-          class="transcription-output"
-          rows="8"
-          readonly
-        />
-      </section>
-
-      <Separator class="separator" />
-
-      <!-- Recordings List Section -->
-      <section class="section">
-        <div class="section-header">
-          <Label class="section-label">Previous Audio Slices</Label>
-          <span class="recordings-count">{{ recordings.length }} recording(s)</span>
-        </div>
-        <div v-if="recordings.length === 0" class="empty-state">
-          No recordings yet. Start and stop recording to create audio slices.
-        </div>
-        <ul v-else class="recordings-list">
-          <li v-for="(r, idx) in recordings" :key="r.url" class="recording-item">
-            <div class="recording-content">
-              <audio :src="r.url" controls class="audio-player" />
-              <div class="recording-info">
-                <span class="recording-name">{{ r.name }}</span>
-                <button class="btn btn-delete" @click="removeRecording(idx)">
-                  Delete
-                </button>
-              </div>
-            </div>
-          </li>
-        </ul>
-      </section>
-    </div>
   </div>
 </template>

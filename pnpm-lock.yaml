@@ -99,6 +99,12 @@ importers:
         specifier: ^3.5.22
         version: 3.5.22(typescript@5.9.3)
     devDependencies:
+      '@tsconfig/strictest':
+        specifier: ^2.0.7
+        version: 2.0.7
+      '@types/audioworklet':
+        specifier: ^0.0.90
+        version: 0.0.90
       '@types/emscripten':
         specifier: ^1.41.5
         version: 1.41.5
@@ -618,8 +624,14 @@ packages:
     peerDependencies:
       vue: ^2.7.0 || ^3.0.0
 
+  '@tsconfig/strictest@2.0.7':
+    resolution: {integrity: sha512-lG1bXQloBVvQXasPBZSBaWbs7GNW4txZMYs7XMUVzM0s4seCbJACYBPFIRpGNVD3gC8gndK00AZON1uBrJt4Fw==}
+
   '@tybys/wasm-util@0.10.1':
     resolution: {integrity: sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg==}
+
+  '@types/audioworklet@0.0.90':
+    resolution: {integrity: sha512-fG1NU0kxzr/vha7zavWL/qR/kzUTtvmOqQ6vGo0/iKf0ZvezDLPgT+bP6x6VwDqeDeBc8HQpzkKDyFGAc8EJeg==}
 
   '@types/debug@4.1.12':
     resolution: {integrity: sha512-vIChWdVG3LG1SMxEvI/AK+FWJthlrqlTu7fbrlywTkkaONwk/UAGaULXRlf8vkzFBLVm0zkMdCquhL5aOjhXPQ==}
@@ -2776,10 +2788,14 @@ snapshots:
       '@tanstack/virtual-core': 3.13.12
       vue: 3.5.22(typescript@5.9.3)
 
+  '@tsconfig/strictest@2.0.7': {}
+
   '@tybys/wasm-util@0.10.1':
     dependencies:
       tslib: 2.8.1
     optional: true
+
+  '@types/audioworklet@0.0.90': {}
 
   '@types/debug@4.1.12':
     dependencies:
