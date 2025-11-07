@@ -6,6 +6,7 @@ words:
   - audioworklet
   - bumpp
   - downsample
+  - emcc
   - emscripten
   - onnx
   - paraformer
