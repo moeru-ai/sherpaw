@@ -1,6 +1,6 @@
 /// <reference types="emscripten" />
 
-export interface WasmModule extends EmscriptenModule {
+export interface WebAssemblyModule extends EmscriptenModule {
   calledRun?: boolean
   runtimeInitialized?: boolean
 
@@ -17,6 +17,8 @@ export interface WasmModule extends EmscriptenModule {
   removeRunDependency: typeof removeRunDependency
 }
 
-export interface WasmModuleOptions extends Partial<WasmModule> {
+export interface WebAssemblyModuleOptions extends Partial<WebAssemblyModule> {
   locateFile: (path: string) => string
 }
+
+export type WebAssemblyModuleFactory = (options?: WebAssemblyModuleOptions) => Promise<WebAssemblyModule>
