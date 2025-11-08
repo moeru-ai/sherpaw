@@ -142,3 +142,6 @@ vite.config.ts.timestamp-*
 
 # Sub-package README files
 packages/lib/README.md
+
+# Misc build outputs
+build/
