@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { MainModule } from '@sherpa-onnx-wasm/asr'
+import type { ASRModule } from '@sherpa-onnx-wasm/asr'
 import type { Metadata } from '@sherpa-onnx-wasm/preloader'
 import type { AudioProcessorMessage } from './audio-processor.protocol'
 import { createOnlineRecognizer, initASRModule } from '@sherpa-onnx-wasm/asr'
@@ -25,7 +25,7 @@ const dataFileInputRef = useTemplateRef('dataFileInput')
 
 const transcriptionsDisplayRef = useTemplateRef<HTMLDivElement>('transcriptionsDisplay')
 
-const asrModule = shallowRef<MainModule>()
+const asrModule = shallowRef<ASRModule>()
 
 async function readMetadataFile(file: File) {
   const text = await readFileAsText(file)
@@ -73,7 +73,6 @@ const { isOverDropZone: isOverDataDropZone } = useDropZone(dataDropZoneRef, {
   preventDefaultForUnhandled: false,
 })
 
-const textAreaRef = ref<HTMLTextAreaElement | null>(null)
 const SAMPLE_RATE = 16000
 
 let audioCtx: AudioContext | null = null
