@@ -169,12 +169,10 @@ async function handleInitASRModule() {
     return
 
   asrModule.value = await initASRModule({
-    locateFile() {
-      return wasmUrl
-    },
+    locateFile: () => wasmUrl,
   })
 
-  loadData(asrModule.value, metadata.value, data.value, 'streaming-zipformer-bilingual-zh-en-2023-02-20')
+  loadData(asrModule.value!, metadata.value, data.value, 'streaming-zipformer-bilingual-zh-en-2023-02-20')
   recognizerRef.value = createOnlineRecognizer(asrModule.value)
 }
 

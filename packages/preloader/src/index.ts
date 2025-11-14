@@ -1,9 +1,9 @@
-import type { WasmModule } from '@sherpa-onnx-wasm/shared'
+import type { WebAssemblyModule } from '@sherpa-onnx-wasm/shared'
 import type { Metadata } from './types'
 
 export * from './types'
 
-export function loadData(module: WasmModule, metadata: Metadata, data: ArrayBuffer, dependencyId: string, parent: string | FS.FSNode = '/') {
+export function loadData(module: WebAssemblyModule, metadata: Metadata, data: ArrayBuffer, dependencyId: string, parent: string | FS.FSNode = '/') {
   function createDataFiles() {
     const bytes = new Uint8Array(data)
     for (const { filename, start, end } of metadata.files) {
