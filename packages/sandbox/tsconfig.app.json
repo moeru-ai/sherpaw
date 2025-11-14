@@ -10,5 +10,6 @@
     "erasableSyntaxOnly": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"],
+  "exclude": ["src/audio-processor.worklet.ts"]
 }
