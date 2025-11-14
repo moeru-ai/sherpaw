@@ -1,4 +1,4 @@
-import { defineConfig, presetAttributify, presetWebFonts, presetWind4 } from 'unocss'
+import { defineConfig, presetAttributify, presetIcons, presetWebFonts, presetWind4 } from 'unocss'
 
 export default defineConfig({
   presets: [
@@ -16,6 +16,7 @@ export default defineConfig({
         },
       },
     }),
+    presetIcons(),
   ],
   theme: {
     animation: {

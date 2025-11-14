@@ -1,77 +1,14 @@
 <script setup lang="ts">
-import type { ASRModule } from '@sherpa-onnx-wasm/asr'
-import type { Metadata } from '@sherpa-onnx-wasm/preloader'
 import type { AudioProcessorMessage } from './audio-processor.protocol'
-import { createOnlineRecognizer, initASRModule } from '@sherpa-onnx-wasm/asr'
-import wasmUrl from '@sherpa-onnx-wasm/asr/module.wasm?url'
-import { loadData } from '@sherpa-onnx-wasm/preloader'
-import { useDropZone } from '@vueuse/core'
-import prettyBytes from 'pretty-bytes'
-import { computed, onBeforeUnmount, ref, shallowRef, useTemplateRef } from 'vue'
+import { createOnlineRecognizer } from '@sherpa-onnx-wasm/asr'
+import { PopoverArrow, PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
+import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue'
 import audioProcessor from './audio-processor.worklet?url'
 import Button from './components/Button.vue'
-import Card from './components/Card.vue'
-import { readFileAsArrayBuffer, readFileAsText } from './helpers'
-
-const metadata = shallowRef<Metadata>()
-const metadataStringified = computed(() => JSON.stringify(metadata.value, null, 2))
-const data = shallowRef<ArrayBuffer>()
-
-const metadataDropZoneRef = useTemplateRef<HTMLDivElement>('metadataDropZone')
-const dataDropZoneRef = useTemplateRef<HTMLDivElement>('dataDropZone')
-
-const metadataFileInputRef = useTemplateRef('metadataFileInput')
-const dataFileInputRef = useTemplateRef('dataFileInput')
+import ModelSetup from './components/ModelSetup.vue'
+import { provideASRStore } from './store'
 
 const transcriptionsDisplayRef = useTemplateRef<HTMLDivElement>('transcriptionsDisplay')
-
-const asrModule = shallowRef<ASRModule>()
-
-async function readMetadataFile(file: File) {
-  const text = await readFileAsText(file)
-  metadata.value = JSON.parse(text)
-}
-
-async function readDataFile(file: File) {
-  const arrayBuffer = await readFileAsArrayBuffer(file)
-  data.value = arrayBuffer
-}
-
-function handleMetadataFileInput(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
-  if (!file)
-    return
-  readMetadataFile(file)
-}
-
-function handleDataFileInput(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
-  if (!file)
-    return
-  readDataFile(file)
-}
-
-const { isOverDropZone: isOverMetadataDropZone } = useDropZone(metadataDropZoneRef, {
-  onDrop: (files: File[] | null) => {
-    if (!files || files.length === 0 || !files[0])
-      return
-
-    readMetadataFile(files[0])
-  },
-  multiple: false,
-  preventDefaultForUnhandled: false,
-})
-
-const { isOverDropZone: isOverDataDropZone } = useDropZone(dataDropZoneRef, {
-  onDrop: (files: File[] | null) => {
-    if (!files || files.length === 0 || !files[0])
-      return
-
-    readDataFile(files[0])
-  },
-  multiple: false,
-  preventDefaultForUnhandled: false,
-})
 
 const SAMPLE_RATE = 16000
 
@@ -84,6 +21,8 @@ let recognizerStream: any = null
 
 const previousTranscriptions = ref<{ id: string, text: string }[]>([])
 const liveTranscription = ref<{ id: string, text: string }>()
+
+const { asrModule } = provideASRStore()
 
 const transcriptions = computed(() => {
   return [
@@ -164,17 +103,11 @@ async function setupRecorder(audioContext: AudioContext, stream: MediaStream) {
   }
 }
 
-async function handleInitASRModule() {
-  if (!metadata.value || !data.value)
-    return
-
-  asrModule.value = await initASRModule({
-    locateFile: () => wasmUrl,
-  })
-
-  loadData(asrModule.value!, metadata.value, data.value, 'streaming-zipformer-bilingual-zh-en-2023-02-20')
-  recognizerRef.value = createOnlineRecognizer(asrModule.value)
-}
+watch(asrModule, (newModule) => {
+  if (newModule) {
+    recognizerRef.value = createOnlineRecognizer(newModule)
+  }
+})
 
 async function requestMicrophone() {
   if (!navigator.mediaDevices?.getUserMedia) {
@@ -209,6 +142,8 @@ function stopRecording() {
     }
   }
   isRecording.value = false
+  previousTranscriptions.value = []
+  liveTranscription.value = undefined
 }
 
 onBeforeUnmount(() => {
@@ -223,184 +158,109 @@ onBeforeUnmount(() => {
 
 <template>
   <div
-    p-4 max-w-screen-md mx-auto font-sans mt-4
-    flex="~ col items-center gap-4"
+    h-dvh w-full font-sans
+    flex="~ col items-center justify-start"
   >
-    <div text-center>
-      <div text-3xl font-black>
-        Sherpa-ONNX WASM
+    <div
+      p-6 w-full font-sans
+      flex="~ col md:row items-center justify-between gap-4 shrink-0"
+    >
+      <div flex="~ col items-center md:items-start">
+        <div text-xl md:text-3xl font-black>
+          Sherpa-ONNX WASM
+        </div>
+        <div font-semibold>
+          ASR Sandbox
+        </div>
       </div>
-      <div font-semibold>
-        ASR Sandbox
-      </div>
+
+      <PopoverRoot>
+        <PopoverTrigger
+          flex="~ row items-center gap-2"
+          bg="transparent hover:neutral/10"
+          rounded-2xl p-2 md:p-4
+          transition="background-color 300"
+          text-sm lg:text-base
+        >
+          <div uppercase>
+            Model setup
+          </div>
+          <div i-ri:ai-generate-3d-line text-xl :class="{ 'op-50': !asrModule }" />
+        </PopoverTrigger>
+        <PopoverPortal>
+          <PopoverContent
+            side="bottom"
+            :side-offset="0"
+            rounded-lg
+            bg-white shadow-sm b m-4
+            class="max-w-[calc(100dvw-var(--spacing)*4*2)] w-[460px] will-change-[transform,opacity]
+              data-[state=open]:animate-[fade-in_150ms_linear_1]
+              data-[state=closed]:animate-[fade-out_150ms_linear_1]"
+          >
+            <ModelSetup />
+            <PopoverArrow class="fill-white stroke-gray-200" />
+          </PopoverContent>
+        </PopoverPortal>
+      </PopoverRoot>
     </div>
-  </div>
 
-  <div
-    p-4 max-w-screen-xl mx-auto font-sans
-    flex="~ col items-center gap-4"
-  >
-    <Card>
-      <template #title>
-        Transcription
-      </template>
+    <div
+      p-4 w-full relative
+      flex="~ col items-center justify-center gap-4 grow-1"
+    >
+      <div
+        v-if="!isRecording"
+        flex="~ col items-center gap-6" w-full p-4
+      >
+        <div text-4xl md:text-6xl lg:text-8xl font-semibold>
+          Transcription
+        </div>
 
-      <div flex="~ col items-start gap-2" w-full>
+        <Button
+          @click="startRecording()"
+        >
+          Start transcription
+        </Button>
+      </div>
+
+      <div
+        v-if="isRecording"
+        flex="~ col items-center justify-end gap-6"
+        w-full absolute h-full
+        p-6
+      >
         <div
-          ref="transcriptionsDisplayRef" w-full max-h-96
+          v-if="transcriptions.length > 0"
+          ref="transcriptionsDisplayRef"
+          w-full
+          flex="~ col items-center justify-center gap-6 grow-1"
           overflow-auto
         >
           <div
             v-for="transcription in transcriptions"
             :key="transcription.id"
+            text-center
             transition="all 300"
             :class="{
-              'text-base op-50': transcription.id !== (liveTranscription && liveTranscription.id),
-              'text-xl font-semibold': transcription.id === (liveTranscription && liveTranscription.id),
+              'text-3xl op-70': transcription.id !== (liveTranscription && liveTranscription.id),
+              'text-4xl font-bold': transcription.id === (liveTranscription && liveTranscription.id),
             }"
           >
             {{ transcription.text }}
             <span
               v-if="transcription.id === (liveTranscription && liveTranscription.id)"
+              font-normal
               animate-pulse
             >|</span>
           </div>
         </div>
 
-        <div self-end flex="~ gap-2">
-          <Button
-            v-if="!isRecording"
-            @click="startRecording()"
-          >
-            Start transcription
-          </Button>
-          <Button
-            v-else
-            @click="stopRecording()"
-          >
+        <div flex="~ col shrink-0">
+          <Button @click="stopRecording()">
             Stop transcription
           </Button>
         </div>
       </div>
-    </Card>
-  </div>
-
-  <div
-    p-4 max-w-screen-md mx-auto font-sans
-    flex="~ col items-center gap-4"
-  >
-    <Card>
-      <template #title>
-        Model
-      </template>
-
-      <div flex="~ col items-start" w-full>
-        <div
-          ref="metadataDropZone"
-          b="b-1 dashed dark-300/20"
-          flex="~ col items-center gap-2"
-          w-full
-          py-4
-        >
-          <div font-bold uppercase>
-            (Metadata)
-          </div>
-
-          <div
-            v-if="metadata"
-            w-full h-96
-            b="1 neutral-300"
-            rounded-xl overflow-hidden
-          >
-            <textarea
-              id="metadata"
-              :value="metadataStringified"
-              readonly
-              w-full font-mono
-              vertical-bottom
-              p-3
-              outline-none
-              text-sm
-              h-full
-            />
-          </div>
-
-          <div text-lg text-center>
-            <template v-if="!isOverMetadataDropZone">
-              Drop a metadata file here, or
-              <span
-                text-dark underline mt-2
-                role="button"
-                @click="metadataFileInputRef?.click()"
-              >choose a file</span><span v-if="metadata"> to replace</span>.
-            </template>
-            <template v-else>
-              Release to use this file.
-            </template>
-          </div>
-
-          <input
-            ref="metadataFileInput"
-            type="file"
-            hidden
-            @change="handleMetadataFileInput"
-          >
-        </div>
-
-        <div
-          ref="dataDropZone"
-          flex="~ col items-center gap-2"
-          py-4
-          w-full
-        >
-          <div font-bold uppercase>
-            (Data)
-          </div>
-
-          <div v-if="data" text-center>
-            <div text-3xl font-semibold>
-              {{ prettyBytes(data.byteLength) }}
-            </div>
-            <div text-lg>
-              loaded
-            </div>
-          </div>
-
-          <div text-lg text-center>
-            <template v-if="!isOverDataDropZone">
-              Drop a data file here, or
-              <span
-                text-dark underline mt-2
-                role="button"
-                @click="dataFileInputRef?.click()"
-              >choose a file</span><span v-if="data"> to replace</span>.
-            </template>
-            <template v-else>
-              Release to use this file.
-            </template>
-          </div>
-
-          <input
-            ref="dataFileInput"
-            type="file"
-            hidden
-            @change="handleDataFileInput"
-          >
-        </div>
-
-        <Button
-          self-end
-          :disabled="!metadata || !data"
-          @click="handleInitASRModule"
-        >
-          <template v-if="!asrModule">
-            Initialize ASR Module
-          </template>
-          <template v-else>
-            Re-initialize ASR Module
-          </template>
-        </Button>
-      </div>
-    </Card>
+    </div>
   </div>
 </template>

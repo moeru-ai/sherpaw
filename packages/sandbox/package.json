@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@iconify-json/ri": "^1.2.6",
     "@sherpa-onnx-wasm/asr": "workspace:^",
     "@sherpa-onnx-wasm/preloader": "workspace:^",
     "@unocss/reset": "^66.5.4",
