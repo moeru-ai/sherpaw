@@ -219,7 +219,7 @@ onBeforeUnmount(() => {
         <Button
           @click="startRecording()"
         >
-          Start transcription
+          Start
         </Button>
       </div>
 
