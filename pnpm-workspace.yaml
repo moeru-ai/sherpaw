@@ -3,3 +3,4 @@ packages:
   - packages/preloader
   - packages/sandbox
   - packages/shared
+  - packages/speaker-diarization
