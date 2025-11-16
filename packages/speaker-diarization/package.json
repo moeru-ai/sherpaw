@@ -1,0 +1,35 @@
+{
+  "name": "@sherpa-onnx-wasm/speaker-diarization",
+  "type": "module",
+  "version": "0.0.1",
+  "packageManager": "pnpm@10.18.2",
+  "description": "",
+  "author": "Makito <i@maki.to>",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sumimakito/sherpa-onnx-wasm.git"
+  },
+  "keywords": [],
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json",
+    "./module.wasm": "./dist/sherpa-onnx-wasm-main-speaker-diarization.wasm"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown"
+  },
+  "devDependencies": {
+    "@sherpa-onnx-wasm/preloader": "workspace:^",
+    "@sherpa-onnx-wasm/shared": "workspace:^",
+    "@types/emscripten": "^1.41.5",
+    "tsdown": "^0.15.12",
+    "typescript": "^5.9.3"
+  }
+}
