@@ -1,5 +1,13 @@
 # Sherpa ONNX WASM Kit
 
+## Development
+
+```shell
+git clone git@github.com:sumimakito/sherpa-onnx-wasm.git
+git submodule init
+git submodule update
+```
+
 ## License
 
 ```

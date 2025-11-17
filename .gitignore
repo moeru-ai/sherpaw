@@ -145,3 +145,17 @@ packages/lib/README.md
 
 # Misc build outputs
 build/
+
+# Models (PyTorch pickle, ONNX, etc.)
+models/
+!models/**/build.sh
+!models/**/download.sh
+*.onnx
+*.pb
+*.pt
+*.pth
+*.safetensors
+
+# Audio binaries
+*.wav
+*.mp3
