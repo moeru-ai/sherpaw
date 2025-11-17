@@ -1,0 +1,5 @@
+[submodule "upstream/sherpa-onnx"]
+	path = upstream/sherpa-onnx
+	url = https://github.com/sumimakito/sherpa-onnx.git
+	branch = feat/wasm-selective-preload
+	shallow = true
