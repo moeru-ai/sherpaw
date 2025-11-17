@@ -1,4 +1,0 @@
-[submodule "upstream/sherpa-onnx"]
-	path = upstream/sherpa-onnx
-	url = https://github.com/k2-fsa/sherpa-onnx
-	shallow = true
