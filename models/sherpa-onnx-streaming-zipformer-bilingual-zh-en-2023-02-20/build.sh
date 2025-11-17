@@ -2,6 +2,8 @@
 set -e
 cd $(dirname "$0")/../..
 
+rm -rf $PWD/models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/install
+
 docker run --platform linux/amd64 \
   -v "$PWD/upstream/sherpa-onnx:/opt/sherpa-onnx" \
   -v "$PWD/models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/model/normalized:/opt/sherpa-onnx/wasm/asr/assets" \
@@ -12,4 +14,11 @@ docker run --platform linux/amd64 \
        source /opt/emsdk/emsdk_env.sh && \
        emcc -v && \
        cd /opt/sherpa-onnx && \
-       /opt/sherpa-onnx/build-wasm-simd-asr.sh'
+       /opt/sherpa-onnx/build-wasm-simd-asr.sh && \
+       cd /opt/sherpa-onnx/wasm/asr && \
+       "$(dirname "$(which emcc)")/tools/file_packager" \
+         preload.data \
+         --preload assets@. \
+         --js-output=preload.js \
+         --separate-metadata \
+         --export-es6'
