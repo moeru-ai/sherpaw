@@ -10,6 +10,13 @@ docker run --platform linux/amd64 \
   -e SHERPA_ONNX_WASM_ASR_EXPORT_ES6=ON \
   --entrypoint /bin/bash \
   emscripten/emsdk \
-  -lc 'emcc -v && \
-       cd /opt/sherpa-onnx && \
-       /opt/sherpa-onnx/build-wasm-simd-asr.sh'
+  -lc 'cd /opt/sherpa-onnx/wasm/asr && \
+       "$(dirname "$(which emcc)")/tools/file_packager" \
+         preload.data \
+         --preload assets@. \
+         --js-output=preload.js \
+         --separate-metadata \
+         --export-es6 && \
+       mv preload.data /opt/sherpa-onnx/build-wasm-simd-asr/install/bin/wasm/asr/preload.data && \
+       mv preload.js /opt/sherpa-onnx/build-wasm-simd-asr/install/bin/wasm/asr/preload.js && \
+       mv preload.js.metadata /opt/sherpa-onnx/build-wasm-simd-asr/install/bin/wasm/asr/preload.js.metadata'

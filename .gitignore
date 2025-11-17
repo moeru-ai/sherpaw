@@ -150,6 +150,7 @@ build/
 models/
 !models/**/build.sh
 !models/**/download.sh
+!models/**/pack.sh
 *.onnx
 *.pb
 *.pt
