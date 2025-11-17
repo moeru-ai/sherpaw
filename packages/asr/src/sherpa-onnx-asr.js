@@ -588,6 +588,12 @@ function initSherpaOnnxOnlineRecognizerConfig(config, Module) {
   }
 }
 
+/**
+ *
+ * @param {import('@sherpa-onnx-wasm/shared').WebAssemblyModule} Module
+ * @param {import('./sherpa-onnx-asr').OnlineRecognizerConfig} myConfig
+ * @returns
+ */
 function createOnlineRecognizer(Module, myConfig) {
   const onlineTransducerModelConfig = {
     encoder: '',

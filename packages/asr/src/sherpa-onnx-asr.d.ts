@@ -153,4 +153,4 @@ export class OnlineRecognizer {
  * Convenience factory. Creates an OnlineRecognizer using the provided Emscripten Module
  * and optional config. Returns an OnlineRecognizer instance.
  */
-export function createOnlineRecognizer(Module: any, myConfig?: OnlineRecognizerConfig): OnlineRecognizer
+export function createOnlineRecognizer(Module: import('@sherpa-onnx-wasm/shared').WebAssemblyModule, myConfig?: OnlineRecognizerConfig): OnlineRecognizer
