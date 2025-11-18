@@ -16,6 +16,7 @@ words:
   - Fsts
   - HEAPF
   - hotwords
+  - iconify
   - Nemo
   - onnx
   - paraformer
@@ -23,6 +24,7 @@ words:
   - Tdnn
   - tele
   - tsdown
+  - unplugin
   - vueuse
   - Wenet
   - worklet
