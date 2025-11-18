@@ -1,5 +1,6 @@
-// Type declarations for the JS implementation in `sherpa-onnx-asr.js`
-// Generated from the implementation in the repository.
+// Inferred types from JavaScript. Verify before use.
+
+import type { WebAssemblyModule } from '@sherpa-onnx-wasm/shared'
 
 export interface FeatureConfig {
   sampleRate?: number
@@ -153,4 +154,4 @@ export class OnlineRecognizer {
  * Convenience factory. Creates an OnlineRecognizer using the provided Emscripten Module
  * and optional config. Returns an OnlineRecognizer instance.
  */
-export function createOnlineRecognizer(Module: import('@sherpa-onnx-wasm/shared').WebAssemblyModule, myConfig?: OnlineRecognizerConfig): OnlineRecognizer
+export function createOnlineRecognizer(Module: WebAssemblyModule, myConfig?: OnlineRecognizerConfig): OnlineRecognizer
