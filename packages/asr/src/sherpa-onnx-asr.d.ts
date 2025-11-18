@@ -73,15 +73,67 @@ export interface OfflineLMConfig {
   scale?: number
 }
 
+export interface WhisperModelConfig {
+  encoder?: string
+  decoder?: string
+  language?: string
+  task?: string
+  tailPaddings?: number
+}
+
+export interface CanaryModelConfig {
+  encoder?: string
+  decoder?: string
+  srcLang?: string
+  tgtLang?: string
+  usePnc?: number
+}
+
+export interface MoonshineModelConfig {
+  preprocessor?: string
+  encoder?: string
+  uncachedDecoder?: string
+  cachedDecoder?: string
+}
+
+export interface SenseVoiceModelConfig {
+  model?: string
+  language?: string
+  useInverseTextNormalization?: number
+}
+
+export interface FireRedAsrModelConfig {
+  encoder?: string
+  decoder?: string
+}
+
+export interface DolphinModelConfig {
+  model?: string
+}
+
+export interface ZipformerCtcModelConfig {
+  model?: string
+}
+
+export interface WenetCtcModelConfig {
+  model?: string
+}
+
+export interface TdnnModelConfig {
+  model?: string
+}
+
 export interface OfflineModelConfig extends OnlineModelConfig {
   // offline-specific optional models
-  whisper?: {
-    encoder?: string
-    decoder?: string
-    language?: string
-    task?: string
-    tailPaddings?: number
-  }
+  whisper?: WhisperModelConfig
+  canary?: CanaryModelConfig
+  moonshine?: MoonshineModelConfig
+  senseVoice?: SenseVoiceModelConfig
+  fireRedAsr?: FireRedAsrModelConfig
+  dolphin?: DolphinModelConfig
+  zipformerCtc?: ZipformerCtcModelConfig
+  wenetCtc?: WenetCtcModelConfig
+  tdnn?: TdnnModelConfig
   // other optional offline-specific entries are represented by SimpleModelConfig above
 }
 
