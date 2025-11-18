@@ -202,8 +202,42 @@ export class OnlineRecognizer {
   getResult(stream: OnlineStream): any
 }
 
-/**
- * Convenience factory. Creates an OnlineRecognizer using the provided Emscripten Module
- * and optional config. Returns an OnlineRecognizer instance.
- */
+export interface InitResult {
+  buffer?: number
+  ptr: number
+  len: number
+  [key: string]: any
+}
+
+export type Config = OnlineModelConfig | OnlineRecognizerConfig | OfflineModelConfig | OfflineRecognizerConfig
+
+export function freeConfig(config: Config, Module: any): void
+
+export function initSherpaOnnxOnlineTransducerModelConfig(config: TransducerModelConfig, Module: any): InitResult
+export function initSherpaOnnxOnlineParaformerModelConfig(config: ParaformerModelConfig, Module: any): InitResult
+export function initSherpaOnnxOnlineZipformer2CtcModelConfig(config: SimpleModelConfig, Module: any): InitResult
+export function initSherpaOnnxOnlineNemoCtcModelConfig(config: SimpleModelConfig, Module: any): InitResult
+export function initSherpaOnnxOnlineToneCtcModelConfig(config: SimpleModelConfig, Module: any): InitResult
+export function initSherpaOnnxOnlineModelConfig(config: OnlineModelConfig, Module: any): InitResult
+export function initSherpaOnnxFeatureConfig(config: FeatureConfig, Module: any): InitResult
+export function initSherpaOnnxHomophoneReplacerConfig(config: HomophoneReplacerConfig, Module: any): InitResult
+export function initSherpaOnnxOnlineCtcFstDecoderConfig(config: CtcFstDecoderConfig, Module: any): InitResult
+export function initSherpaOnnxOnlineRecognizerConfig(config: OnlineRecognizerConfig, Module: any): InitResult
+
+export function initSherpaOnnxOfflineTransducerModelConfig(config: TransducerModelConfig, Module: any): InitResult
+export function initSherpaOnnxOfflineParaformerModelConfig(config: SimpleModelConfig, Module: any): InitResult
+export function initSherpaOnnxOfflineNemoEncDecCtcModelConfig(config: SimpleModelConfig, Module: any): InitResult
+export function initSherpaOnnxOfflineDolphinModelConfig(config: SimpleModelConfig, Module: any): InitResult
+export function initSherpaOnnxOfflineZipformerCtcModelConfig(config: SimpleModelConfig, Module: any): InitResult
+export function initSherpaOnnxOfflineWenetCtcModelConfig(config: SimpleModelConfig, Module: any): InitResult
+export function initSherpaOnnxOfflineWhisperModelConfig(config: WhisperModelConfig, Module: any): InitResult
+export function initSherpaOnnxOfflineCanaryModelConfig(config: CanaryModelConfig, Module: any): InitResult
+export function initSherpaOnnxOfflineMoonshineModelConfig(config: MoonshineModelConfig, Module: any): InitResult
+export function initSherpaOnnxOfflineFireRedAsrModelConfig(config: FireRedAsrModelConfig, Module: any): InitResult
+export function initSherpaOnnxOfflineTdnnModelConfig(config: TdnnModelConfig, Module: any): InitResult
+export function initSherpaOnnxOfflineSenseVoiceModelConfig(config: SenseVoiceModelConfig, Module: any): InitResult
+export function initSherpaOnnxOfflineLMConfig(config: OfflineLMConfig, Module: any): InitResult
+export function initSherpaOnnxOfflineModelConfig(config: OfflineModelConfig, Module: any): InitResult
+export function initSherpaOnnxOfflineRecognizerConfig(config: OfflineRecognizerConfig, Module: any): InitResult
+
 export function createOnlineRecognizer(Module: WebAssemblyModule, myConfig?: OnlineRecognizerConfig): OnlineRecognizer
