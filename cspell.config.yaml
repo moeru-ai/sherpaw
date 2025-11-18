@@ -1,19 +1,31 @@
 version: "0.2"
-ignorePaths: []
+ignorePaths:
+  - packages/asr/src/sherpa-onnx-wasm-main-asr.js
+  - packages/speaker-diarization/src/sherpa-onnx-wasm-main-speaker-diarization.js
 dictionaryDefinitions: []
 dictionaries: []
 words:
   - audioworklet
   - bumpp
+  - cjkchar
   - downsample
   - emcc
   - emscripten
   - emsdk
+  - Fars
+  - Fsts
+  - HEAPF
+  - hotwords
+  - Nemo
   - onnx
   - paraformer
   - reka
+  - Tdnn
+  - tele
   - tsdown
   - vueuse
+  - Wenet
   - worklet
+  - zipformer
 ignoreWords: []
 import: []
