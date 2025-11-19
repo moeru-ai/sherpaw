@@ -624,7 +624,10 @@ function createOnlineRecognizer(Module, myConfig) {
     model: '',
   }
 
-  let type = 0
+  let type = myConfig?.type || 0
+  if (myConfig?.type != null) {
+    delete myConfig?.type
+  }
 
   switch (type) {
     case 0:
