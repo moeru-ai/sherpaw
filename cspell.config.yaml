@@ -1,4 +1,4 @@
-version: "0.2"
+version: '0.2'
 ignorePaths:
   - packages/asr/src/sherpa-onnx-wasm-main-asr.js
   - packages/speaker-diarization/src/sherpa-onnx-wasm-main-speaker-diarization.js
@@ -7,7 +7,9 @@ dictionaries: []
 words:
   - audioworklet
   - bumpp
+  - ccall
   - cjkchar
+  - cwrap
   - downsample
   - emcc
   - emscripten
@@ -15,6 +17,7 @@ words:
   - Fars
   - Fsts
   - HEAPF
+  - HEAPU
   - hotwords
   - iconify
   - Nemo
