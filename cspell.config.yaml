@@ -14,15 +14,20 @@ words:
   - emcc
   - emscripten
   - emsdk
+  - endforeach
   - Fars
   - Fsts
   - HEAPF
   - HEAPU
   - hotwords
   - iconify
+  - LIBSTDCPP
+  - Makito
+  - malloc
   - Nemo
   - onnx
   - paraformer
+  - PORTAUDIO
   - reka
   - Tdnn
   - tele
