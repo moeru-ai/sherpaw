@@ -3,3 +3,6 @@
 	url = https://github.com/sumimakito/sherpa-onnx.git
 	branch = feat/wasm-selective-preload
 	shallow = true
+[submodule "sherpa-onnx/upstream"]
+	path = sherpa-onnx/upstream
+	url = https://github.com/k2-fsa/sherpa-onnx.git
