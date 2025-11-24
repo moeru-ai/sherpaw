@@ -1,4 +1,5 @@
-function(set_emcc_flags flag_output exported_functions exported_runtime_methods)
+# Add necessary flags for emcc.
+function(set_emcc_flags var_name exported_functions exported_runtime_methods)
 	set(_exported_functions)
 
 	foreach(x IN LISTS exported_functions)
@@ -18,9 +19,11 @@ function(set_emcc_flags flag_output exported_functions exported_runtime_methods)
 	string(APPEND flags " -sSTACK_SIZE=10485760 ") # 10MB
 	string(APPEND flags " -sEXPORTED_FUNCTIONS=[_malloc,_free,${_exported_functions}] ")
 	string(APPEND flags " -sEXPORTED_RUNTIME_METHODS=[${_exported_runtime_methods}] ")
-	set(${flag_output} "${flags}" PARENT_SCOPE)
+	set(${var_name} "${flags}" PARENT_SCOPE)
 endfunction()
 
+# Plan a build for a given executable name.
+# Must call this function in a direct subdirectory relative to the root CMakeLists.txt.
 function(plan_build name)
 	add_executable(${name} ../sherpa-onnx-wasm-main.cc)
 	target_link_libraries(${name} sherpa-onnx-c-api)
