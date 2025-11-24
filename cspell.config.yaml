@@ -15,6 +15,7 @@ words:
   - emscripten
   - emsdk
   - endforeach
+  - endfunction
   - Fars
   - Fsts
   - HEAPF

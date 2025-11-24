@@ -61,4 +61,6 @@ cmake \
 make -j2
 make install
 
-ls -lh install/bin/wasm
+pushd install/bin/wasm
+find . -type f | xargs ls -lh
+popd
