@@ -1,5 +1,5 @@
 {
-  "name": "@sherpa-onnx-wasm/workspace",
+  "name": "@sherpaw/workspace",
   "type": "module",
   "version": "0.0.1",
   "private": true,
@@ -9,7 +9,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sumimakito/sherpa-onnx-wasm-es.git"
+    "url": "git+https://github.com/sumimakito/sherpaw.git"
   },
   "keywords": [],
   "exports": {

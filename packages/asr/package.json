@@ -1,14 +1,14 @@
 {
-  "name": "@sherpa-onnx-wasm/asr",
+  "name": "@sherpaw/asr",
   "type": "module",
   "version": "0.0.1",
-  "packageManager": "pnpm@10.18.2",
   "description": "",
   "author": "Makito <i@maki.to>",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sumimakito/sherpa-onnx-wasm.git"
+    "url": "git+https://github.com/sumimakito/sherpaw.git",
+    "directory": "packages/asr"
   },
   "keywords": [],
   "exports": {
@@ -26,9 +26,9 @@
     "build": "tsdown"
   },
   "devDependencies": {
-    "@sherpa-onnx-wasm/asr": "workspace:^",
-    "@sherpa-onnx-wasm/preloader": "workspace:^",
-    "@sherpa-onnx-wasm/shared": "workspace:^",
+    "@sherpaw/asr": "workspace:^",
+    "@sherpaw/preloader": "workspace:^",
+    "@sherpaw/shared": "workspace:^",
     "@types/emscripten": "^1.41.5",
     "tsdown": "^0.15.12",
     "typescript": "^5.9.3"

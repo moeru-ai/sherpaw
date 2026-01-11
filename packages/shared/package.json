@@ -1,14 +1,14 @@
 {
-  "name": "@sherpa-onnx-wasm/shared",
+  "name": "@sherpaw/shared",
   "type": "module",
   "version": "0.0.1",
-  "packageManager": "pnpm@10.18.2",
   "description": "",
   "author": "Makito <i@maki.to>",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sumimakito/sherpa-onnx-wasm.git"
+    "url": "git+https://github.com/sumimakito/sherpaw.git",
+    "directory": "packages/shared"
   },
   "keywords": [],
   "exports": {

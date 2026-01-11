@@ -29,13 +29,13 @@ importers:
 
   packages/asr:
     devDependencies:
-      '@sherpa-onnx-wasm/asr':
+      '@sherpaw/asr':
         specifier: workspace:^
         version: 'link:'
-      '@sherpa-onnx-wasm/preloader':
+      '@sherpaw/preloader':
         specifier: workspace:^
         version: link:../preloader
-      '@sherpa-onnx-wasm/shared':
+      '@sherpaw/shared':
         specifier: workspace:^
         version: link:../shared
       '@types/emscripten':
@@ -53,7 +53,7 @@ importers:
       '@antfu/eslint-config':
         specifier: ^6.2.0
         version: 6.2.0(@vue/compiler-sfc@3.5.22)(eslint@9.38.0(jiti@2.6.1))(typescript@5.9.3)
-      '@sherpa-onnx-wasm/shared':
+      '@sherpaw/shared':
         specifier: workspace:^
         version: link:../shared
       '@types/emscripten':
@@ -77,10 +77,10 @@ importers:
       '@iconify-json/ri':
         specifier: ^1.2.6
         version: 1.2.6
-      '@sherpa-onnx-wasm/asr':
+      '@sherpaw/asr':
         specifier: workspace:^
         version: link:../asr
-      '@sherpa-onnx-wasm/preloader':
+      '@sherpaw/preloader':
         specifier: workspace:^
         version: link:../preloader
       '@tsconfig/strictest':
@@ -158,10 +158,10 @@ importers:
 
   packages/speaker-diarization:
     devDependencies:
-      '@sherpa-onnx-wasm/preloader':
+      '@sherpaw/preloader':
         specifier: workspace:^
         version: link:../preloader
-      '@sherpa-onnx-wasm/shared':
+      '@sherpaw/shared':
         specifier: workspace:^
         version: link:../shared
       '@types/emscripten':

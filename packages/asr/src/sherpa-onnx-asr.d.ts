@@ -1,6 +1,6 @@
 // Inferred types from JavaScript. Verify before use.
 
-import type { WebAssemblyModule } from '@sherpa-onnx-wasm/shared'
+import type { WebAssemblyModule } from '@sherpaw/shared'
 
 export interface FeatureConfig {
   sampleRate?: number

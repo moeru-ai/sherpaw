@@ -1,4 +1,4 @@
-import type { WebAssemblyModule } from '@sherpa-onnx-wasm/shared'
+import type { WebAssemblyModule } from '@sherpaw/shared'
 import type { Data, DataMetadata, VirtualData } from './types'
 
 export * from './types'

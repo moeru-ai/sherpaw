@@ -1,13 +1,13 @@
-import type { ASRModule } from '@sherpa-onnx-wasm/asr'
-import type { Metadata } from '@sherpa-onnx-wasm/preloader'
-import { initASRModule } from '@sherpa-onnx-wasm/asr'
-import wasmUrl from '@sherpa-onnx-wasm/asr/module.wasm?url'
-import { loadData } from '@sherpa-onnx-wasm/preloader'
+import type { ASRModule } from '@sherpaw/asr'
+import type { DataMetadata } from '@sherpaw/preloader'
+import { initASRModule } from '@sherpaw/asr'
+import wasmUrl from '@sherpaw/asr/module.wasm?url'
+import { loadData } from '@sherpaw/preloader'
 import { createInjectionState } from '@vueuse/core'
 import { shallowRef } from 'vue'
 
 const [provideASRStore, _useASRStore] = createInjectionState(() => {
-  const metadata = shallowRef<Metadata>()
+  const metadata = shallowRef<DataMetadata>()
   const data = shallowRef<ArrayBuffer>()
 
   const asrModule = shallowRef<ASRModule>()

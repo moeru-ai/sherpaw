@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { AudioProcessorMessage } from '../audio-processor.protocol'
-import { createOnlineRecognizer } from '@sherpa-onnx-wasm/asr'
+import { createOnlineRecognizer } from '@sherpaw/asr'
 import { PopoverArrow, PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue'
 import audioProcessor from '../audio-processor.worklet?url'
