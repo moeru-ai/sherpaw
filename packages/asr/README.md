@@ -1,6 +1,8 @@
 # @sherpaw/asr
 
-A WebAssembly (WASM) wrapper for ASR-related features from [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx) using onnxruntime **purely locally**.
+A WebAssembly (WASM) wrapper for ASR-related features.
+
+> [**Sherpaw**](https://github.com/sumimakito/sherpaw) (the "w" stands for "WASM") is a WebAssembly (WASM) wrapper for [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx)—a framework for speech-related tasks (ASR, VAD, TTS, STT, SD, etc.) using onnxruntime **purely locally**.
 
 ## License
 
