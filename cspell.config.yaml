@@ -1,4 +1,4 @@
-version: "0.2"
+version: '0.2'
 ignorePaths:
   - packages/asr/src/sherpa-onnx-wasm-main-asr.js
   - packages/speaker-diarization/src/sherpa-onnx-wasm-main-speaker-diarization.js
@@ -6,6 +6,7 @@ dictionaryDefinitions: []
 dictionaries: []
 words:
   - audioworklet
+  - Ayaka
   - bumpp
   - ccall
   - cjkchar
@@ -25,6 +26,7 @@ words:
   - LIBSTDCPP
   - Makito
   - malloc
+  - Neko
   - Nemo
   - onnx
   - paraformer

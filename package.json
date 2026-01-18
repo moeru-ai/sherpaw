@@ -5,7 +5,23 @@
   "private": true,
   "packageManager": "pnpm@10.18.2",
   "description": "",
-  "author": "Makito <i@maki.to>",
+  "author": {
+    "name": "Makito",
+    "email": "i@maki.to",
+    "url": "http://github.com/sumimakito"
+  },
+  "contributors": [
+    {
+      "name": "Makito",
+      "email": "i@maki.to",
+      "url": "http://github.com/sumimakito"
+    },
+    {
+      "name": "Neko Ayaka",
+      "email": "neko@ayaka.moe",
+      "url": "https://github.com/nekomeowww"
+    }
+  ],
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
