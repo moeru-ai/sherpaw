@@ -15,7 +15,8 @@ function(set_emcc_flags var_name exported_functions exported_runtime_methods)
 	list(JOIN _exported_functions "," _exported_functions)
 	list(JOIN _exported_runtime_methods "," _exported_runtime_methods)
 
-	set(flags " -s FORCE_FILESYSTEM=1 -s INITIAL_MEMORY=512MB -s ALLOW_MEMORY_GROWTH=1 -sMODULARIZE=1 -sEXPORT_ES6=1")
+	# FORCE_FILESYSTEM: Forces the full filesystem API to be supported from JS.
+	set(flags " -sFORCE_FILESYSTEM=1 -sINITIAL_MEMORY=512MB -sALLOW_MEMORY_GROWTH=1 -sMODULARIZE=1 -sEXPORT_ES6=1")
 	string(APPEND flags " -sSTACK_SIZE=10485760 ") # 10MB
 	string(APPEND flags " -sEXPORTED_FUNCTIONS=[_malloc,_free,${_exported_functions}] ")
 	string(APPEND flags " -sEXPORTED_RUNTIME_METHODS=[${_exported_runtime_methods}] ")
