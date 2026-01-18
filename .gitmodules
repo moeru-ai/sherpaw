@@ -5,4 +5,6 @@
 	shallow = true
 [submodule "sherpa-onnx/upstream"]
 	path = sherpa-onnx/upstream
-	url = https://github.com/k2-fsa/sherpa-onnx.git
+	url = https://github.com/k2-fsa/sherpa-onnx
+	branch = master
+	shallow = true
