@@ -1,4 +1,6 @@
-# Sherpa-ONNX WASM ASR
+# @sherpaw/asr
+
+A WebAssembly (WASM) wrapper for ASR-related features from [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx) using onnxruntime **purely locally**.
 
 ## License
 

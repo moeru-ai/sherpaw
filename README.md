@@ -1,4 +1,6 @@
-# Sherpa ONNX WASM Kit
+# SherpaW<sup>ASM</sup> 🐾
+
+**SherpaW** (the "W" stands for "WASM") is a WebAssembly (WASM) wrapper for [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx)—a framework for speech-related tasks (ASR, VAD, TTS, STT, SD, etc.) using onnxruntime **purely locally**.
 
 ## Development
 

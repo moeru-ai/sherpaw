@@ -29,10 +29,12 @@ words:
   - Neko
   - Nemo
   - onnx
+  - onnxruntime
   - paraformer
   - PORTAUDIO
   - reka
   - sherpaw
+  - sumimakito
   - Tdnn
   - tele
   - tsdown
