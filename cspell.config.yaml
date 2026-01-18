@@ -1,16 +1,23 @@
 version: '0.2'
 ignorePaths:
+  - '**/build/**/*'
+  - '**/dist/**/*'
   - packages/asr/src/sherpa-onnx-wasm-main-asr.js
   - packages/speaker-diarization/src/sherpa-onnx-wasm-main-speaker-diarization.js
+  - pnpm-lock.yaml
+  - sherpa-onnx/upstream/**/*
+  - upstream/**/*
 dictionaryDefinitions: []
 dictionaries: []
 words:
+  - Attributify
   - audioworklet
   - Ayaka
   - bumpp
   - ccall
   - cjkchar
   - cwrap
+  - demi
   - downsample
   - emcc
   - emscripten
@@ -28,20 +35,24 @@ words:
   - malloc
   - Neko
   - Nemo
+  - npmjs
   - onnx
   - onnxruntime
   - paraformer
   - PORTAUDIO
+  - Pyannote
   - reka
   - sherpaw
   - sumimakito
   - Tdnn
   - tele
   - tsdown
+  - unocss
   - unplugin
   - vueuse
   - Wenet
   - worklet
+  - xlink
   - zipformer
 ignoreWords: []
 import: []
