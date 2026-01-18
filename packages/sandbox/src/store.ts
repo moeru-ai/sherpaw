@@ -17,7 +17,11 @@ const [provideASRStore, _useASRStore] = createInjectionState(() => {
       return
 
     const asr = await initASRModule({ locateFile: () => wasmUrl })
-    loadData(asr, metadata.value, data.value, 'asr')
+    loadData({
+      module: asr,
+      metadata: metadata.value,
+      data: data.value,
+    })
     asrModule.value = asr
 
     return asr

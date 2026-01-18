@@ -1,5 +1,5 @@
-import type { WebAssemblyModule } from '@sherpaw/shared'
-import type { Data, DataMetadata, VirtualData } from './types'
+import type { Data, LoadDataOptions, LoadVirtualDataOptions } from './types'
+import { nanoid } from 'nanoid'
 
 export * from './types'
 
@@ -13,13 +13,15 @@ function dataToBytes(data: Data): Uint8Array {
   return new TextEncoder().encode(String(data))
 }
 
-export function loadData(
-  module: WebAssemblyModule,
-  metadata: DataMetadata,
-  data: Data,
-  dependencyId: string,
-  parent: string | FS.FSNode = '/',
-) {
+export function loadData(options: LoadDataOptions) {
+  const {
+    module,
+    metadata,
+    data,
+    parent = '/',
+    dependencyId = `load_data_${nanoid()}`,
+  } = options
+
   function createDataFiles() {
     const bytes = dataToBytes(data)
     for (const { filename, start, end } of metadata.files) {
@@ -43,12 +45,14 @@ export function loadData(
 /**
  * Load "virtual" data without the need to pre-pack it with emsdk.
  */
-export function loadVirtualData(
-  module: WebAssemblyModule,
-  virtualData: VirtualData,
-  dependencyId: string,
-  parent: string | FS.FSNode = '/',
-) {
+export function loadVirtualData(options: LoadVirtualDataOptions) {
+  const {
+    module,
+    virtualData,
+    parent = '/',
+    dependencyId = `load_virtual_data_${nanoid()}`,
+  } = options
+
   function createDataFiles() {
     for (const vf of virtualData.files) {
       module.FS_createDataFile(parent, vf.filename, dataToBytes(vf.data), true, true, true)

@@ -30,6 +30,7 @@
     "@types/emscripten": "^1.41.5",
     "bumpp": "^10.3.1",
     "eslint": "^9.38.0",
+    "nanoid": "^5.1.6",
     "tsdown": "^0.15.12",
     "typescript": "^5.9.3"
   }

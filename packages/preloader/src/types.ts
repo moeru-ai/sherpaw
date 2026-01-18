@@ -1,3 +1,5 @@
+import type { WebAssemblyModule } from '@sherpaw/shared'
+
 export type Data = ArrayBuffer | Uint8Array | string
 
 export interface FileMetadata {
@@ -20,4 +22,19 @@ export interface VirtualFile {
 
 export interface VirtualData {
   files: VirtualFile[]
+}
+
+interface BaseLoadDataOptions {
+  module: WebAssemblyModule
+  parent?: string | FS.FSNode
+  dependencyId?: string
+}
+
+export interface LoadDataOptions extends BaseLoadDataOptions {
+  metadata: DataMetadata
+  data: Data
+}
+
+export interface LoadVirtualDataOptions extends BaseLoadDataOptions {
+  virtualData: VirtualData
 }

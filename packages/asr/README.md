@@ -35,7 +35,11 @@ async function setupRecognizer(): OnlineRecognizer {
 
   // Provide the path to the WASM file and initialize the ASR module
   const asr = await initASRModule({ locateFile: () => asrWASMFile })
-  loadData(asr, metadata, data, 'my-asr') // 'my-asr' is an identifier only for internal Emscripten use to ensure model data is loaded before using it
+  loadData({
+    module: asr,
+    metadata,
+    data,
+  })
 
   // Create an online recognizer
   return createOnlineRecognizer(asr)
