@@ -27,7 +27,7 @@
     "build": "pnpm -r run build",
     "lint:fix": "eslint --cache . --fix",
     "lint": "eslint --cache .",
-    "publish:lib": "pnpm -F {./packages} publish --access public --no-git-checks"
+    "publish:lib": "pnpm -r publish --access public --no-git-checks"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^6.2.0",
