@@ -10,6 +10,29 @@ git submodule init
 git submodule update
 ```
 
+## Development at the WASM/C level
+
+### Prerequisites
+
+Follow Sherpa-ONNX's [Install Emscripten](https://k2-fsa.github.io/sherpa/onnx/wasm/install-emscripten.html#install-emscripten) and Emscripten's [Download and install](https://emscripten.org/docs/getting_started/downloads) guides to set up the Emscripten SDK.
+
+> [!IMPORTANT]
+> Some versions of Emscripten may be incompatible with Sherpa-ONNX. Ensure you follow their official documentation and use the recommended version.
+
+### Build
+
+```shell
+# Assuming Emscripten 3.1.64 is used
+# Refer to the documentation above when selecting a version
+./emsdk install 3.1.64
+./emsdk activate 3.1.64
+
+cd sherpa-onnx
+./build.sh
+```
+
+The build outputs are located in `sherpa-onnx/build/install/bin/wasm/`.
+
 ## License
 
 ```
