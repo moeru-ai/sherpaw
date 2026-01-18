@@ -23,7 +23,11 @@
     "dist"
   ],
   "scripts": {
-    "build": "pnpm -r run build"
+    "dev": "pnpm -F @sherpaw/sandbox dev",
+    "build": "pnpm -r run build",
+    "lint:fix": "eslint --cache . --fix",
+    "lint": "eslint --cache .",
+    "publish:lib": "pnpm -F {./packages/lib} publish --access public --no-git-checks"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^6.2.0",
