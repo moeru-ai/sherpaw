@@ -35,6 +35,6 @@ function(plan_build name)
 		"$<TARGET_FILE_DIR:${name}>/${name}.js"
 		"$<TARGET_FILE_DIR:${name}>/${name}.wasm"
 		DESTINATION
-		bin/wasm/${name}
+		"${PROJECT_SOURCE_DIR}/../packages/${name}/src/prebuilt"
 	)
 endfunction()
