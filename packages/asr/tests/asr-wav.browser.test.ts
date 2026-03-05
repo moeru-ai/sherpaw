@@ -1,7 +1,6 @@
 import { loadVirtualData } from '@sherpaw/preloader'
 import { expect, it } from 'vitest'
 import { createOnlineRecognizer, initASRModule } from '../src/index'
-import wasmUrl from '../src/prebuilt/asr.wasm?url'
 import { decodeWavPcm16, encodeWavPcm16 } from './helpers/wav'
 
 it('runs in a browser context', () => {
@@ -40,9 +39,7 @@ it('transcribes wav samples with the browser asr pipeline', async () => {
   const wavBuffer = encodeWavPcm16(pcmSamples, 16000)
   const wavData = decodeWavPcm16(wavBuffer)
 
-  const asrModule = await initASRModule({
-    locateFile: () => wasmUrl,
-  })
+  const asrModule = await initASRModule()
   if (!asrModule?.addRunDependency) {
     throw new Error('ASR module failed to initialize for browser test')
   }
