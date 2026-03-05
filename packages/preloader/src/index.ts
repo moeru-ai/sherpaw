@@ -1,5 +1,5 @@
 import type { Data, LoadDataOptions, LoadVirtualDataOptions } from './types'
-import { nanoid } from 'nanoid'
+import { nanoid } from 'nanoid/non-secure'
 
 export * from './types'
 
