@@ -160,3 +160,6 @@ models/
 # Audio binaries
 *.wav
 *.mp3
+
+packages/*/tests/model/**/*
+packages/*/tests/fixtures/**/*
