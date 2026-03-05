@@ -5,6 +5,7 @@ cd $(dirname "$0")
 
 # https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models
 curl -Lv -o model.tar.bz2 https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-paraformer-bilingual-zh-en.tar.bz2
+rm -rf model
 mkdir model
 tar -xzf model.tar.bz2 -C model --strip-components=1
 
