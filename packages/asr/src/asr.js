@@ -1,6 +1,6 @@
 // @ts-nocheck
 
-/** @type {import('./sherpa-onnx-asr')['freeConfig']} */
+/** @type {import('./asr')['freeConfig']} */
 function freeConfig(config, Module) {
   if ('buffer' in config) {
     Module._free(config.buffer)
@@ -90,7 +90,7 @@ function freeConfig(config, Module) {
 }
 
 // The user should free the returned pointers
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxOnlineTransducerModelConfig']} */
+/** @type {import('./asr')['initSherpaOnnxOnlineTransducerModelConfig']} */
 function initSherpaOnnxOnlineTransducerModelConfig(config, Module) {
   const encoderLen = Module.lengthBytesUTF8(config.encoder || '') + 1
   const decoderLen = Module.lengthBytesUTF8(config.decoder || '') + 1
@@ -128,7 +128,7 @@ function initSherpaOnnxOnlineTransducerModelConfig(config, Module) {
   }
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxOnlineParaformerModelConfig']} */
+/** @type {import('./asr')['initSherpaOnnxOnlineParaformerModelConfig']} */
 function initSherpaOnnxOnlineParaformerModelConfig(config, Module) {
   const encoderLen = Module.lengthBytesUTF8(config.encoder || '') + 1
   const decoderLen = Module.lengthBytesUTF8(config.decoder || '') + 1
@@ -158,7 +158,7 @@ function initSherpaOnnxOnlineParaformerModelConfig(config, Module) {
   }
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxOnlineZipformer2CtcModelConfig']} */
+/** @type {import('./asr')['initSherpaOnnxOnlineZipformer2CtcModelConfig']} */
 function initSherpaOnnxOnlineZipformer2CtcModelConfig(config, Module) {
   const n = Module.lengthBytesUTF8(config.model || '') + 1
   const buffer = Module._malloc(n)
@@ -177,7 +177,7 @@ function initSherpaOnnxOnlineZipformer2CtcModelConfig(config, Module) {
   }
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxOnlineNemoCtcModelConfig']} */
+/** @type {import('./asr')['initSherpaOnnxOnlineNemoCtcModelConfig']} */
 function initSherpaOnnxOnlineNemoCtcModelConfig(config, Module) {
   const n = Module.lengthBytesUTF8(config.model || '') + 1
   const buffer = Module._malloc(n)
@@ -196,7 +196,7 @@ function initSherpaOnnxOnlineNemoCtcModelConfig(config, Module) {
   }
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxOnlineToneCtcModelConfig']} */
+/** @type {import('./asr')['initSherpaOnnxOnlineToneCtcModelConfig']} */
 function initSherpaOnnxOnlineToneCtcModelConfig(config, Module) {
   const n = Module.lengthBytesUTF8(config.model || '') + 1
   const buffer = Module._malloc(n)
@@ -215,7 +215,7 @@ function initSherpaOnnxOnlineToneCtcModelConfig(config, Module) {
   }
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxOnlineModelConfig']} */
+/** @type {import('./asr')['initSherpaOnnxOnlineModelConfig']} */
 function initSherpaOnnxOnlineModelConfig(config, Module) {
   if (!('transducer' in config)) {
     config.transducer = {
@@ -387,7 +387,7 @@ function initSherpaOnnxOnlineModelConfig(config, Module) {
   }
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxFeatureConfig']} */
+/** @type {import('./asr')['initSherpaOnnxFeatureConfig']} */
 function initSherpaOnnxFeatureConfig(config, Module) {
   const len = 2 * 4 // 2 pointers
   const ptr = Module._malloc(len)
@@ -397,7 +397,7 @@ function initSherpaOnnxFeatureConfig(config, Module) {
   return { ptr, len }
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxHomophoneReplacerConfig']} */
+/** @type {import('./asr')['initSherpaOnnxHomophoneReplacerConfig']} */
 function initSherpaOnnxHomophoneReplacerConfig(config, Module) {
   const len = 3 * 4
   const ptr = Module._malloc(len)
@@ -428,7 +428,7 @@ function initSherpaOnnxHomophoneReplacerConfig(config, Module) {
   return { ptr, len, buffer }
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxOnlineCtcFstDecoderConfig']} */
+/** @type {import('./asr')['initSherpaOnnxOnlineCtcFstDecoderConfig']} */
 function initSherpaOnnxOnlineCtcFstDecoderConfig(config, Module) {
   const len = 2 * 4
   const ptr = Module._malloc(len)
@@ -442,7 +442,7 @@ function initSherpaOnnxOnlineCtcFstDecoderConfig(config, Module) {
   return { ptr, len, buffer }
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxOnlineRecognizerConfig']} */
+/** @type {import('./asr')['initSherpaOnnxOnlineRecognizerConfig']} */
 function initSherpaOnnxOnlineRecognizerConfig(config, Module) {
   if (!('featConfig' in config)) {
     config.featConfig = {
@@ -599,7 +599,7 @@ function initSherpaOnnxOnlineRecognizerConfig(config, Module) {
   }
 }
 
-/** @type {import('./sherpa-onnx-asr')['createOnlineRecognizer']} */
+/** @type {import('./asr')['createOnlineRecognizer']} */
 function createOnlineRecognizer(Module, myConfig) {
   const onlineTransducerModelConfig = {
     encoder: '',
@@ -700,7 +700,7 @@ function createOnlineRecognizer(Module, myConfig) {
   return new OnlineRecognizer(recognizerConfig, Module)
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxOfflineTransducerModelConfig']} */
+/** @type {import('./asr')['initSherpaOnnxOfflineTransducerModelConfig']} */
 function initSherpaOnnxOfflineTransducerModelConfig(config, Module) {
   const encoderLen = Module.lengthBytesUTF8(config.encoder || '') + 1
   const decoderLen = Module.lengthBytesUTF8(config.decoder || '') + 1
@@ -738,7 +738,7 @@ function initSherpaOnnxOfflineTransducerModelConfig(config, Module) {
   }
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxOfflineParaformerModelConfig']} */
+/** @type {import('./asr')['initSherpaOnnxOfflineParaformerModelConfig']} */
 function initSherpaOnnxOfflineParaformerModelConfig(config, Module) {
   const n = Module.lengthBytesUTF8(config.model || '') + 1
 
@@ -758,7 +758,7 @@ function initSherpaOnnxOfflineParaformerModelConfig(config, Module) {
   }
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxOfflineNemoEncDecCtcModelConfig']} */
+/** @type {import('./asr')['initSherpaOnnxOfflineNemoEncDecCtcModelConfig']} */
 function initSherpaOnnxOfflineNemoEncDecCtcModelConfig(config, Module) {
   const n = Module.lengthBytesUTF8(config.model || '') + 1
 
@@ -778,7 +778,7 @@ function initSherpaOnnxOfflineNemoEncDecCtcModelConfig(config, Module) {
   }
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxOfflineDolphinModelConfig']} */
+/** @type {import('./asr')['initSherpaOnnxOfflineDolphinModelConfig']} */
 function initSherpaOnnxOfflineDolphinModelConfig(config, Module) {
   const n = Module.lengthBytesUTF8(config.model || '') + 1
 
@@ -798,7 +798,7 @@ function initSherpaOnnxOfflineDolphinModelConfig(config, Module) {
   }
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxOfflineZipformerCtcModelConfig']} */
+/** @type {import('./asr')['initSherpaOnnxOfflineZipformerCtcModelConfig']} */
 function initSherpaOnnxOfflineZipformerCtcModelConfig(config, Module) {
   const n = Module.lengthBytesUTF8(config.model || '') + 1
 
@@ -818,7 +818,7 @@ function initSherpaOnnxOfflineZipformerCtcModelConfig(config, Module) {
   }
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxOfflineWenetCtcModelConfig']} */
+/** @type {import('./asr')['initSherpaOnnxOfflineWenetCtcModelConfig']} */
 function initSherpaOnnxOfflineWenetCtcModelConfig(config, Module) {
   const n = Module.lengthBytesUTF8(config.model || '') + 1
 
@@ -838,7 +838,7 @@ function initSherpaOnnxOfflineWenetCtcModelConfig(config, Module) {
   }
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxOfflineWhisperModelConfig']} */
+/** @type {import('./asr')['initSherpaOnnxOfflineWhisperModelConfig']} */
 function initSherpaOnnxOfflineWhisperModelConfig(config, Module) {
   const encoderLen = Module.lengthBytesUTF8(config.encoder || '') + 1
   const decoderLen = Module.lengthBytesUTF8(config.decoder || '') + 1
@@ -885,7 +885,7 @@ function initSherpaOnnxOfflineWhisperModelConfig(config, Module) {
   }
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxOfflineCanaryModelConfig']} */
+/** @type {import('./asr')['initSherpaOnnxOfflineCanaryModelConfig']} */
 function initSherpaOnnxOfflineCanaryModelConfig(config, Module) {
   const encoderLen = Module.lengthBytesUTF8(config.encoder || '') + 1
   const decoderLen = Module.lengthBytesUTF8(config.decoder || '') + 1
@@ -933,7 +933,7 @@ function initSherpaOnnxOfflineCanaryModelConfig(config, Module) {
   }
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxOfflineMoonshineModelConfig']} */
+/** @type {import('./asr')['initSherpaOnnxOfflineMoonshineModelConfig']} */
 function initSherpaOnnxOfflineMoonshineModelConfig(config, Module) {
   const preprocessorLen = Module.lengthBytesUTF8(config.preprocessor || '') + 1
   const encoderLen = Module.lengthBytesUTF8(config.encoder || '') + 1
@@ -994,7 +994,7 @@ function initSherpaOnnxOfflineMoonshineModelConfig(config, Module) {
   }
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxOfflineFireRedAsrModelConfig']} */
+/** @type {import('./asr')['initSherpaOnnxOfflineFireRedAsrModelConfig']} */
 function initSherpaOnnxOfflineFireRedAsrModelConfig(config, Module) {
   const encoderLen = Module.lengthBytesUTF8(config.encoder || '') + 1
   const decoderLen = Module.lengthBytesUTF8(config.decoder || '') + 1
@@ -1026,7 +1026,7 @@ function initSherpaOnnxOfflineFireRedAsrModelConfig(config, Module) {
   }
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxOfflineTdnnModelConfig']} */
+/** @type {import('./asr')['initSherpaOnnxOfflineTdnnModelConfig']} */
 function initSherpaOnnxOfflineTdnnModelConfig(config, Module) {
   const n = Module.lengthBytesUTF8(config.model || '') + 1
   const buffer = Module._malloc(n)
@@ -1045,7 +1045,7 @@ function initSherpaOnnxOfflineTdnnModelConfig(config, Module) {
   }
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxOfflineSenseVoiceModelConfig']} */
+/** @type {import('./asr')['initSherpaOnnxOfflineSenseVoiceModelConfig']} */
 function initSherpaOnnxOfflineSenseVoiceModelConfig(config, Module) {
   const modelLen = Module.lengthBytesUTF8(config.model || '') + 1
   const languageLen = Module.lengthBytesUTF8(config.language || '') + 1
@@ -1080,7 +1080,7 @@ function initSherpaOnnxOfflineSenseVoiceModelConfig(config, Module) {
   }
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxOfflineLMConfig']} */
+/** @type {import('./asr')['initSherpaOnnxOfflineLMConfig']} */
 function initSherpaOnnxOfflineLMConfig(config, Module) {
   const n = Module.lengthBytesUTF8(config.model || '') + 1
   const buffer = Module._malloc(n)
@@ -1099,7 +1099,7 @@ function initSherpaOnnxOfflineLMConfig(config, Module) {
   }
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxOfflineModelConfig']} */
+/** @type {import('./asr')['initSherpaOnnxOfflineModelConfig']} */
 function initSherpaOnnxOfflineModelConfig(config, Module) {
   if (!('transducer' in config)) {
     config.transducer = {
@@ -1368,7 +1368,7 @@ function initSherpaOnnxOfflineModelConfig(config, Module) {
   }
 }
 
-/** @type {import('./sherpa-onnx-asr')['initSherpaOnnxOfflineRecognizerConfig']} */
+/** @type {import('./asr')['initSherpaOnnxOfflineRecognizerConfig']} */
 function initSherpaOnnxOfflineRecognizerConfig(config, Module) {
   if (!('featConfig' in config)) {
     config.featConfig = {
