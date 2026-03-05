@@ -18,6 +18,10 @@ export interface ParaformerModelConfig {
   decoder?: string
 }
 
+export interface OfflineParaformerModelConfig {
+  model?: string
+}
+
 export interface SimpleModelConfig {
   model?: string
 }
@@ -63,6 +67,7 @@ export interface OnlineRecognizerConfig {
   ctcFstDecoderConfig?: CtcFstDecoderConfig
   ruleFsts?: string
   ruleFars?: string
+  blankPenalty?: number
   hotwordsBuf?: string
   hotwordsBufSize?: number
   hr?: HomophoneReplacerConfig
@@ -79,6 +84,8 @@ export interface WhisperModelConfig {
   language?: string
   task?: string
   tailPaddings?: number
+  enableTokenTimestamps?: number
+  enableSegmentTimestamps?: number
 }
 
 export interface CanaryModelConfig {
@@ -94,6 +101,7 @@ export interface MoonshineModelConfig {
   encoder?: string
   uncachedDecoder?: string
   cachedDecoder?: string
+  mergedDecoder?: string
 }
 
 export interface SenseVoiceModelConfig {
@@ -119,11 +127,40 @@ export interface WenetCtcModelConfig {
   model?: string
 }
 
+export interface OfflineOmnilingualAsrCtcModelConfig {
+  model?: string
+}
+
+export interface OfflineMedAsrCtcModelConfig {
+  model?: string
+}
+
+export interface OfflineFireRedAsrCtcModelConfig {
+  model?: string
+}
+
+export interface OfflineFunAsrNanoModelConfig {
+  encoderAdaptor?: string
+  llm?: string
+  embedding?: string
+  tokenizer?: string
+  systemPrompt?: string
+  userPrompt?: string
+  maxNewTokens?: number
+  temperature?: number
+  topP?: number
+  seed?: number
+  language?: string
+  itn?: number
+  hotwords?: string
+}
+
 export interface TdnnModelConfig {
   model?: string
 }
 
 export interface OfflineModelConfig extends OnlineModelConfig {
+  paraformer?: OfflineParaformerModelConfig
   // offline-specific optional models
   whisper?: WhisperModelConfig
   canary?: CanaryModelConfig
@@ -133,7 +170,12 @@ export interface OfflineModelConfig extends OnlineModelConfig {
   dolphin?: DolphinModelConfig
   zipformerCtc?: ZipformerCtcModelConfig
   wenetCtc?: WenetCtcModelConfig
+  omnilingual?: OfflineOmnilingualAsrCtcModelConfig
+  medasr?: OfflineMedAsrCtcModelConfig
+  fireRedAsrCtc?: OfflineFireRedAsrCtcModelConfig
+  funasrNano?: OfflineFunAsrNanoModelConfig
   tdnn?: TdnnModelConfig
+  teleSpeechCtc?: string
   // other optional offline-specific entries are represented by SimpleModelConfig above
 }
 
@@ -225,11 +267,15 @@ export function initSherpaOnnxOnlineCtcFstDecoderConfig(config: CtcFstDecoderCon
 export function initSherpaOnnxOnlineRecognizerConfig(config: OnlineRecognizerConfig, Module: any): InitResult
 
 export function initSherpaOnnxOfflineTransducerModelConfig(config: TransducerModelConfig, Module: any): InitResult
-export function initSherpaOnnxOfflineParaformerModelConfig(config: SimpleModelConfig, Module: any): InitResult
+export function initSherpaOnnxOfflineParaformerModelConfig(config: OfflineParaformerModelConfig, Module: any): InitResult
 export function initSherpaOnnxOfflineNemoEncDecCtcModelConfig(config: SimpleModelConfig, Module: any): InitResult
 export function initSherpaOnnxOfflineDolphinModelConfig(config: SimpleModelConfig, Module: any): InitResult
 export function initSherpaOnnxOfflineZipformerCtcModelConfig(config: SimpleModelConfig, Module: any): InitResult
 export function initSherpaOnnxOfflineWenetCtcModelConfig(config: SimpleModelConfig, Module: any): InitResult
+export function initSherpaOnnxOfflineOmnilingualAsrCtcModelConfig(config: OfflineOmnilingualAsrCtcModelConfig, Module: any): InitResult
+export function initSherpaOnnxOfflineMedAsrCtcModelConfig(config: OfflineMedAsrCtcModelConfig, Module: any): InitResult
+export function initSherpaOnnxOfflineFireRedAsrCtcModelConfig(config: OfflineFireRedAsrCtcModelConfig, Module: any): InitResult
+export function initSherpaOnnxOfflineFunAsrNanoModelConfig(config: OfflineFunAsrNanoModelConfig, Module: any): InitResult
 export function initSherpaOnnxOfflineWhisperModelConfig(config: WhisperModelConfig, Module: any): InitResult
 export function initSherpaOnnxOfflineCanaryModelConfig(config: CanaryModelConfig, Module: any): InitResult
 export function initSherpaOnnxOfflineMoonshineModelConfig(config: MoonshineModelConfig, Module: any): InitResult
@@ -244,7 +290,7 @@ export enum OnlineRecognizerType {
   Transducer = 0,
   Paraformer = 1,
   Zipformer2CTC = 2,
-  MemoCTC = 3,
+  NemoCTC = 3,
   ToneCTC = 4,
 }
 

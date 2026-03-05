@@ -1,6 +1,6 @@
 import { loadVirtualData } from '@sherpaw/preloader'
 import { expect, it } from 'vitest'
-import { createOnlineRecognizer, initASRModule } from '../src/index'
+import { createOnlineRecognizer, initASRModule } from '../src'
 import { decodeWavPcm16, encodeWavPcm16 } from './helpers/wav'
 
 it('runs in a browser context', () => {
