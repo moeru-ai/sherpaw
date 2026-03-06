@@ -8,4 +8,5 @@ add_subdirectory(upstream)
 
 add_subdirectory(asr)
 add_subdirectory(vad)
+add_subdirectory(vad-asr)
 add_subdirectory(speaker-embedding)

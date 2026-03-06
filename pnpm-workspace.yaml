@@ -5,3 +5,4 @@ packages:
   - packages/shared
   - packages/speaker-diarization
   - packages/vad
+  - packages/vad-asr

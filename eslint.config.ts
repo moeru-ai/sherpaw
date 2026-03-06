@@ -5,6 +5,8 @@ export default eslintConfig({
     'packages/*/src/prebuilt/**/*',
     'packages/asr/src/asr.js',
     'packages/vad/src/vad.js',
+    'packages/vad-asr/src/asr.js',
+    'packages/vad-asr/src/vad.js',
   ],
   vue: true,
 })
