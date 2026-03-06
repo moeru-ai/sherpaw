@@ -2,7 +2,8 @@ version: '0.2'
 ignorePaths:
   - '**/build/**/*'
   - '**/dist/**/*'
-  - packages/asr/src/sherpa-onnx-wasm-main-asr.js
+  - packages/asr/src/asr.js
+  - packages/vad/src/vad.js
   - packages/speaker-diarization/src/sherpa-onnx-wasm-main-speaker-diarization.js
   - pnpm-lock.yaml
   - sherpa-onnx/upstream/**/*
