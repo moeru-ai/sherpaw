@@ -1,0 +1,41 @@
+{
+  "name": "@sherpaw/vad",
+  "type": "module",
+  "version": "0.0.1",
+  "description": "",
+  "author": "Makito <i@maki.to>",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sumimakito/sherpaw.git",
+    "directory": "packages/vad"
+  },
+  "keywords": [],
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json",
+    "./module.wasm": "./dist/prebuilt/vad.wasm"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown"
+  },
+  "devDependencies": {
+    "@sherpaw/preloader": "workspace:^",
+    "@sherpaw/shared": "workspace:^",
+    "@sherpaw/vad": "workspace:^",
+    "@types/emscripten": "^1.41.5",
+    "@vitest/browser": "^3.2.4",
+    "@vitest/ui": "3.2.4",
+    "playwright": "^1.55.0",
+    "tsdown": "^0.15.12",
+    "typescript": "^5.9.3",
+    "vite": "npm:rolldown-vite@7.1.14",
+    "vitest": "^3.2.4"
+  }
+}

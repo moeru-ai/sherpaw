@@ -4,3 +4,4 @@ packages:
   - packages/sandbox
   - packages/shared
   - packages/speaker-diarization
+  - packages/vad
