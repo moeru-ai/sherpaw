@@ -71,25 +71,23 @@ it('transcribes wav samples with the browser vad-asr pipeline', async () => {
     fetchBytes(new URL(`./models/${modelName}/test_wavs/0.wav`, import.meta.url)),
   ])
 
-  loadVirtualData({
+  const filenames = loadVirtualData({
     module,
     virtualData: {
-      files: [
-        { filename: 'silero_vad.onnx', data: silero },
-        { filename: 'encoder_model.ort', data: encoder },
-        { filename: 'decoder_model_merged.ort', data: decoder },
-        { filename: 'tokens.txt', data: tokens },
-      ],
+      'silero_vad.onnx': silero,
+      'encoder_model.ort': encoder,
+      'decoder_model_merged.ort': decoder,
+      'tokens.txt': tokens,
     },
     dependencyId: 'vad-asr-model',
   })
 
   const recognizer = new OfflineRecognizer({
     modelConfig: {
-      tokens: './tokens.txt',
+      tokens: filenames['tokens.txt'],
       moonshine: {
-        encoder: './encoder_model.ort',
-        mergedDecoder: './decoder_model_merged.ort',
+        encoder: filenames['encoder_model.ort'],
+        mergedDecoder: filenames['decoder_model_merged.ort'],
       },
     },
   }, module)

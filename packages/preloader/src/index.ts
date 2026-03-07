@@ -1,4 +1,4 @@
-import type { Data, LoadDataOptions, LoadVirtualDataOptions } from './types'
+import type { Data, Filename, LoadDataOptions, LoadVirtualDataOptions } from './types'
 import { nanoid } from 'nanoid/non-secure'
 
 export * from './types'
@@ -45,7 +45,7 @@ export function loadData(options: LoadDataOptions) {
 /**
  * Load "virtual" data without the need to pre-pack it with emsdk.
  */
-export function loadVirtualData(options: LoadVirtualDataOptions) {
+export function loadVirtualData<T extends Record<Filename, Data> = Record<Filename, Data>>(options: LoadVirtualDataOptions<T>): Record<keyof T, keyof T> {
   const {
     module,
     virtualData,
@@ -54,8 +54,8 @@ export function loadVirtualData(options: LoadVirtualDataOptions) {
   } = options
 
   function createDataFiles() {
-    for (const vf of virtualData.files) {
-      module.FS_createDataFile(parent, vf.filename, dataToBytes(vf.data), true, true, true)
+    for (const [filename, data] of Object.entries(virtualData)) {
+      module.FS_createDataFile(parent, filename, dataToBytes(data), true, true, true)
     }
     module.removeRunDependency(dependencyId)
   }
@@ -69,4 +69,9 @@ export function loadVirtualData(options: LoadVirtualDataOptions) {
       module.preRun = []
     module.preRun.push(createDataFiles) // FS is not initialized yet, wait for it
   }
+
+  return Object.keys(virtualData).reduce((filenames, filename: keyof T) => {
+    filenames[filename] = filename
+    return filenames
+  }, {} as Record<keyof T, keyof T>)
 }
