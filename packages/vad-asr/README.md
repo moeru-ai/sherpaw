@@ -5,7 +5,7 @@ A WebAssembly (WASM) wrapper for VAD + offline ASR with sherpa-onnx.
 ## Quick start
 
 ```ts
-import { CircularBuffer, OfflineRecognizer, createVad, initVADASRModule } from '@sherpaw/vad-asr'
+import { CircularBuffer, createVad, initVADASRModule, OfflineRecognizer } from '@sherpaw/vad-asr'
 
 const module = await initVADASRModule()
 

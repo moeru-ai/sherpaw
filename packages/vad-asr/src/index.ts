@@ -1,9 +1,10 @@
 import type { WebAssemblyModule } from '@sherpaw/shared'
 
-export { OfflineRecognizer } from './asr'
 export type { OfflineRecognizerConfig } from './asr'
-export * from './vad'
 export type { WebAssemblyModule as VADASRModule } from '@sherpaw/shared'
+
+export { OfflineRecognizer } from './asr'
+export * from './vad'
 
 export async function initVADASRModule(): Promise<WebAssemblyModule> {
   // @ts-expect-error Missing types from generated prebuilt module

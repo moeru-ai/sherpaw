@@ -1,5 +1,6 @@
 import { loadVirtualData } from '@sherpaw/preloader'
 import { expect, it } from 'vitest'
+
 import { CircularBuffer, createVad, initVADASRModule, OfflineRecognizer } from '../src'
 import { decodeWavPcm16, encodeWavPcm16 } from './helpers/wav'
 
