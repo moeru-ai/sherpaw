@@ -19,6 +19,7 @@
   ],
   "exports": {
     ".": "./dist/index.js",
+    "./stream-transcription": "./dist/stream-transcription.js",
     "./worker": "./dist/worker/index.js",
     "./package.json": "./package.json"
   },

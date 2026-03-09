@@ -2,7 +2,8 @@ import { defineConfig } from 'tsdown'
 
 export default defineConfig({
   entry: {
-    index: 'src/index.ts',
+    'index': 'src/index.ts',
+    'stream-transcription': 'src/stream-transcription/index.ts',
     'worker/index': 'src/worker/index.ts',
   },
   dts: true,
