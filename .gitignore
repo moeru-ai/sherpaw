@@ -163,3 +163,6 @@ models/
 
 packages/*/tests/model/**/*
 packages/*/tests/fixtures/**/*
+
+# Coding Agent
+.claude/**local**
