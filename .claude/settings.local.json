@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(npx tsc --noEmit -p packages/xsai-transcription/tsconfig.lib.json 2>&1 | head -40)"
-    ]
-  }
-}
