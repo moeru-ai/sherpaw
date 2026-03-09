@@ -1,0 +1,42 @@
+{
+  "name": "@sherpaw/xsai-transcription",
+  "type": "module",
+  "version": "0.0.1",
+  "description": "Streaming transcription wrapper for Sherpa-ONNX WASM with xsai-style ergonomics",
+  "author": "Makito <i@maki.to>",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sumimakito/sherpaw.git",
+    "directory": "packages/xsai-transcription"
+  },
+  "keywords": [
+    "asr",
+    "speech",
+    "transcription",
+    "sherpa-onnx",
+    "wasm"
+  ],
+  "exports": {
+    ".": "./dist/index.js",
+    "./worker": "./dist/worker/index.js",
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@moeru/eventa": "1.0.0-beta.1",
+    "@moeru/std": "0.1.0-beta.17",
+    "@sherpaw/asr": "workspace:^",
+    "@sherpaw/preloader": "workspace:^",
+    "@sherpaw/shared": "workspace:^"
+  }
+}
