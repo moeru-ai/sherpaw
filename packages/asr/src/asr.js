@@ -1890,3 +1890,11 @@ export {
   createOnlineRecognizer,
   OfflineRecognizer,
 }
+
+export const OnlineRecognizerType = {
+  Transducer: 0,
+  Paraformer: 1,
+  Zipformer2CTC: 2,
+  NemoCTC: 3,
+  ToneCTC: 4,
+}
