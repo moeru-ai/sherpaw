@@ -1,7 +1,7 @@
 import type { ASRModule } from '@sherpaw/asr'
 import type { DataMetadata } from '@sherpaw/preloader'
+
 import { initASRModule } from '@sherpaw/asr'
-import wasmUrl from '@sherpaw/asr/module.wasm?url'
 import { loadData } from '@sherpaw/preloader'
 import { createInjectionState } from '@vueuse/core'
 import { shallowRef } from 'vue'
@@ -16,7 +16,7 @@ const [provideASRStore, _useASRStore] = createInjectionState(() => {
     if (!metadata.value || !data.value)
       return
 
-    const asr = await initASRModule({ locateFile: () => wasmUrl })
+    const asr = await initASRModule()
     loadData({
       module: asr,
       metadata: metadata.value,
