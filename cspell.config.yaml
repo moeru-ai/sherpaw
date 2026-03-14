@@ -1,7 +1,7 @@
-version: '0.2'
+version: "0.2"
 ignorePaths:
-  - '**/build/**/*'
-  - '**/dist/**/*'
+  - "**/build/**/*"
+  - "**/dist/**/*"
   - packages/*/src/prebuilt/**/*
   - packages/asr/src/asr.js
   - packages/vad/src/vad.js
@@ -28,6 +28,7 @@ words:
   - emsdk
   - endforeach
   - endfunction
+  - eventa
   - Fars
   - Fsts
   - HEAPF
@@ -37,6 +38,7 @@ words:
   - LIBSTDCPP
   - Makito
   - malloc
+  - moeru
   - Neko
   - Nemo
   - npmjs
@@ -56,9 +58,11 @@ words:
   - unplugin
   - VADASR
   - vueuse
+  - webworkers
   - Wenet
   - worklet
   - xlink
+  - xsai
   - zipformer
 ignoreWords: []
 import: []

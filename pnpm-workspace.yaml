@@ -1,4 +1,5 @@
 packages:
+  - playgrounds/xsai
   - packages/asr
   - packages/preloader
   - packages/sandbox
@@ -6,3 +7,4 @@ packages:
   - packages/speaker-diarization
   - packages/vad
   - packages/vad-asr
+  - packages/xsai-transcription

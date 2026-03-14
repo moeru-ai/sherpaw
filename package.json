@@ -40,6 +40,7 @@
   ],
   "scripts": {
     "dev": "pnpm -F @sherpaw/sandbox dev",
+    "dev:xsai": "pnpm -F @sherpaw/playground-xsai dev",
     "build": "pnpm -r run build",
     "lint:fix": "eslint --cache . --fix",
     "lint": "eslint --cache .",
