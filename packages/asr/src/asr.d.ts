@@ -286,12 +286,14 @@ export function initSherpaOnnxOfflineLMConfig(config: OfflineLMConfig, Module: a
 export function initSherpaOnnxOfflineModelConfig(config: OfflineModelConfig, Module: any): InitResult
 export function initSherpaOnnxOfflineRecognizerConfig(config: OfflineRecognizerConfig, Module: any): InitResult
 
-export enum OnlineRecognizerType {
-  Transducer = 0,
-  Paraformer = 1,
-  Zipformer2CTC = 2,
-  NemoCTC = 3,
-  ToneCTC = 4,
+export declare const OnlineRecognizerTypes: {
+  readonly Transducer: 0
+  readonly Paraformer: 1
+  readonly Zipformer2CTC: 2
+  readonly NemoCTC: 3
+  readonly ToneCTC: 4
 }
 
-export function createOnlineRecognizer(Module: WebAssemblyModule, myConfig?: OnlineRecognizerConfig & { type: OnlineRecognizerType }): OnlineRecognizer
+export type OnlineRecognizerType = typeof OnlineRecognizerTypes[keyof typeof OnlineRecognizerTypes]
+
+export function createOnlineRecognizer(Module: WebAssemblyModule, myConfig?: OnlineRecognizerConfig & { type?: OnlineRecognizerType }): OnlineRecognizer

@@ -629,9 +629,7 @@ function createOnlineRecognizer(Module, myConfig) {
     model: '',
   }
 
-  let type = 0
-
-  switch (type) {
+  switch (myConfig?.type ?? 0) {
     case 0:
       // transducer
       onlineTransducerModelConfig.encoder = './encoder.onnx'
@@ -1891,7 +1889,7 @@ export {
   OfflineRecognizer,
 }
 
-export const OnlineRecognizerType = {
+export const OnlineRecognizerTypes = {
   Transducer: 0,
   Paraformer: 1,
   Zipformer2CTC: 2,
