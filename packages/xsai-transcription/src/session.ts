@@ -30,19 +30,7 @@ export class StreamingTranscriptionSession {
   private lastWordCount = 0
 
   constructor(module: ASRModule, options?: { recognizerConfig?: OnlineRecognizerConfig & { type?: OnlineRecognizerType }, sampleRate?: number }) {
-    // TODO(@nekomeowww): ok so the type: 0 handling in packages/asr/src/asr.js
-    // and the pass of second parameter of createOnlineRecognizer will result in undefined
-    // property in required parameters of modelConfig and many other properties...
-    //
-    // we need to handle and replace the switch (0) in asr.js with proper implementation.
-
-    // const recognizerConfig = {
-    //   type: OnlineRecognizerType.Transducer,
-    //   ...options?.recognizerConfig,
-    // } satisfies OnlineRecognizerConfig & { type: OnlineRecognizerType }
-
-    // this.recognizer = createOnlineRecognizer(module, recognizerConfig)
-    this.recognizer = createOnlineRecognizer(module)
+    this.recognizer = createOnlineRecognizer(module, options?.recognizerConfig)
     this.stream = this.recognizer.createStream()
     this.sampleRate = options?.sampleRate ?? DEFAULT_SAMPLE_RATE
   }

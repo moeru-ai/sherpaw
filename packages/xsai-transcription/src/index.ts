@@ -1,3 +1,15 @@
+export type {
+  BinarySource,
+  FetchLike,
+  InitTranscriptionOptions,
+  LoadSources,
+  MetadataSource,
+  SherpawProviderOptions,
+  SherpawSpeechModel,
+  SherpawSpeechTransport,
+  TransportResponse as StreamTranscriptionTransportResponse,
+} from './types'
+
 export {
   createSession,
   createStreamingTranscriptionSession,
@@ -13,14 +25,3 @@ export {
   StreamingTranscriptionSession,
 } from './session'
 export * from './stream-transcription'
-export type {
-  BinarySource,
-  FetchLike,
-  InitTranscriptionOptions,
-  LoadSources,
-  MetadataSource,
-  SherpawProviderOptions,
-  SherpawSpeechModel,
-  SherpawSpeechTransport,
-  TransportResponse as StreamTranscriptionTransportResponse,
-} from './types'
