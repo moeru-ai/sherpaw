@@ -3,12 +3,13 @@ import type { TranscriptionResult } from '@sherpaw/xsai-transcription'
 import type { AudioProcessorMessage } from './audio-processor.protocol'
 
 import { errorMessageFrom } from '@moeru/std'
+import { OnlineRecognizerTypes } from '@sherpaw/asr'
 import { createSherpawProvider, streamTranscription } from '@sherpaw/xsai-transcription'
 import sherpawWorkerUrl from '@sherpaw/xsai-transcription/worker?worker&url'
 import { useDevicesList, useUserMedia } from '@vueuse/core'
 import { nanoid } from 'nanoid/non-secure'
-import { computed, onBeforeUnmount, ref, shallowRef, toRaw, useTemplateRef, watch } from 'vue'
 
+import { computed, onBeforeUnmount, ref, shallowRef, toRaw, useTemplateRef, watch } from 'vue'
 import audioProcessor from './audio-processor.worklet?url'
 import Button from './components/Button.vue'
 import ModelSetup from './components/ModelSetup.vue'
@@ -180,6 +181,17 @@ async function initializeSession() {
         metadata: toRaw(metadata.value) as any,
         data: toRaw(data.value),
         sampleRate: SAMPLE_RATE,
+        recognizerConfig: {
+          // Hardcoded to Paraformer for now.
+          type: OnlineRecognizerTypes.Paraformer,
+          modelConfig: {
+            tokens: './tokens.txt',
+            paraformer: {
+              encoder: './encoder.onnx',
+              decoder: './decoder.onnx',
+            },
+          },
+        },
       }),
       inputSampleRate: SAMPLE_RATE,
     })
@@ -333,8 +345,8 @@ onBeforeUnmount(() => {
     flex="~ col items-center justify-start"
   >
     <div
-      p-6 w-full font-sans
-      flex="~ col md:row items-center justify-between gap-4 shrink-0"
+      p-6 w-full font-sans relative
+      flex="~ col md:row items-start justify-between gap-4 shrink-0"
     >
       <div flex="~ col items-center md:items-start">
         <div text-xl md:text-3xl font-black>
@@ -345,7 +357,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <details rounded-2xl p-2 border="1 neutral-200" bg="neutral-50" max-w-full>
+      <details absolute top-0 right-0 m-6 rounded-2xl p-2 border="1 neutral-200" bg="neutral-50" max-w-full>
         <summary cursor-pointer uppercase text-sm lg:text-base>
           Model setup
         </summary>

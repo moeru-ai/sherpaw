@@ -65,6 +65,9 @@ async function handleDataFileInput(event: Event) {
 <template>
   <div font-sans flex="~ col items-center" w-full p-4 gap-4>
     <div w-full flex="~ col gap-3">
+      Please select a Paraformer model for now.
+    </div>
+    <div w-full flex="~ col gap-3">
       <label text-sm font-semibold>Metadata JSON</label>
       <input type="file" accept=".json,application/json" @change="handleMetadataFileInput">
       <textarea
