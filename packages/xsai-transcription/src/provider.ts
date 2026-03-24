@@ -9,6 +9,7 @@ import type {
   TranscriptionEvent,
 } from './stream-transcription/types'
 import type {
+  ResolvedSherpawSpeechModel,
   SherpawProviderOptions,
   SherpawSpeechModel,
   SherpawSpeechTransport,
@@ -23,6 +24,7 @@ import {
   streamTranscriptionPushInvoke,
   streamTranscriptionResetInvoke,
 } from './events'
+import { resolveBinary, resolveMetadata } from './stream-transcription/resolve'
 
 interface InvokeTransportRequest {
   invoke: string
@@ -32,7 +34,7 @@ interface InvokeTransportRequest {
 interface WorkerInvokes {
   dispose: () => Promise<void>
   finish: () => Promise<FinishResult>
-  init: (payload: SherpawSpeechModel, options?: { transfer?: Transferable[] } & { signal?: AbortSignal }) => Promise<void>
+  init: (payload: ResolvedSherpawSpeechModel, options?: { transfer?: Transferable[] } & { signal?: AbortSignal }) => Promise<void>
   push: (payload: PushAudioInvokeRequest, options?: { transfer?: Transferable[] } & { signal?: AbortSignal }) => Promise<PushAudioResult>
   reset: () => Promise<void>
 }
@@ -142,6 +144,7 @@ export interface SherpawProvider {
 export function createSherpawProvider(options: SherpawProviderOptions = {}): SherpawProvider {
   return {
     speech(model) {
+      let resolvedModelPromise: Promise<ResolvedSherpawSpeechModel> | null = null
       let workerRef: Worker | null = options.worker ?? null
       let workerInvokes: WorkerInvokes | null = null
       let stopEventListener: (() => void) | null = null
@@ -197,12 +200,43 @@ export function createSherpawProvider(options: SherpawProviderOptions = {}): She
         return workerInvokes
       }
 
+      function getFetcher() {
+        return options.fetch ?? globalThis.fetch
+      }
+
+      async function resolveModel(): Promise<ResolvedSherpawSpeechModel> {
+        if (!resolvedModelPromise) {
+          resolvedModelPromise = Promise.all([
+            resolveMetadata(model.metadata, getFetcher()),
+            resolveBinary(model.data, getFetcher()),
+          ]).then(([metadata, data]) => ({
+            data,
+            metadata,
+            module: model.module,
+            recognizerConfig: model.recognizerConfig,
+            sampleRate: model.sampleRate,
+          }))
+        }
+
+        return await resolvedModelPromise
+      }
+
+      async function createInitPayload(): Promise<ResolvedSherpawSpeechModel> {
+        const resolvedModel = await resolveModel()
+        return {
+          ...resolvedModel,
+          data: resolvedModel.data.slice(0),
+        }
+      }
+
       async function runInvoke(invoke: InvokeTransportRequest): Promise<unknown> {
         const invokes = ensureWorkerInvokes()
 
         switch (invoke.invoke) {
-          case streamTranscriptionInitInvoke.sendEvent.id:
-            return await invokes.init(model, { transfer: [model.data] })
+          case streamTranscriptionInitInvoke.sendEvent.id: {
+            const resolvedModel = await createInitPayload()
+            return await invokes.init(resolvedModel, { transfer: [resolvedModel.data] })
+          }
 
           case streamTranscriptionPushInvoke.sendEvent.id: {
             if (!isPushAudioInvokeRequest(invoke.payload))
@@ -244,7 +278,8 @@ export function createSherpawProvider(options: SherpawProviderOptions = {}): She
         load: async () => {
           await runInInvokeOrder(async () => {
             const invokes = ensureWorkerInvokes()
-            await invokes.init(model)
+            const resolvedModel = await createInitPayload()
+            await invokes.init(resolvedModel, { transfer: [resolvedModel.data] })
           })
         },
         push: async (payload) => {

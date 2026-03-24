@@ -4,6 +4,8 @@ export type {
   InitTranscriptionOptions,
   LoadSources,
   MetadataSource,
+  RemoteUrlSource,
+  ResolvedSherpawSpeechModel,
   SherpawProviderOptions,
   SherpawSpeechModel,
   SherpawSpeechTransport,
@@ -11,6 +13,7 @@ export type {
 } from './types'
 
 export {
+  asRemoteUrl,
   createSession,
   createStreamingTranscriptionSession,
   initTranscriptionModule,

@@ -3,10 +3,18 @@ import type { ASRModule } from '@sherpaw/asr'
 import { initASRModule } from '@sherpaw/asr'
 import { loadData } from '@sherpaw/preloader'
 
-import type { InitTranscriptionOptions } from './types'
+import type { InitTranscriptionOptions, RemoteUrlSource } from './types'
 
 import { StreamingTranscriptionSession } from './session'
 import { resolveBinary, resolveMetadata } from './stream-transcription/resolve'
+
+export function asRemoteUrl(url: string | URL, init?: RequestInit): RemoteUrlSource {
+  return {
+    kind: 'remote-url' as const,
+    init,
+    url,
+  }
+}
 
 export function pcm16ToFloat32(input: ArrayBuffer | Int16Array): Float32Array {
   const pcm = input instanceof Int16Array ? input : new Int16Array(input)

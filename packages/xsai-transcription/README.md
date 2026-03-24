@@ -25,6 +25,7 @@ This package now follows a provider/executor design similar to `xsai-transformer
 
 ```ts
 import {
+  asRemoteUrl,
   createSherpawProvider,
   streamTranscription,
 } from '@sherpaw/xsai-transcription'
@@ -35,8 +36,8 @@ const sherpawProvider = createSherpawProvider({
 })
 
 const speech = sherpawProvider.speech({
-  metadata, // DataMetadata | string | Blob | File | ArrayBuffer | Uint8Array
-  data, // Blob | File | ArrayBuffer | Uint8Array
+  metadata: asRemoteUrl('https://huggingface.co/.../tokens.json'),
+  data: asRemoteUrl('https://huggingface.co/.../model.int8.onnx.data'),
   sampleRate: 16000,
 })
 
@@ -63,6 +64,8 @@ console.log('sentence:', sentence?.text)
 `streamTranscription` now uses the duplex stream transport (`openStream`) as the primary execution path.
 
 `loadSpeech()` is optional preloading for model assets before streaming starts. `terminateSpeech()` terminates provider-owned worker state for the speech transport instance.
+
+Use `asRemoteUrl(...)` when model assets should be fetched on the main thread before being transferred into the worker.
 
 ## Event model
 

@@ -7,7 +7,7 @@ import type {
   PushAudioInvokeRequest,
   TranscriptionEvent,
 } from '../stream-transcription/types'
-import type { SherpawSpeechModel } from '../types'
+import type { ResolvedSherpawSpeechModel } from '../types'
 
 import { createSession, initTranscriptionModule, loadModelFiles } from '../core'
 import {
@@ -28,7 +28,7 @@ let unsubscribeHandlers: Array<() => void> = []
 export type WorkerInvokeCommand = keyof WorkerInvokePayloadMap
 
 interface WorkerInvokePayloadMap {
-  load: SherpawSpeechModel
+  load: ResolvedSherpawSpeechModel
   push: PushAudioInvokeRequest
   finish: void
   reset: void
@@ -98,7 +98,7 @@ async function runCommand(
 ): Promise<WorkerInvokeResultMap[typeof command]> {
   switch (command) {
     case 'load': {
-      const model = payload as SherpawSpeechModel
+      const model = payload as ResolvedSherpawSpeechModel
       moduleRef = model.module ?? moduleRef ?? await initTranscriptionModule()
       await loadModelFiles(moduleRef, {
         metadata: model.metadata,

@@ -3,7 +3,13 @@ import type { DataMetadata } from '@sherpaw/preloader'
 
 import type { FinishResult, Request, TranscriptionEvent } from './stream-transcription/types'
 
-export type BinarySource = ArrayBuffer | Blob | File | Uint8Array
+export interface RemoteUrlSource {
+  kind: 'remote-url'
+  init?: RequestInit
+  url: string | URL
+}
+
+export type BinarySource = ArrayBuffer | Blob | File | RemoteUrlSource | Uint8Array
 export type MetadataSource = BinarySource | DataMetadata | string
 
 export interface LoadSources {
@@ -30,6 +36,14 @@ export interface SherpawProviderOptions {
   fetch?: FetchLike
   worker?: Worker
   workerURL?: string | URL
+}
+
+export interface ResolvedSherpawSpeechModel {
+  data: ArrayBuffer
+  metadata: DataMetadata
+  module?: ASRModule
+  recognizerConfig?: OnlineRecognizerConfig & { type?: OnlineRecognizerType }
+  sampleRate?: number
 }
 
 export interface SherpawSpeechTransport extends Request<TranscriptionEvent, FinishResult> {

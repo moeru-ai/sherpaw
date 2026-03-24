@@ -6,11 +6,11 @@ import type {
   PushAudioResult,
   TranscriptionEvent,
 } from './stream-transcription/types'
-import type { SherpawSpeechModel } from './types'
+import type { ResolvedSherpawSpeechModel } from './types'
 
 export const streamTranscriptionEvent = defineEventa<TranscriptionEvent>('sherpaw:stream-transcription:event')
 
-export const streamTranscriptionInitInvoke = defineInvokeEventa<void, SherpawSpeechModel>('sherpaw:stream-transcription:init')
+export const streamTranscriptionInitInvoke = defineInvokeEventa<void, ResolvedSherpawSpeechModel>('sherpaw:stream-transcription:init')
 export const streamTranscriptionPushInvoke = defineInvokeEventa<PushAudioResult, PushAudioInvokeRequest>('sherpaw:stream-transcription:push')
 export const streamTranscriptionFinishInvoke = defineInvokeEventa<FinishResult, void>('sherpaw:stream-transcription:finish')
 export const streamTranscriptionResetInvoke = defineInvokeEventa<void, void>('sherpaw:stream-transcription:reset')
