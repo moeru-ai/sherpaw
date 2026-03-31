@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { OnlineRecognizerConfig, OnlineRecognizerType } from '@sherpaw/asr'
 import type { TranscriptionResult } from '@sherpaw/xsai-transcription'
 import type { AudioProcessorMessage } from './audio-processor.protocol'
 
@@ -33,6 +34,7 @@ const metadata = ref<MetadataJson | null>(null)
 const data = ref<ArrayBuffer | null>(null)
 const initializing = ref(false)
 const errorMessage = ref('')
+const recognizerType = ref<OnlineRecognizerType>(OnlineRecognizerTypes.Paraformer)
 
 const previousTranscriptions = ref<{ id: string, text: string }[]>([])
 const liveTranscription = ref<{ id: string, text: string }>()
@@ -43,6 +45,22 @@ const selectedAudioInputId = ref<string>()
 
 const mediaDevicesSupported = computed(() => !!navigator.mediaDevices?.getUserMedia)
 const { audioInputs, ensurePermissions } = useDevicesList({ requestPermissions: false })
+const detectedRecognizerLabel = computed(() => {
+  switch (recognizerType.value) {
+    case OnlineRecognizerTypes.Transducer:
+      return 'Transducer'
+    case OnlineRecognizerTypes.Paraformer:
+      return 'Paraformer'
+    case OnlineRecognizerTypes.Zipformer2CTC:
+      return 'Zipformer2CTC'
+    case OnlineRecognizerTypes.NemoCTC:
+      return 'NemoCTC'
+    case OnlineRecognizerTypes.ToneCTC:
+      return 'ToneCTC'
+    default:
+      throw new Error(`Unknown recognizer type: ${recognizerType.value}`)
+  }
+})
 
 const { stream, start: startUserMedia, stop: stopUserMedia } = useUserMedia({
   enabled: false,
@@ -71,6 +89,133 @@ watch(audioInputs, (inputs) => {
     selectedAudioInputId.value = inputs[0]?.deviceId
   }
 }, { immediate: true })
+
+watch(metadata, (nextMetadata) => {
+  const inferredType = inferRecognizerType(nextMetadata)
+  if (inferredType !== null) {
+    recognizerType.value = inferredType
+  }
+})
+
+function inferRecognizerType(nextMetadata: MetadataJson | null): OnlineRecognizerType | null {
+  const files = Array.isArray(nextMetadata?.files) ? nextMetadata.files : []
+  const filenames = files
+    .map(file => String((file as { filename?: unknown }).filename ?? '').toLowerCase())
+    .filter(Boolean)
+
+  if (filenames.some(filename => filename.endsWith('/joiner.onnx') || filename === 'joiner.onnx')) {
+    return OnlineRecognizerTypes.Transducer
+  }
+
+  if (filenames.some(filename => filename.endsWith('/nemo-ctc.onnx') || filename === 'nemo-ctc.onnx')) {
+    return OnlineRecognizerTypes.NemoCTC
+  }
+
+  if (filenames.some(filename => filename.endsWith('/tone-ctc.onnx') || filename === 'tone-ctc.onnx')) {
+    return OnlineRecognizerTypes.ToneCTC
+  }
+
+  if (filenames.some(filename => filename.endsWith('/decoder.onnx') || filename === 'decoder.onnx')) {
+    return OnlineRecognizerTypes.Paraformer
+  }
+
+  if (filenames.some(filename => filename.endsWith('/encoder.onnx') || filename === 'encoder.onnx')) {
+    return OnlineRecognizerTypes.Zipformer2CTC
+  }
+
+  return null
+}
+
+function createRecognizerConfig(type: OnlineRecognizerType): OnlineRecognizerConfig & { type: OnlineRecognizerType } {
+  const config: OnlineRecognizerConfig & { type: OnlineRecognizerType } = {
+    type,
+    featConfig: {
+      sampleRate: SAMPLE_RATE,
+      featureDim: 80,
+    },
+    modelConfig: {
+      tokens: './tokens.txt',
+      numThreads: 1,
+      provider: 'cpu',
+      debug: 0,
+      modelType: '',
+      modelingUnit: 'cjkchar',
+      bpeVocab: '',
+    },
+    decodingMethod: 'greedy_search',
+    maxActivePaths: 4,
+    enableEndpoint: 1,
+    rule1MinTrailingSilence: 2.4,
+    rule2MinTrailingSilence: 1.2,
+    rule3MinUtteranceLength: 20,
+    hotwordsFile: '',
+    hotwordsScore: 1.5,
+    ctcFstDecoderConfig: {
+      graph: '',
+      maxActive: 3000,
+    },
+    ruleFsts: '',
+    ruleFars: '',
+  }
+
+  switch (type) {
+    case OnlineRecognizerTypes.Transducer:
+      if (!config.modelConfig) {
+        config.modelConfig = {}
+      }
+
+      config.modelConfig.transducer = {
+        encoder: './encoder.onnx',
+        decoder: './decoder.onnx',
+        joiner: './joiner.onnx',
+      }
+
+      break
+    case OnlineRecognizerTypes.Paraformer:
+      if (!config.modelConfig) {
+        config.modelConfig = {}
+      }
+
+      config.modelConfig.paraformer = {
+        encoder: './encoder.onnx',
+        decoder: './decoder.onnx',
+      }
+
+      break
+    case OnlineRecognizerTypes.Zipformer2CTC:
+      if (!config.modelConfig) {
+        config.modelConfig = {}
+      }
+
+      config.modelConfig.zipformer2Ctc = {
+        model: './encoder.onnx',
+      }
+
+      break
+    case OnlineRecognizerTypes.NemoCTC:
+      if (!config.modelConfig) {
+        config.modelConfig = {}
+      }
+
+      config.modelConfig.nemoCtc = {
+        model: './nemo-ctc.onnx',
+      }
+
+      break
+    case OnlineRecognizerTypes.ToneCTC:
+      if (!config.modelConfig) {
+        config.modelConfig = {}
+      }
+
+      config.modelConfig.toneCtc = {
+        model: './tone-ctc.onnx',
+      }
+
+      break
+  }
+
+  return config
+}
 
 function clearControllerListeners() {
   for (const reader of controllerReaders) {
@@ -181,17 +326,7 @@ async function initializeSession() {
         metadata: toRaw(metadata.value) as any,
         data: toRaw(data.value),
         sampleRate: SAMPLE_RATE,
-        recognizerConfig: {
-          // Hardcoded to Paraformer for now.
-          type: OnlineRecognizerTypes.Paraformer,
-          modelConfig: {
-            tokens: './tokens.txt',
-            paraformer: {
-              encoder: './encoder.onnx',
-              decoder: './decoder.onnx',
-            },
-          },
-        },
+        recognizerConfig: createRecognizerConfig(recognizerType.value),
       }),
       inputSampleRate: SAMPLE_RATE,
     })
@@ -357,7 +492,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <details absolute top-0 right-0 m-6 rounded-2xl p-2 border="1 neutral-200" bg="neutral-50" max-w-full>
+      <details absolute top-0 right-0 z-20 m-6 rounded-2xl p-2 border="1 neutral-200" bg="neutral-50" max-w-full>
         <summary cursor-pointer uppercase text-sm lg:text-base>
           Model setup
         </summary>
@@ -365,6 +500,8 @@ onBeforeUnmount(() => {
           <ModelSetup
             v-model:metadata="metadata"
             v-model:data="data"
+            v-model:recognizer-type="recognizerType"
+            :detected-recognizer-label="detectedRecognizerLabel"
             :initializing="initializing"
             @initialize="initializeSession"
           />
