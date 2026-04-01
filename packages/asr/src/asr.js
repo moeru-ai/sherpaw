@@ -605,7 +605,15 @@ function initSherpaOnnxOnlineRecognizerConfig(config, Module) {
   }
 }
 
-function createOnlineRecognizer(Module, myConfig) {
+export const OnlineRecognizerTypes = {
+  Transducer: 0,
+  Paraformer: 1,
+  Zipformer2CTC: 2,
+  NemoCTC: 3,
+  ToneCTC: 4,
+}
+
+export function createOnlineRecognizerConfig(type = OnlineRecognizerTypes.Transducer, overrides) {
   const onlineTransducerModelConfig = {
     encoder: '',
     decoder: '',
@@ -629,7 +637,7 @@ function createOnlineRecognizer(Module, myConfig) {
     model: '',
   }
 
-  switch (myConfig?.type ?? 0) {
+  switch (type) {
     case 0:
       // transducer
       onlineTransducerModelConfig.encoder = './encoder.onnx'
@@ -675,7 +683,8 @@ function createOnlineRecognizer(Module, myConfig) {
     featureDim: 80, // it is ignored when toneCtc is used
   }
 
-  let recognizerConfig = {
+  const recognizerConfig = {
+    type,
     featConfig: featureConfig,
     modelConfig: onlineModelConfig,
     decodingMethod: 'greedy_search',
@@ -693,9 +702,50 @@ function createOnlineRecognizer(Module, myConfig) {
     ruleFsts: '',
     ruleFars: '',
   }
-  if (myConfig) {
-    recognizerConfig = myConfig
+
+  return {
+    ...recognizerConfig,
+    ...overrides,
+    type,
+    featConfig: {
+      ...recognizerConfig.featConfig,
+      ...overrides?.featConfig,
+    },
+    modelConfig: {
+      ...recognizerConfig.modelConfig,
+      ...overrides?.modelConfig,
+      transducer: {
+        ...recognizerConfig.modelConfig.transducer,
+        ...overrides?.modelConfig?.transducer,
+      },
+      paraformer: {
+        ...recognizerConfig.modelConfig.paraformer,
+        ...overrides?.modelConfig?.paraformer,
+      },
+      zipformer2Ctc: {
+        ...recognizerConfig.modelConfig.zipformer2Ctc,
+        ...overrides?.modelConfig?.zipformer2Ctc,
+      },
+      nemoCtc: {
+        ...recognizerConfig.modelConfig.nemoCtc,
+        ...overrides?.modelConfig?.nemoCtc,
+      },
+      toneCtc: {
+        ...recognizerConfig.modelConfig.toneCtc,
+        ...overrides?.modelConfig?.toneCtc,
+      },
+    },
+    ctcFstDecoderConfig: {
+      ...recognizerConfig.ctcFstDecoderConfig,
+      ...overrides?.ctcFstDecoderConfig,
+    },
   }
+}
+
+function createOnlineRecognizer(Module, myConfig) {
+  const recognizerConfig = myConfig
+    ? createOnlineRecognizerConfig(myConfig.type ?? OnlineRecognizerTypes.Transducer, myConfig)
+    : createOnlineRecognizerConfig()
 
   return new OnlineRecognizer(recognizerConfig, Module)
 }
@@ -1887,12 +1937,4 @@ class OnlineRecognizer {
 export {
   createOnlineRecognizer,
   OfflineRecognizer,
-}
-
-export const OnlineRecognizerTypes = {
-  Transducer: 0,
-  Paraformer: 1,
-  Zipformer2CTC: 2,
-  NemoCTC: 3,
-  ToneCTC: 4,
 }

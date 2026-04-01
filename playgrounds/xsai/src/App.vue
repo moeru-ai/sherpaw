@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import type { OnlineRecognizerConfig, OnlineRecognizerType } from '@sherpaw/asr'
+import type { OnlineRecognizerType } from '@sherpaw/asr'
 import type { TranscriptionResult } from '@sherpaw/xsai-transcription'
 import type { AudioProcessorMessage } from './audio-processor.protocol'
 
 import { errorMessageFrom } from '@moeru/std'
-import { OnlineRecognizerTypes } from '@sherpaw/asr'
-import { createSherpawProvider, streamTranscription } from '@sherpaw/xsai-transcription'
+import { createOnlineRecognizerConfig, OnlineRecognizerTypes } from '@sherpaw/asr'
+import { createSherpawProvider, inferRecognizerType, streamTranscription } from '@sherpaw/xsai-transcription'
 import sherpawWorkerUrl from '@sherpaw/xsai-transcription/worker?worker&url'
 import { useDevicesList, useUserMedia } from '@vueuse/core'
 import { nanoid } from 'nanoid/non-secure'
@@ -18,7 +18,6 @@ import ModelSetup from './components/ModelSetup.vue'
 const transcriptionsDisplayRef = useTemplateRef<HTMLDivElement>('transcriptionsDisplay')
 
 const SAMPLE_RATE = 16000
-type MetadataJson = Record<string, unknown>
 const sherpawProvider = createSherpawProvider({ workerURL: sherpawWorkerUrl })
 
 let audioCtx: AudioContext | null = null
@@ -30,7 +29,7 @@ let controllerReaders: ReadableStreamDefaultReader[] = []
 let inputWriter: WritableStreamDefaultWriter<Float32Array> | null = null
 let pushQueue = Promise.resolve()
 
-const metadata = ref<MetadataJson | null>(null)
+const metadata = ref<Record<string, unknown> | null>(null)
 const data = ref<ArrayBuffer | null>(null)
 const initializing = ref(false)
 const errorMessage = ref('')
@@ -96,126 +95,6 @@ watch(metadata, (nextMetadata) => {
     recognizerType.value = inferredType
   }
 })
-
-function inferRecognizerType(nextMetadata: MetadataJson | null): OnlineRecognizerType | null {
-  const files = Array.isArray(nextMetadata?.files) ? nextMetadata.files : []
-  const filenames = files
-    .map(file => String((file as { filename?: unknown }).filename ?? '').toLowerCase())
-    .filter(Boolean)
-
-  if (filenames.some(filename => filename.endsWith('/joiner.onnx') || filename === 'joiner.onnx')) {
-    return OnlineRecognizerTypes.Transducer
-  }
-
-  if (filenames.some(filename => filename.endsWith('/nemo-ctc.onnx') || filename === 'nemo-ctc.onnx')) {
-    return OnlineRecognizerTypes.NemoCTC
-  }
-
-  if (filenames.some(filename => filename.endsWith('/tone-ctc.onnx') || filename === 'tone-ctc.onnx')) {
-    return OnlineRecognizerTypes.ToneCTC
-  }
-
-  if (filenames.some(filename => filename.endsWith('/decoder.onnx') || filename === 'decoder.onnx')) {
-    return OnlineRecognizerTypes.Paraformer
-  }
-
-  if (filenames.some(filename => filename.endsWith('/encoder.onnx') || filename === 'encoder.onnx')) {
-    return OnlineRecognizerTypes.Zipformer2CTC
-  }
-
-  return null
-}
-
-function createRecognizerConfig(type: OnlineRecognizerType): OnlineRecognizerConfig & { type: OnlineRecognizerType } {
-  const config: OnlineRecognizerConfig & { type: OnlineRecognizerType } = {
-    type,
-    featConfig: {
-      sampleRate: SAMPLE_RATE,
-      featureDim: 80,
-    },
-    modelConfig: {
-      tokens: './tokens.txt',
-      numThreads: 1,
-      provider: 'cpu',
-      debug: 0,
-      modelType: '',
-      modelingUnit: 'cjkchar',
-      bpeVocab: '',
-    },
-    decodingMethod: 'greedy_search',
-    maxActivePaths: 4,
-    enableEndpoint: 1,
-    rule1MinTrailingSilence: 2.4,
-    rule2MinTrailingSilence: 1.2,
-    rule3MinUtteranceLength: 20,
-    hotwordsFile: '',
-    hotwordsScore: 1.5,
-    ctcFstDecoderConfig: {
-      graph: '',
-      maxActive: 3000,
-    },
-    ruleFsts: '',
-    ruleFars: '',
-  }
-
-  switch (type) {
-    case OnlineRecognizerTypes.Transducer:
-      if (!config.modelConfig) {
-        config.modelConfig = {}
-      }
-
-      config.modelConfig.transducer = {
-        encoder: './encoder.onnx',
-        decoder: './decoder.onnx',
-        joiner: './joiner.onnx',
-      }
-
-      break
-    case OnlineRecognizerTypes.Paraformer:
-      if (!config.modelConfig) {
-        config.modelConfig = {}
-      }
-
-      config.modelConfig.paraformer = {
-        encoder: './encoder.onnx',
-        decoder: './decoder.onnx',
-      }
-
-      break
-    case OnlineRecognizerTypes.Zipformer2CTC:
-      if (!config.modelConfig) {
-        config.modelConfig = {}
-      }
-
-      config.modelConfig.zipformer2Ctc = {
-        model: './encoder.onnx',
-      }
-
-      break
-    case OnlineRecognizerTypes.NemoCTC:
-      if (!config.modelConfig) {
-        config.modelConfig = {}
-      }
-
-      config.modelConfig.nemoCtc = {
-        model: './nemo-ctc.onnx',
-      }
-
-      break
-    case OnlineRecognizerTypes.ToneCTC:
-      if (!config.modelConfig) {
-        config.modelConfig = {}
-      }
-
-      config.modelConfig.toneCtc = {
-        model: './tone-ctc.onnx',
-      }
-
-      break
-  }
-
-  return config
-}
 
 function clearControllerListeners() {
   for (const reader of controllerReaders) {
@@ -326,7 +205,14 @@ async function initializeSession() {
         metadata: toRaw(metadata.value) as any,
         data: toRaw(data.value),
         sampleRate: SAMPLE_RATE,
-        recognizerConfig: createRecognizerConfig(recognizerType.value),
+        recognizerConfig: createOnlineRecognizerConfig(recognizerType.value, {
+          featConfig: {
+            sampleRate: SAMPLE_RATE,
+          },
+          modelConfig: {
+            debug: 0,
+          },
+        }),
       }),
       inputSampleRate: SAMPLE_RATE,
     })

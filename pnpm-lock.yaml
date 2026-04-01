@@ -287,6 +287,10 @@ importers:
       '@sherpaw/shared':
         specifier: workspace:^
         version: link:../shared
+    devDependencies:
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@24.9.2)(@vitest/browser@3.2.4)(@vitest/ui@3.2.4)(jiti@2.6.1)(yaml@2.8.2)
 
   playgrounds/xsai:
     dependencies:

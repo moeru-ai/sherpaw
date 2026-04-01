@@ -31,6 +31,7 @@
   ],
   "scripts": {
     "build": "tsdown",
+    "test:run": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -39,5 +40,8 @@
     "@sherpaw/asr": "workspace:^",
     "@sherpaw/preloader": "workspace:^",
     "@sherpaw/shared": "workspace:^"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
   }
 }

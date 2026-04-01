@@ -296,4 +296,5 @@ export declare const OnlineRecognizerTypes: {
 
 export type OnlineRecognizerType = typeof OnlineRecognizerTypes[keyof typeof OnlineRecognizerTypes]
 
+export function createOnlineRecognizerConfig(type?: OnlineRecognizerType, overrides?: OnlineRecognizerConfig & { type?: OnlineRecognizerType }): OnlineRecognizerConfig & { type: OnlineRecognizerType }
 export function createOnlineRecognizer(Module: WebAssemblyModule, myConfig?: OnlineRecognizerConfig & { type?: OnlineRecognizerType }): OnlineRecognizer

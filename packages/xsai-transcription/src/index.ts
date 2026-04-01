@@ -25,6 +25,9 @@ export {
   createSherpawProvider,
 } from './provider'
 export {
+  inferRecognizerType,
+} from './recognizer'
+export {
   StreamingTranscriptionSession,
 } from './session'
 export * from './stream-transcription'

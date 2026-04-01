@@ -23,7 +23,9 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsdown"
+    "build": "tsdown",
+    "test:run": "vitest run --config vitest.node.config.ts",
+    "test:run:browser": "vitest run --config vitest.config.ts"
   },
   "devDependencies": {
     "@sherpaw/asr": "workspace:^",
