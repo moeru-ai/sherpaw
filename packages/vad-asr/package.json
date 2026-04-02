@@ -26,6 +26,7 @@
     "build": "tsdown"
   },
   "devDependencies": {
+    "@moeru/eventa": "1.0.0-beta.1",
     "@sherpaw/preloader": "workspace:^",
     "@sherpaw/shared": "workspace:^",
     "@sherpaw/vad-asr": "workspace:^",

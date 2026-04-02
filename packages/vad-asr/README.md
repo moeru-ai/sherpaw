@@ -5,33 +5,63 @@ A WebAssembly (WASM) wrapper for VAD + offline ASR with sherpa-onnx.
 ## Quick start
 
 ```ts
-import { CircularBuffer, createVad, initVADASRModule, OfflineRecognizer } from '@sherpaw/vad-asr'
+import { createVADASR } from '@sherpaw/vad-asr'
 
-const module = await initVADASRModule()
-
-const vad = createVad(module, {
-  sileroVad: { model: './silero_vad.onnx' },
-  sampleRate: 16000,
-  numThreads: 1,
-  provider: 'cpu',
-  debug: 0,
-  bufferSizeInSeconds: 30,
-})
-
-const recognizer = new OfflineRecognizer(
-  {
-    modelConfig: {
-      tokens: './tokens.txt',
-      numThreads: 1,
-      provider: 'cpu',
-      debug: 0,
-      paraformer: { model: './paraformer.onnx' },
+const vadAsr = await createVADASR({
+  models: {
+    vad: {
+      silero: '/models/silero_vad.onnx',
+    },
+    asr: {
+      modelConfig: {
+        moonshine: {
+          encoder: '/models/moonshine/encoder_model.ort',
+          mergedDecoder: '/models/moonshine/decoder_model_merged.ort',
+        },
+        tokens: '/models/moonshine/tokens.txt',
+      },
     },
   },
-  module,
-)
+  runtime: {
+    sampleRate: 16000,
+  },
+})
 
-const circularBuffer = new CircularBuffer(30 * 16000, module)
+const samples = new Float32Array([/* 16kHz mono PCM samples */])
+const segments = await vadAsr.transcribe(samples, 16000)
+
+for (const segment of segments) {
+  console.log(segment.text)
+}
+
+vadAsr.close()
+```
+
+### Hybrid model sources (URL/path + in-memory data)
+
+```ts
+import { createVADASR } from '@sherpaw/vad-asr'
+
+const encoderBuffer = await fetch('/models/moonshine/encoder_model.ort').then(r => r.arrayBuffer())
+const mergedDecoderBuffer = await fetch('/models/moonshine/decoder_model_merged.ort').then(r => r.arrayBuffer())
+const tokensBuffer = await fetch('/models/moonshine/tokens.txt').then(r => r.arrayBuffer())
+
+const vadAsr = await createVADASR({
+  models: {
+    vad: {
+      silero: '/models/silero_vad.onnx',
+    },
+    asr: {
+      modelConfig: {
+        moonshine: {
+          encoder: { data: encoderBuffer, filename: 'encoder_model.ort' },
+          mergedDecoder: { data: mergedDecoderBuffer, filename: 'decoder_model_merged.ort' },
+        },
+        tokens: { data: tokensBuffer, filename: 'tokens.txt' },
+      },
+    },
+  },
+})
 ```
 
 ## Notes

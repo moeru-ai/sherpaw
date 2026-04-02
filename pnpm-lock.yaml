@@ -242,6 +242,9 @@ importers:
 
   packages/vad-asr:
     devDependencies:
+      '@moeru/eventa':
+        specifier: 1.0.0-beta.1
+        version: 1.0.0-beta.1
       '@sherpaw/preloader':
         specifier: workspace:^
         version: link:../preloader

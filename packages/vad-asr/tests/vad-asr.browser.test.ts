@@ -1,7 +1,7 @@
 import { loadVirtualData } from '@sherpaw/preloader'
 import { expect, it } from 'vitest'
 
-import { CircularBuffer, createVad, initVADASRModule, OfflineRecognizer } from '../src'
+import { CircularBuffer, createVad, createVadAsr, initVadAsrModule, OfflineRecognizer } from '../src'
 import { decodeWavPcm16, encodeWavPcm16 } from './helpers/wav'
 
 const vadModelPath = new URL('./models/silero_vad.onnx', import.meta.url)
@@ -59,7 +59,7 @@ it('encodes and decodes wav pcm16 data', () => {
 })
 
 it('transcribes wav samples with the browser vad-asr pipeline', async () => {
-  const module = await initVADASRModule()
+  const module = await initVadAsrModule()
   expect(module).toBeDefined()
 
   const modelName = 'moonshine-tiny-ja-quantized-2026-02-27'
@@ -140,3 +140,79 @@ it('transcribes wav samples with the browser vad-asr pipeline', async () => {
   vad.free()
   recognizer.free()
 }, 120000)
+
+it('transcribes wav samples with createVADASR using hybrid model inputs', async () => {
+  const modelName = 'moonshine-tiny-ja-quantized-2026-02-27'
+
+  const [encoder, decoder, tokens, wav] = await Promise.all([
+    fetchBytes(new URL(`./models/${modelName}/encoder_model.ort`, import.meta.url)),
+    fetchBytes(new URL(`./models/${modelName}/decoder_model_merged.ort`, import.meta.url)),
+    fetchBytes(new URL(`./models/${modelName}/tokens.txt`, import.meta.url)),
+    fetchBytes(new URL(`./models/${modelName}/test_wavs/0.wav`, import.meta.url)),
+  ])
+
+  const session = await createVadAsr({
+    models: {
+      vad: {
+        silero: vadModelPath,
+      },
+      asr: {
+        modelConfig: {
+          moonshine: {
+            encoder: { filename: 'encoder_model.ort', source: encoder },
+            mergedDecoder: { filename: 'decoder_model_merged.ort', source: decoder },
+          },
+          tokens: { filename: 'tokens.txt', source: tokens },
+        },
+      },
+    },
+    runtime: {
+      sampleRate: 16000,
+    },
+  })
+
+  const wavArrayBuffer = wav.buffer.slice(wav.byteOffset, wav.byteOffset + wav.byteLength) as ArrayBuffer
+  const wavData = decodeWavPcm16(wavArrayBuffer)
+  const samples = downsampleBuffer(wavData.samples, wavData.sampleRate, 16000)
+
+  const segments = await session.transcribe(samples, 16000)
+  expect(segments.length).toBeGreaterThan(0)
+  expect(segments.some(s => s.text.length > 0)).toBe(true)
+  session.close()
+}, 120000)
+
+it('requires filename when model data is provided', async () => {
+  await expect(createVadAsr({
+    models: {
+      vad: {
+        silero: { data: new Uint8Array([1, 2, 3]) as any, filename: 'silero_vad.onnx' },
+      },
+      asr: {
+        modelConfig: {
+          moonshine: {
+            encoder: { data: new Uint8Array([1]), filename: 'encoder_model.ort' },
+            mergedDecoder: { data: new Uint8Array([1]), filename: 'decoder_model_merged.ort' },
+          },
+          tokens: { data: new Uint8Array([1]), filename: 'tokens.txt' },
+        },
+      },
+    },
+  })).rejects.toThrow('filename')
+})
+
+it('supports legacy asr model shape and validates filenames', async () => {
+  await expect(createVadAsr({
+    models: {
+      vad: {
+        silero: { data: new Uint8Array([1]), filename: 'silero_vad.onnx' },
+      },
+      asr: {
+        moonshine: {
+          encoder: { data: new Uint8Array([1]), filename: 'encoder_model.ort' },
+          mergedDecoder: { data: new Uint8Array([1]), filename: 'decoder_model_merged.ort' },
+        },
+        tokens: { data: new Uint8Array([1]) as any, filename: 'tokens.txt' },
+      },
+    },
+  })).rejects.toThrow('filename')
+})
