@@ -5,7 +5,7 @@ import { createContext } from '@moeru/eventa/adapters/webworkers/worker'
 
 import type {
   PushAudioInvokeRequest,
-  TranscriptionEvent,
+  RuntimeTranscriptionEvent,
 } from '../stream-transcription/types'
 import type { ResolvedSherpawSpeechModel } from '../types'
 
@@ -50,17 +50,14 @@ function clearBinds(): void {
   unsubscribeHandlers = []
 }
 
-function subscribeSessionEvents(emit: (event: TranscriptionEvent) => void): Array<() => void> {
+function subscribeSessionEvents(emit: (event: RuntimeTranscriptionEvent) => void): Array<() => void> {
   if (!sessionRef) {
     return []
   }
 
   const eventTypes = [
     'transcription.started',
-    'sentence.begin',
     'transcription.partial',
-    'word',
-    'sentence.end',
     'transcription.completed',
   ] as const
 

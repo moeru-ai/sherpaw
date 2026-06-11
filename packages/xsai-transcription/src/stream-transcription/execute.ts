@@ -1,17 +1,17 @@
 import { errorMessageFrom } from '@moeru/std'
 
 import type {
-  EventByType,
   Request,
-  TranscriptionEvent,
+  RuntimeTranscriptionEvent,
+  StreamTranscriptionDelta,
   TranscriptionResult,
 } from './types'
 
 function createEventStreams<TEvent extends { type: string }>() {
-  const fullControllers = new Set<ReadableStreamDefaultController<TEvent>>()
-  const partialControllers = new Set<ReadableStreamDefaultController<EventByType<TEvent, 'transcription.partial'>>>()
-  const wordControllers = new Set<ReadableStreamDefaultController<EventByType<TEvent, 'word'>>>()
-  const sentenceControllers = new Set<ReadableStreamDefaultController<EventByType<TEvent, 'sentence.end'>>>()
+  const xsaiFullControllers = new Set<ReadableStreamDefaultController<StreamTranscriptionDelta>>()
+  const xsaiTextControllers = new Set<ReadableStreamDefaultController<string>>()
+  const lastPartialByIndex = new Map<number, string>()
+  let text = ''
 
   const createBranch = <T>(controllers: Set<ReadableStreamDefaultController<T>>) => {
     let currentController: ReadableStreamDefaultController<T> | null = null
@@ -41,7 +41,7 @@ function createEventStreams<TEvent extends { type: string }>() {
   }
 
   const closeAll = () => {
-    for (const controllers of [fullControllers, partialControllers, wordControllers, sentenceControllers] as const) {
+    for (const controllers of [xsaiFullControllers, xsaiTextControllers] as const) {
       for (const controller of controllers) {
         try {
           controller.close()
@@ -55,7 +55,7 @@ function createEventStreams<TEvent extends { type: string }>() {
   }
 
   const errorAll = (error: Error) => {
-    for (const controllers of [fullControllers, partialControllers, wordControllers, sentenceControllers] as const) {
+    for (const controllers of [xsaiFullControllers, xsaiTextControllers] as const) {
       for (const controller of controllers) {
         try {
           controller.error(error)
@@ -68,23 +68,47 @@ function createEventStreams<TEvent extends { type: string }>() {
     }
   }
 
+  const emitXsaiDelta = (delta: string) => {
+    if (delta.length === 0) {
+      return
+    }
+
+    text += delta
+    safeEnqueue(xsaiTextControllers, delta)
+    safeEnqueue(xsaiFullControllers, { type: 'transcript.text.delta', delta })
+  }
+
+  const emitXsaiDone = () => {
+    safeEnqueue(xsaiFullControllers, { type: 'transcript.text.done', delta: '' })
+  }
+
+  const emitXsaiFromPartial = (event: TEvent) => {
+    const partial = event as { index?: unknown, text?: unknown }
+    if (typeof partial.index !== 'number' || typeof partial.text !== 'string') {
+      return
+    }
+
+    const previous = lastPartialByIndex.get(partial.index) ?? ''
+    const delta = partial.text.startsWith(previous)
+      ? partial.text.slice(previous.length)
+      : partial.text
+
+    lastPartialByIndex.set(partial.index, partial.text)
+    emitXsaiDelta(delta)
+  }
+
   return {
-    streams: {
-      full: createBranch(fullControllers),
-      partials: createBranch(partialControllers),
-      sentences: createBranch(sentenceControllers),
-      words: createBranch(wordControllers),
+    xsai: {
+      fullStream: createBranch(xsaiFullControllers),
+      getText: () => text,
+      textStream: createBranch(xsaiTextControllers),
     },
     emit: (event: TEvent) => {
-      safeEnqueue(fullControllers, event)
       if (event.type === 'transcription.partial') {
-        safeEnqueue(partialControllers, event as EventByType<TEvent, 'transcription.partial'>)
+        emitXsaiFromPartial(event)
       }
-      else if (event.type === 'word') {
-        safeEnqueue(wordControllers, event as EventByType<TEvent, 'word'>)
-      }
-      else if (event.type === 'sentence.end') {
-        safeEnqueue(sentenceControllers, event as EventByType<TEvent, 'sentence.end'>)
+      else if (event.type === 'transcription.completed') {
+        emitXsaiDone()
       }
     },
     errorAll,
@@ -92,16 +116,19 @@ function createEventStreams<TEvent extends { type: string }>() {
   }
 }
 
-function normalizeError(error: unknown): Error {
-  return error instanceof Error
-    ? error
-    : new Error(errorMessageFrom(error))
+function getFinishText(result: unknown): string {
+  if (!result || typeof result !== 'object') {
+    return ''
+  }
+
+  const text = (result as { text?: unknown }).text
+  return typeof text === 'string' ? text : ''
 }
 
 export function streamTranscription<
-  E extends { type: string } = TranscriptionEvent,
+  E extends { type: string } = RuntimeTranscriptionEvent,
   TFinish = unknown,
->(request: Request<E, TFinish>): TranscriptionResult<E, TFinish> {
+>(request: Request<E, TFinish>): TranscriptionResult<TFinish> {
   const eventStreams = createEventStreams<E>()
   let disposed = false
   let responsePump: Promise<void> | null = null
@@ -112,6 +139,13 @@ export function streamTranscription<
   const done = new Promise<TFinish>((resolve, reject) => {
     resolveDone = resolve
     rejectDone = reject
+  })
+
+  let resolveText!: (value: string) => void
+  let rejectText!: (error: Error) => void
+  const text = new Promise<string>((resolve, reject) => {
+    resolveText = resolve
+    rejectText = reject
   })
 
   if (request.events) {
@@ -128,9 +162,10 @@ export function streamTranscription<
         }
       }
       catch (error) {
-        const eventError = normalizeError(error)
+        const eventError = new Error(errorMessageFrom(error))
         eventStreams.errorAll(eventError)
         rejectDone(eventError)
+        rejectText(eventError)
         throw error
       }
     })()
@@ -147,9 +182,10 @@ export function streamTranscription<
       return await runInCommandOrder(fn)
     }
     catch (error) {
-      const commandError = normalizeError(error)
+      const commandError = new Error(errorMessageFrom(error))
       eventStreams.errorAll(commandError)
       rejectDone(commandError)
+      rejectText(commandError)
       throw commandError
     }
   }
@@ -188,6 +224,7 @@ export function streamTranscription<
         const result = await runOrFail(async () => {
           return await request.finish()
         })
+        resolveText(eventStreams.xsai.getText() || getFinishText(result))
         resolveDone(result)
       }
       finally {
@@ -195,9 +232,10 @@ export function streamTranscription<
       }
     },
     async abort(reason) {
-      const abortError = normalizeError(reason)
+      const abortError = new Error(errorMessageFrom(reason))
       eventStreams.errorAll(abortError)
       rejectDone(abortError)
+      rejectText(abortError)
       await dispose()
     },
   })
@@ -205,7 +243,9 @@ export function streamTranscription<
   return {
     dispose,
     done,
+    fullStream: eventStreams.xsai.fullStream,
     input,
-    streams: eventStreams.streams,
+    text,
+    textStream: eventStreams.xsai.textStream,
   }
 }

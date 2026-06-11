@@ -1,53 +1,31 @@
-export interface WordBoundary {
-  text: string
-  startMs?: number
-  endMs?: number
-  estimated?: boolean
-}
-
 export interface TranscriptionStartedEvent {
   type: 'transcription.started'
-}
-
-export interface SentenceBeginEvent {
-  type: 'sentence.begin'
-  index: number
-  timeMs?: number
 }
 
 export interface PartialEvent {
   type: 'transcription.partial'
   index: number
   text: string
-  timeMs?: number
-  words?: WordBoundary[]
-}
-
-export interface WordEvent {
-  type: 'word'
-  index: number
-  word: WordBoundary
-}
-
-export interface SentenceEndEvent {
-  type: 'sentence.end'
-  index: number
-  text: string
-  timeMs?: number
-  words?: WordBoundary[]
 }
 
 export interface CompletedEvent {
   type: 'transcription.completed'
 }
 
-export type TranscriptionEvent
+export type RuntimeTranscriptionEvent
   = | CompletedEvent
     | PartialEvent
-    | SentenceBeginEvent
-    | SentenceEndEvent
     | TranscriptionStartedEvent
-    | WordEvent
+
+export interface StreamTranscriptionDelta {
+  delta: string
+  type: StreamTranscriptionDeltaType
+}
+
+export type StreamTranscriptionDeltaType = 'transcript.text.delta' | 'transcript.text.done'
+
+export type TranscriptionEvent
+  = StreamTranscriptionDelta
 
 export interface PushAudioOptions {
   sampleRate?: number
@@ -63,17 +41,12 @@ export interface FinishResult {
   sentenceCount: number
 }
 
-export interface WordExtractionResult {
-  words?: WordBoundary[]
-  timeMs?: number
-}
-
 export interface PushAudioInvokeRequest {
   samples: number[]
   sampleRate?: number
 }
 
-export interface Request<E extends { type: string } = TranscriptionEvent, TFinish = FinishResult> {
+export interface Request<E extends { type: string } = RuntimeTranscriptionEvent, TFinish = FinishResult> {
   inputSampleRate?: number
   events?: ReadableStream<E>
   load: () => Promise<void>
@@ -85,17 +58,11 @@ export interface Request<E extends { type: string } = TranscriptionEvent, TFinis
 
 export type EventByType<TEvent extends { type: string }, TType extends string> = Extract<TEvent, { type: TType }>
 
-export interface TranscriptionResult<
-  TEvent extends { type: string } = TranscriptionEvent,
-  TFinish = FinishResult,
-> {
+export interface TranscriptionResult<TFinish = FinishResult> {
   input: WritableStream<Float32Array>
   done: Promise<TFinish>
   dispose: () => Promise<void>
-  streams: {
-    full: ReadableStream<TEvent>
-    partials: ReadableStream<EventByType<TEvent, 'transcription.partial'>>
-    words: ReadableStream<EventByType<TEvent, 'word'>>
-    sentences: ReadableStream<EventByType<TEvent, 'sentence.end'>>
-  }
+  fullStream: ReadableStream<StreamTranscriptionDelta>
+  text: Promise<string>
+  textStream: ReadableStream<string>
 }

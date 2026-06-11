@@ -1,6 +1,5 @@
-import { expect, it } from 'vitest'
-
 import { OnlineRecognizerTypes } from '@sherpaw/asr'
+import { expect, it } from 'vitest'
 
 import { inferRecognizerType } from './recognizer'
 

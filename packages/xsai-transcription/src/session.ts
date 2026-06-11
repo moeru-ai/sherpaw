@@ -7,14 +7,21 @@ import type {
   FinishResult,
   PushAudioOptions,
   PushAudioResult,
-  TranscriptionEvent,
-  WordBoundary,
+  RuntimeTranscriptionEvent,
 } from './stream-transcription/types'
 
 import { streamTranscriptionEvent } from './events'
-import { extractText, extractWordsAndTime } from './stream-transcription/result'
 
 const DEFAULT_SAMPLE_RATE = 16000
+
+function extractText(result: unknown): string {
+  if (!result || typeof result !== 'object') {
+    return ''
+  }
+
+  const text = (result as Record<string, unknown>).text
+  return typeof text === 'string' ? text : ''
+}
 
 export class StreamingTranscriptionSession {
   readonly eventContext = createContext()
@@ -26,8 +33,6 @@ export class StreamingTranscriptionSession {
   private sentenceIndex = 1
   private currentText = ''
   private started = false
-  private sentenceStarted = false
-  private lastWordCount = 0
 
   constructor(module: ASRModule, options?: { recognizerConfig?: OnlineRecognizerConfig & { type?: OnlineRecognizerType }, sampleRate?: number }) {
     this.recognizer = createOnlineRecognizer(module, options?.recognizerConfig)
@@ -35,13 +40,13 @@ export class StreamingTranscriptionSession {
     this.sampleRate = options?.sampleRate ?? DEFAULT_SAMPLE_RATE
   }
 
-  on<T extends TranscriptionEvent['type']>(
+  on<T extends RuntimeTranscriptionEvent['type']>(
     type: T,
-    handler: (event: Extract<TranscriptionEvent, { type: T }>) => void,
+    handler: (event: Extract<RuntimeTranscriptionEvent, { type: T }>) => void,
   ): () => void {
     return this.eventContext.on(streamTranscriptionEvent, ({ body }) => {
       if (body.type === type) {
-        handler(body as Extract<TranscriptionEvent, { type: T }>)
+        handler(body as Extract<RuntimeTranscriptionEvent, { type: T }>)
       }
     })
   }
@@ -62,11 +67,8 @@ export class StreamingTranscriptionSession {
     this.emitProgress(text, result)
 
     if (isEndpoint) {
-      this.emitSentenceEnd(text, result)
       this.recognizer.reset(this.stream)
       this.currentText = ''
-      this.sentenceStarted = false
-      this.lastWordCount = 0
       this.sentenceIndex++
     }
 
@@ -85,10 +87,6 @@ export class StreamingTranscriptionSession {
 
     this.emitProgress(text, result)
 
-    if (text.length > 0) {
-      this.emitSentenceEnd(text, result)
-    }
-
     if (this.started) {
       this.eventContext.emit(streamTranscriptionEvent, { type: 'transcription.completed' })
     }
@@ -106,8 +104,6 @@ export class StreamingTranscriptionSession {
   reset(): void {
     this.recognizer.reset(this.stream)
     this.currentText = ''
-    this.sentenceStarted = false
-    this.lastWordCount = 0
     this.sentenceIndex = 1
     this.started = false
   }
@@ -118,61 +114,17 @@ export class StreamingTranscriptionSession {
     this.eventContext.off(streamTranscriptionEvent)
   }
 
-  private emitProgress(text: string, rawResult: unknown): void {
+  private emitProgress(text: string, _rawResult: unknown): void {
     if (!this.started) {
       this.started = true
       this.eventContext.emit(streamTranscriptionEvent, { type: 'transcription.started' })
-    }
-
-    if (text.length > 0 && !this.sentenceStarted) {
-      this.sentenceStarted = true
-      const { timeMs } = extractWordsAndTime(rawResult, text)
-      this.eventContext.emit(streamTranscriptionEvent, { type: 'sentence.begin', index: this.sentenceIndex, timeMs })
     }
 
     if (text.length === 0 || text === this.currentText) {
       return
     }
 
-    const { words, timeMs } = extractWordsAndTime(rawResult, text)
-    this.eventContext.emit(streamTranscriptionEvent, { type: 'transcription.partial', index: this.sentenceIndex, text, timeMs, words })
-    this.emitWordDelta(words)
+    this.eventContext.emit(streamTranscriptionEvent, { type: 'transcription.partial', index: this.sentenceIndex, text })
     this.currentText = text
-  }
-
-  private emitWordDelta(words?: WordBoundary[]): void {
-    if (!words || words.length === 0) {
-      return
-    }
-
-    const nextWordCount = words.length
-    if (nextWordCount <= this.lastWordCount) {
-      return
-    }
-
-    for (let i = this.lastWordCount; i < nextWordCount; i++) {
-      this.eventContext.emit(streamTranscriptionEvent, {
-        type: 'word',
-        index: this.sentenceIndex,
-        word: words[i]!,
-      })
-    }
-
-    this.lastWordCount = nextWordCount
-  }
-
-  private emitSentenceEnd(text: string, rawResult: unknown): void {
-    if (!this.sentenceStarted || text.length === 0) {
-      return
-    }
-
-    const { words, timeMs } = extractWordsAndTime(rawResult, text)
-    this.eventContext.emit(streamTranscriptionEvent, {
-      type: 'sentence.end',
-      index: this.sentenceIndex,
-      text,
-      timeMs,
-      words,
-    })
   }
 }

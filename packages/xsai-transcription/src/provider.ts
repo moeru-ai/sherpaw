@@ -6,7 +6,7 @@ import type {
   FinishResult,
   PushAudioInvokeRequest,
   PushAudioResult,
-  TranscriptionEvent,
+  RuntimeTranscriptionEvent,
 } from './stream-transcription/types'
 import type {
   ResolvedSherpawSpeechModel,
@@ -149,8 +149,10 @@ export function createSherpawProvider(options: SherpawProviderOptions = {}): She
       let workerInvokes: WorkerInvokes | null = null
       let stopEventListener: (() => void) | null = null
       let disposed = false
-      const eventQueue: TranscriptionEvent[] = []
-      const eventChannel = createEventChannel<TranscriptionEvent>()
+      let loaded = false
+      let collectingFetchEvents = false
+      const eventQueue: RuntimeTranscriptionEvent[] = []
+      const eventChannel = createEventChannel<RuntimeTranscriptionEvent>()
       let invokeChain = Promise.resolve()
 
       function runInInvokeOrder<T>(fn: () => Promise<T>): Promise<T> {
@@ -159,7 +161,7 @@ export function createSherpawProvider(options: SherpawProviderOptions = {}): She
         return job
       }
 
-      function takeEvents(): TranscriptionEvent[] {
+      function takeEvents(): RuntimeTranscriptionEvent[] {
         return eventQueue.splice(0)
       }
 
@@ -168,6 +170,7 @@ export function createSherpawProvider(options: SherpawProviderOptions = {}): She
         stopEventListener?.()
         stopEventListener = null
         workerInvokes = null
+        loaded = false
 
         if (workerRef && options.worker !== workerRef) {
           workerRef.terminate()
@@ -185,7 +188,9 @@ export function createSherpawProvider(options: SherpawProviderOptions = {}): She
 
         const workerContext = createContext(worker).context
         stopEventListener = workerContext.on(streamTranscriptionEvent, ({ body }) => {
-          eventQueue.push(body)
+          if (collectingFetchEvents) {
+            eventQueue.push(body)
+          }
           eventChannel.emit(body)
         })
 
@@ -229,14 +234,24 @@ export function createSherpawProvider(options: SherpawProviderOptions = {}): She
         }
       }
 
+      async function loadWorker(): Promise<void> {
+        if (loaded) {
+          return
+        }
+
+        const invokes = ensureWorkerInvokes()
+        const resolvedModel = await createInitPayload()
+        await invokes.init(resolvedModel, { transfer: [resolvedModel.data] })
+        loaded = true
+        disposed = false
+      }
+
       async function runInvoke(invoke: InvokeTransportRequest): Promise<unknown> {
         const invokes = ensureWorkerInvokes()
 
         switch (invoke.invoke) {
-          case streamTranscriptionInitInvoke.sendEvent.id: {
-            const resolvedModel = await createInitPayload()
-            return await invokes.init(resolvedModel, { transfer: [resolvedModel.data] })
-          }
+          case streamTranscriptionInitInvoke.sendEvent.id:
+            return await loadWorker()
 
           case streamTranscriptionPushInvoke.sendEvent.id: {
             if (!isPushAudioInvokeRequest(invoke.payload))
@@ -261,10 +276,14 @@ export function createSherpawProvider(options: SherpawProviderOptions = {}): She
       const transportFetch = async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
         try {
           const invoke = await parseInvokeRequest(init)
+          eventQueue.length = 0
+          collectingFetchEvents = true
           const payload = await runInvoke(invoke)
+          collectingFetchEvents = false
           return createTransportResponse({ ok: true, payload, events: takeEvents() })
         }
         catch (error) {
+          collectingFetchEvents = false
           const message = errorMessageFrom(error)
           return createTransportResponse({ ok: false, error: message })
         }
@@ -277,9 +296,7 @@ export function createSherpawProvider(options: SherpawProviderOptions = {}): She
         events: eventChannel.stream,
         load: async () => {
           await runInInvokeOrder(async () => {
-            const invokes = ensureWorkerInvokes()
-            const resolvedModel = await createInitPayload()
-            await invokes.init(resolvedModel, { transfer: [resolvedModel.data] })
+            await loadWorker()
           })
         },
         push: async (payload) => {
@@ -324,8 +341,6 @@ export function createSherpawProvider(options: SherpawProviderOptions = {}): She
           await transport.load()
         },
         terminateSpeech: () => {
-          disposed = true
-          eventChannel.close()
           teardownWorker()
         },
       }
