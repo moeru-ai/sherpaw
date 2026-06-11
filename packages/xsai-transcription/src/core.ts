@@ -73,24 +73,30 @@ export async function transcribeOnce(options: {
   const { session } = await createStreamingTranscriptionSession(options)
 
   const sentences: string[] = []
-  const unsubscribeHandlers = session.on('sentence.end', ({ text }) => {
-    sentences.push(text)
-  })
 
-  const sampleRate = options.sampleRate ?? 16000
-  const chunkSize = options.chunkSize ?? sampleRate / 10
-  const samples = options.audio instanceof Float32Array ? options.audio : pcm16ToFloat32(options.audio)
+  try {
+    const sampleRate = options.sampleRate ?? 16000
+    const chunkSize = options.chunkSize ?? sampleRate / 10
+    const samples = options.audio instanceof Float32Array ? options.audio : pcm16ToFloat32(options.audio)
 
-  for (let i = 0; i < samples.length; i += chunkSize) {
-    session.pushAudio(samples.subarray(i, i + chunkSize), { sampleRate })
+    for (let i = 0; i < samples.length; i += chunkSize) {
+      const result = session.pushAudio(samples.subarray(i, i + chunkSize), { sampleRate })
+      if (result.isEndpoint && result.text.length > 0) {
+        sentences.push(result.text)
+      }
+    }
+
+    const finished = session.finish()
+    if (finished.text.length > 0) {
+      sentences.push(finished.text)
+    }
+
+    return {
+      text: sentences.join(' ').trim() || finished.text,
+      sentences,
+    }
   }
-
-  const finished = session.finish()
-  unsubscribeHandlers()
-  session.dispose()
-
-  return {
-    text: sentences.join(' ').trim() || finished.text,
-    sentences,
+  finally {
+    session.dispose()
   }
 }

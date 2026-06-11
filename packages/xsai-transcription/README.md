@@ -49,9 +49,12 @@ await writer.write(float32Chunk)
 await writer.close()
 const final = await transcription.done
 
-const sentenceReader = transcription.streams.sentences.getReader()
-const { value: sentence } = await sentenceReader.read()
-console.log('sentence:', sentence?.text)
+for await (const textPart of transcription.textStream) {
+  console.log('delta:', textPart)
+}
+
+const text = await transcription.text
+console.log('text:', text)
 ```
 
 ## Provider design
@@ -59,9 +62,8 @@ console.log('sentence:', sentence?.text)
 `createSherpawProvider()` returns:
 
 - `speech(model)` -> `{ baseURL, fetch, loadSpeech, terminateSpeech }`
-- `speech(model)` exposes `openStream(...)` for native bi-directional command/event streaming.
 
-`streamTranscription` now uses the duplex stream transport (`openStream`) as the primary execution path.
+`streamTranscription` accepts realtime `Float32Array` chunks through `input` and exposes xsai-compatible transcription output streams.
 
 `loadSpeech()` is optional preloading for model assets before streaming starts. `terminateSpeech()` terminates provider-owned worker state for the speech transport instance.
 
@@ -69,23 +71,13 @@ Use `asRemoteUrl(...)` when model assets should be fetched on the main thread be
 
 ## Event model
 
-Events emitted in `streamTranscription(...).streams.full`:
+`streamTranscription(...)` exposes output fields aligned with `@xsai/stream-transcription`:
 
-- `transcription.started`
-- `sentence.begin`
-- `transcription.partial`
-- `word`
-- `sentence.end`
-- `transcription.completed`
+- `fullStream`: `ReadableStream<{ type: 'transcript.text.delta' | 'transcript.text.done', delta: string }>`
+- `textStream`: `ReadableStream<string>`
+- `text`: `Promise<string>`
 
 These are routed with `@moeru/eventa` internally.
-
-`streamTranscription(...).streams` also exposes typed stream branches:
-
-- `full`: all events (`TranscriptionEvent`)
-- `partials`: only `transcription.partial`
-- `words`: only `word`
-- `sentences`: only `sentence.end`
 
 ## Low-level APIs
 

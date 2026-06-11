@@ -1,17 +1,23 @@
-import type { AudioProcessorDataMessage } from './audio-processor.protocol'
-
-declare const sampleRate: number
+interface AudioProcessorDataMessage {
+  type: 'data'
+  sampleRate: number
+  frames: number
+  data: ArrayBufferLike
+}
 
 class AudioProcessor extends AudioWorkletProcessor {
   private readonly outSampleRate = 16000
 
   private emitData(data: Float32Array) {
-    this.port.postMessage({
+    const buffer = data.buffer
+    const message = {
       type: 'data',
       sampleRate: this.outSampleRate,
       frames: data.length,
-      data: data.buffer,
-    } as AudioProcessorDataMessage, [data.buffer as ArrayBuffer])
+      data: buffer,
+    } satisfies AudioProcessorDataMessage
+
+    this.port.postMessage(message, buffer instanceof ArrayBuffer ? [buffer] : [])
   }
 
   process(inputs: Float32Array[][], _outputs: Float32Array[][], _parameters: Record<string, Float32Array>): boolean {

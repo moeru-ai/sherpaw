@@ -1,18 +1,12 @@
 export type {
-  CompletedEvent,
-  EventByType,
   FinishResult,
-  PartialEvent,
   PushAudioInvokeRequest,
   PushAudioResult,
   Request,
-  SentenceBeginEvent,
-  SentenceEndEvent,
+  StreamTranscriptionDelta,
+  StreamTranscriptionDeltaType,
   TranscriptionEvent,
   TranscriptionResult,
-  TranscriptionStartedEvent,
-  WordBoundary,
-  WordEvent,
 } from './types'
 
 export {

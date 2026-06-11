@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { OnlineRecognizerType } from '@sherpaw/asr'
 import type { TranscriptionResult } from '@sherpaw/xsai-transcription'
-import type { AudioProcessorMessage } from './audio-processor.protocol'
 
 import { errorMessageFrom } from '@moeru/std'
 import { createOnlineRecognizerConfig, OnlineRecognizerTypes } from '@sherpaw/asr'
@@ -14,18 +13,26 @@ import { computed, onBeforeUnmount, ref, shallowRef, toRaw, useTemplateRef, watc
 import audioProcessor from './audio-processor.worklet?url'
 import Button from './components/Button.vue'
 import ModelSetup from './components/ModelSetup.vue'
+import { reduceReadableStream } from './readable-stream'
 
 const transcriptionsDisplayRef = useTemplateRef<HTMLDivElement>('transcriptionsDisplay')
 
 const SAMPLE_RATE = 16000
 const sherpawProvider = createSherpawProvider({ workerURL: sherpawWorkerUrl })
 
+interface AudioProcessorDataMessage {
+  type: 'data'
+  sampleRate: number
+  frames: number
+  data: ArrayBufferLike
+}
+
 let audioCtx: AudioContext | null = null
 let mediaStreamSource: MediaStreamAudioSourceNode | null = null
 let workletNode: AudioWorkletNode | null = null
 
 const streamResultsControllers = shallowRef<TranscriptionResult | null>(null)
-let controllerReaders: ReadableStreamDefaultReader[] = []
+let stopControllerListeners: Array<() => void> = []
 let inputWriter: WritableStreamDefaultWriter<Float32Array> | null = null
 let pushQueue = Promise.resolve()
 
@@ -97,63 +104,48 @@ watch(metadata, (nextMetadata) => {
 })
 
 function clearControllerListeners() {
-  for (const reader of controllerReaders) {
-    void reader.cancel()
+  for (const stop of stopControllerListeners) {
+    stop()
   }
-  controllerReaders = []
+  stopControllerListeners = []
 }
 
 function attachControllerListeners(target: TranscriptionResult) {
   clearControllerListeners()
 
-  const partialReader = target.streams.partials.getReader()
-  controllerReaders.push(partialReader)
-  void (async () => {
-    while (true) {
-      const { done, value } = await partialReader.read()
-      if (done) {
-        break
-      }
-
+  stopControllerListeners.push(reduceReadableStream(target.textStream, undefined, (_, value) => {
+    if (value.length > 0) {
       if (!liveTranscription.value) {
-        liveTranscription.value = { id: nanoid(), text: value.text }
+        liveTranscription.value = { id: nanoid(), text: value }
       }
       else {
-        liveTranscription.value.text = value.text
+        liveTranscription.value.text += value
       }
 
       if (transcriptionsDisplayRef.value) {
         transcriptionsDisplayRef.value.scrollTop = transcriptionsDisplayRef.value.scrollHeight
       }
     }
-  })()
+  }, {
+    onError: error => errorMessage.value = errorMessageFrom(error) || 'An unknown error occurred while reading transcription text.',
+  }))
 
-  const sentenceReader = target.streams.sentences.getReader()
-  controllerReaders.push(sentenceReader)
-  void (async () => {
-    while (true) {
-      const { done, value } = await sentenceReader.read()
-      if (done) {
-        break
-      }
-
-      if (!liveTranscription.value) {
-        liveTranscription.value = { id: nanoid(), text: value.text }
-      }
-      else {
-        liveTranscription.value.text = value.text
-      }
-
-      if (liveTranscription.value.text.length > 0) {
-        previousTranscriptions.value.push(liveTranscription.value)
-        liveTranscription.value = { id: nanoid(), text: '' }
-      }
-
-      if (transcriptionsDisplayRef.value) {
-        transcriptionsDisplayRef.value.scrollTop = transcriptionsDisplayRef.value.scrollHeight
-      }
+  stopControllerListeners.push(reduceReadableStream(target.fullStream, undefined, (_, value) => {
+    if (value.type !== 'transcript.text.done') {
+      return
     }
-  })()
+
+    if (liveTranscription.value && liveTranscription.value.text.length > 0) {
+      previousTranscriptions.value.push(liveTranscription.value)
+      liveTranscription.value = { id: nanoid(), text: '' }
+    }
+
+    if (transcriptionsDisplayRef.value) {
+      transcriptionsDisplayRef.value.scrollTop = transcriptionsDisplayRef.value.scrollHeight
+    }
+  }, {
+    onError: error => errorMessage.value = errorMessageFrom(error) || 'An unknown error occurred while reading transcription events.',
+  }))
 }
 
 async function stopRecording() {
@@ -200,7 +192,7 @@ async function initializeSession() {
   initializing.value = true
 
   try {
-    const nextController = streamTranscription({
+    const transcribing = streamTranscription({
       ...sherpawProvider.speech({
         metadata: toRaw(metadata.value) as any,
         data: toRaw(data.value),
@@ -217,9 +209,9 @@ async function initializeSession() {
       inputSampleRate: SAMPLE_RATE,
     })
 
-    attachControllerListeners(nextController)
-    inputWriter = nextController.input.getWriter()
-    streamResultsControllers.value = nextController
+    attachControllerListeners(transcribing)
+    inputWriter = transcribing.input.getWriter()
+    streamResultsControllers.value = transcribing
   }
   catch (error) {
     errorMessage.value = errorMessageFrom(error) || 'An unknown error occurred during initialization.'
@@ -269,8 +261,8 @@ async function setupRecorder(audioContext: AudioContext, stream: MediaStream) {
       await audioCtx.audioWorklet.addModule(audioProcessor)
       workletNode = new AudioWorkletNode(audioCtx, 'audio-processor')
 
-      workletNode.port.onmessage = (event) => {
-        const message: AudioProcessorMessage = event.data
+      workletNode.port.onmessage = (event: MessageEvent<AudioProcessorDataMessage>) => {
+        const message = event.data
         if (message.type === 'data') {
           processAudioData(new Float32Array(message.data), message.sampleRate)
         }

@@ -1,7 +1,7 @@
 import type { ASRModule, OnlineRecognizerConfig, OnlineRecognizerType } from '@sherpaw/asr'
 import type { DataMetadata } from '@sherpaw/preloader'
 
-import type { FinishResult, Request, TranscriptionEvent } from './stream-transcription/types'
+import type { FinishResult, Request, RuntimeTranscriptionEvent } from './stream-transcription/types'
 
 export interface RemoteUrlSource {
   kind: 'remote-url'
@@ -46,14 +46,14 @@ export interface ResolvedSherpawSpeechModel {
   sampleRate?: number
 }
 
-export interface SherpawSpeechTransport extends Request<TranscriptionEvent, FinishResult> {
+export interface SherpawSpeechTransport extends Request<RuntimeTranscriptionEvent, FinishResult> {
   baseURL?: string
   fetch?: FetchLike
   loadSpeech: () => Promise<void>
   terminateSpeech: () => void
 }
 
-export type TransportResponse<TEvent extends { type: string } = TranscriptionEvent>
+export type TransportResponse<TEvent extends { type: string } = RuntimeTranscriptionEvent>
   = | {
     ok: true
     payload?: unknown
