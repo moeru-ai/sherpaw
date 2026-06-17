@@ -4,6 +4,14 @@ import { expect, it } from 'vitest'
 import { createOnlineRecognizer, initASRModule } from '../src'
 import { decodeWavPcm16, encodeWavPcm16 } from './helpers/wav'
 
+async function fetchBytes(url: URL): Promise<Uint8Array> {
+  const res = await fetch(url)
+  if (!res.ok) {
+    throw new Error(`Failed to fetch ${url.toString()}: ${res.status} ${res.statusText}`)
+  }
+  return new Uint8Array(await res.arrayBuffer())
+}
+
 it('runs in a browser context', () => {
   expect(window).toBeDefined()
 })
@@ -20,24 +28,8 @@ it('encodes and decodes wav pcm16 data', () => {
 })
 
 it('transcribes wav samples with the browser asr pipeline', async () => {
-  const mp3Url = new URL('./fixtures/en-IE-EmilyNeural.mp3', import.meta.url)
-  const mp3Buffer = await (await fetch(mp3Url)).arrayBuffer()
-  const audioContext = new AudioContext()
-  const decoded = await audioContext.decodeAudioData(mp3Buffer.slice(0))
-
-  let pcmSamples = decoded.getChannelData(0)
-  if (decoded.sampleRate !== 16000) {
-    const offline = new OfflineAudioContext(1, Math.ceil(decoded.duration * 16000), 16000)
-    const source = offline.createBufferSource()
-    source.buffer = decoded
-    source.connect(offline.destination)
-    source.start()
-    const rendered = await offline.startRendering()
-    pcmSamples = rendered.getChannelData(0)
-  }
-  await audioContext.close()
-
-  const wavBuffer = encodeWavPcm16(pcmSamples, 16000)
+  const wav = await fetchBytes(new URL('./fixtures/0.wav', import.meta.url))
+  const wavBuffer = wav.buffer.slice(wav.byteOffset, wav.byteOffset + wav.byteLength) as ArrayBuffer
   const wavData = decodeWavPcm16(wavBuffer)
 
   const asrModule = await initASRModule()
@@ -46,17 +38,17 @@ it('transcribes wav samples with the browser asr pipeline', async () => {
   }
 
   const [encoder, decoder, tokens] = await Promise.all([
-    fetch(new URL('./model/encoder.onnx', import.meta.url)).then(r => r.arrayBuffer()),
-    fetch(new URL('./model/decoder.onnx', import.meta.url)).then(r => r.arrayBuffer()),
-    fetch(new URL('./model/tokens.txt', import.meta.url)).then(r => r.arrayBuffer()),
+    fetchBytes(new URL('./model/encoder.onnx', import.meta.url)),
+    fetchBytes(new URL('./model/decoder.onnx', import.meta.url)),
+    fetchBytes(new URL('./model/tokens.txt', import.meta.url)),
   ])
 
   const filenames = loadVirtualData({
     module: asrModule,
     virtualData: {
-      'encoder.onnx': new Uint8Array(encoder),
-      'decoder.onnx': new Uint8Array(decoder),
-      'tokens.txt': new Uint8Array(tokens),
+      'encoder.onnx': encoder,
+      'decoder.onnx': decoder,
+      'tokens.txt': tokens,
     },
     dependencyId: 'asr-model',
   })

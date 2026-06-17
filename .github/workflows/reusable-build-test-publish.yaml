@@ -70,7 +70,9 @@ jobs:
         run: pnpm run build
 
       - name: Prepare test models
-        run: packages/vad-asr/tests/scripts/prepare-models.sh
+        run: |
+          packages/asr/tests/scripts/prepare-models.sh
+          packages/vad-asr/tests/scripts/prepare-models.sh
 
       - name: Run tests
         run: pnpm run test
