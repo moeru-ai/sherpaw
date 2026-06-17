@@ -2,8 +2,11 @@ import eslintConfig from '@antfu/eslint-config'
 
 export default eslintConfig({
   ignores: [
+    'cspell.config.yaml',
     'packages/*/src/prebuilt/**/*',
     'packages/asr/src/asr.js',
+    'packages/speaker-diarization/src/sherpa-onnx-speaker-diarization.js',
+    'packages/speaker-diarization/src/sherpa-onnx-wasm-main-speaker-diarization.js',
     'packages/vad/src/vad.js',
     'packages/vad-asr/src/asr.js',
     'packages/vad-asr/src/vad.js',

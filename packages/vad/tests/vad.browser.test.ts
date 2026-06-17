@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest'
+
 import { initVADModule } from '../src'
 import { decodeWavPcm16, encodeWavPcm16 } from './helpers/wav'
 

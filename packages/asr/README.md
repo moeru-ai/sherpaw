@@ -24,6 +24,7 @@ yarn add @sherpaw/asr @sherpaw/preloader
 ```ts
 import type { OnlineRecognizer } from '@sherpaw/asr'
 import type { DataMetadata } from '@sherpaw/preloader'
+
 import { createOnlineRecognizer, initASRModule } from '@sherpaw/asr'
 import asrWASMFile from '@sherpaw/asr/module.wasm?url'
 import { loadData } from '@sherpaw/preloader'

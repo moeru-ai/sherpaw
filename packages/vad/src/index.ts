@@ -1,7 +1,8 @@
 import type { WebAssemblyModule } from '@sherpaw/shared'
 
-export * from './vad'
 export type { WebAssemblyModule as VADModule } from '@sherpaw/shared'
+
+export * from './vad'
 
 export async function initVADModule(): Promise<WebAssemblyModule> {
   // @ts-expect-error Missing types from generated prebuilt module
