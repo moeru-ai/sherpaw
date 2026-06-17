@@ -163,6 +163,8 @@ models/
 
 packages/*/tests/model/**/*
 packages/*/tests/fixtures/**/*
+**/tests/**/*.png
+typed-router.d.ts
 
 # Coding Agent
 .claude/**local**
