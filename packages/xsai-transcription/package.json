@@ -1,7 +1,7 @@
 {
   "name": "@sherpaw/xsai-transcription",
   "type": "module",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Streaming transcription wrapper for Sherpa-ONNX WASM with xsai-style ergonomics",
   "author": "Makito <i@maki.to>",
   "license": "Apache-2.0",
