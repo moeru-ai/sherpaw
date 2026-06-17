@@ -50,14 +50,12 @@ it('transcribes wav samples with the browser asr pipeline', async () => {
     fetch(new URL('./model/tokens.txt', import.meta.url)).then(r => r.arrayBuffer()),
   ])
 
-  loadVirtualData({
+  const filenames = loadVirtualData({
     module: asrModule,
     virtualData: {
-      files: [
-        { filename: 'encoder.onnx', data: new Uint8Array(encoder) },
-        { filename: 'decoder.onnx', data: new Uint8Array(decoder) },
-        { filename: 'tokens.txt', data: new Uint8Array(tokens) },
-      ],
+      'encoder.onnx': new Uint8Array(encoder),
+      'decoder.onnx': new Uint8Array(decoder),
+      'tokens.txt': new Uint8Array(tokens),
     },
     dependencyId: 'asr-model',
   })
@@ -70,10 +68,10 @@ it('transcribes wav samples with the browser asr pipeline', async () => {
     },
     modelConfig: {
       paraformer: {
-        encoder: './encoder.onnx',
-        decoder: './decoder.onnx',
+        encoder: filenames['encoder.onnx'],
+        decoder: filenames['decoder.onnx'],
       },
-      tokens: './tokens.txt',
+      tokens: filenames['tokens.txt'],
       numThreads: 1,
       provider: 'cpu',
       debug: 0,
