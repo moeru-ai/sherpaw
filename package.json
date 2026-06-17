@@ -42,6 +42,8 @@
     "dev": "pnpm -F @sherpaw/sandbox dev",
     "dev:xsai": "pnpm -F @sherpaw/playground-xsai dev",
     "build": "pnpm -r run build",
+    "test": "vitest",
+    "test:run": "vitest run",
     "lint:fix": "eslint --cache . --fix",
     "lint": "eslint --cache .",
     "up": "taze -w -r -I && pnpm prune && pnpm dedupe",
@@ -57,7 +59,8 @@
     "taze": "^19.11.0",
     "tinyexec": "^1.0.4",
     "tsdown": "^0.15.12",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   },
   "pnpm": {
     "overrides": {
