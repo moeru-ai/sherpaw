@@ -214,6 +214,36 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  packages/testing-audio:
+    devDependencies:
+      '@moeru/std':
+        specifier: 0.1.0-beta.17
+        version: 0.1.0-beta.17
+      '@sherpaw/asr':
+        specifier: workspace:^
+        version: link:../asr
+      '@sherpaw/vitest-plugin-fakemic':
+        specifier: workspace:^
+        version: link:../vitest-plugin-fakemic
+      '@sherpaw/xsai-transcription':
+        specifier: workspace:^
+        version: link:../xsai-transcription
+      '@types/audioworklet':
+        specifier: ^0.0.90
+        version: 0.0.90
+      '@types/node':
+        specifier: ^24.6.0
+        version: 24.9.2
+      playwright:
+        specifier: ^1.57.0
+        version: 1.57.0
+      vite:
+        specifier: npm:rolldown-vite@7.1.14
+        version: rolldown-vite@7.1.14(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@24.9.2)(jiti@2.6.1)(yaml@2.8.3)
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@24.9.2)(@vitest/browser-playwright@4.1.9)(@vitest/coverage-v8@4.1.9)(rolldown-vite@7.1.14(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@24.9.2)(jiti@2.6.1)(yaml@2.8.3))
+
   packages/vad:
     devDependencies:
       '@sherpaw/preloader':
@@ -279,6 +309,22 @@ importers:
       vitest:
         specifier: ^4.1.9
         version: 4.1.9(@types/node@24.9.2)(@vitest/browser-playwright@4.1.9)(@vitest/coverage-v8@4.1.9)(rolldown-vite@7.1.14(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@24.9.2)(jiti@2.6.1)(yaml@2.8.3))
+
+  packages/vitest-plugin-fakemic:
+    dependencies:
+      playwright:
+        specifier: ^1.57.0
+        version: 1.57.0
+      vite:
+        specifier: npm:rolldown-vite@7.1.14
+        version: rolldown-vite@7.1.14(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@24.9.2)(jiti@2.6.1)(yaml@2.8.3)
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@24.9.2)(@vitest/browser-playwright@4.1.9)(@vitest/coverage-v8@4.1.9)(rolldown-vite@7.1.14(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@24.9.2)(jiti@2.6.1)(yaml@2.8.3))
+    devDependencies:
+      '@types/node':
+        specifier: ^24.6.0
+        version: 24.9.2
 
   packages/xsai-transcription:
     dependencies:

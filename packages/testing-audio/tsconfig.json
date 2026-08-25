@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": [
+      "DOM",
+      "DOM.Iterable",
+      "ESNext"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": [
+      "node",
+      "@types/audioworklet",
+      "vite/client"
+    ],
+    "strict": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "app/src/**/*.ts",
+    "cases/**/*.ts",
+    "src/**/*.ts",
+    "vite.config.ts",
+    "vitest.config.ts"
+  ]
+}

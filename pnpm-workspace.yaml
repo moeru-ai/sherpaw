@@ -5,6 +5,8 @@ packages:
   - packages/sandbox
   - packages/shared
   - packages/speaker-diarization
+  - packages/testing-audio
   - packages/vad
   - packages/vad-asr
+  - packages/vitest-plugin-fakemic
   - packages/xsai-transcription
