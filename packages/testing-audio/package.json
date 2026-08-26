@@ -1,0 +1,28 @@
+{
+  "name": "@sherpaw/testing-audio",
+  "type": "module",
+  "version": "0.0.3",
+  "private": true,
+  "description": "Sherpaw browser audio pipeline tests",
+  "author": "Moeru AI",
+  "license": "Apache-2.0",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "build:target": "pnpm --filter @sherpaw/xsai-transcription... build && vite build",
+    "test": "vitest",
+    "test:run": "pnpm run build:target && vitest run",
+    "test:existing-build": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@moeru/std": "0.1.0-beta.17",
+    "@sherpaw/asr": "workspace:^",
+    "@sherpaw/vitest-plugin-fakemic": "workspace:^",
+    "@sherpaw/xsai-transcription": "workspace:^",
+    "@types/audioworklet": "^0.0.90",
+    "@types/node": "^24.6.0",
+    "playwright": "^1.57.0",
+    "vite": "npm:rolldown-vite@7.1.14",
+    "vitest": "^4.1.9"
+  }
+}

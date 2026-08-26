@@ -44,6 +44,7 @@
     "build": "pnpm -r run build",
     "test": "vitest",
     "test:run": "vitest run",
+    "type-check": "pnpm -r --if-present typecheck",
     "lint:fix": "eslint --cache . --fix",
     "lint": "eslint --cache .",
     "up": "taze -w -r -I && pnpm prune && pnpm dedupe",

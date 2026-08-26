@@ -10,6 +10,7 @@ export default defineConfig(() => {
         'packages/speaker-diarization',
         'packages/vad',
         'packages/vad-asr',
+        'packages/vitest-plugin-fakemic',
         'packages/xsai-transcription',
       ],
     },
