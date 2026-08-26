@@ -18,6 +18,8 @@ ignorePaths:
 dictionaryDefinitions: []
 dictionaries: []
 words:
+  - accum
+  - AIRI
   - Attributify
   - audioworklet
   - Ayaka
@@ -27,17 +29,17 @@ words:
   - cwrap
   - demi
   - downsample
-  - accum
+  - Eeuo
   - emcc
   - emscripten
   - emsdk
   - endforeach
   - endfunction
   - eventa
-  - Eeuo
+  - Fakemic
   - Fars
-  - funasr
   - Fsts
+  - funasr
   - HEAPF
   - HEAPU
   - hfup
@@ -50,9 +52,10 @@ words:
   - moeru
   - Neko
   - Nemo
+  - noloop
   - npmjs
-  - Omnilingual
   - omnilingual
+  - Omnilingual
   - onnx
   - onnxruntime
   - paraformer
@@ -70,6 +73,7 @@ words:
   - unocss
   - unplugin
   - VADASR
+  - vitest
   - vueuse
   - wavs
   - webworkers
