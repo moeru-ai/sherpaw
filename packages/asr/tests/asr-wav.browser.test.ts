@@ -36,6 +36,9 @@ it('transcribes wav samples with the browser asr pipeline', async () => {
   if (!asrModule?.addRunDependency) {
     throw new Error('ASR module failed to initialize for browser test')
   }
+  expect((asrModule as any)._SherpaOnnxCreateOfflineRecognizer).toBeTypeOf('function')
+  expect((asrModule as any)._SherpaOnnxOnlineStreamGetOption).toBeTypeOf('function')
+  expect((asrModule as any)._SherpaOnnxOfflineStreamGetOption).toBeTypeOf('function')
 
   const [encoder, decoder, tokens] = await Promise.all([
     fetchBytes(new URL('./model/encoder.onnx', import.meta.url)),
@@ -89,6 +92,8 @@ it('transcribes wav samples with the browser asr pipeline', async () => {
   })
 
   const stream = recognizer.createStream()
+  stream.setOption('is_final', '1')
+  expect(stream.getOption('is_final')).toBe('1')
   stream.acceptWaveform(wavData.sampleRate, wavData.samples)
   stream.inputFinished()
 

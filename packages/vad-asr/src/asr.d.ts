@@ -155,6 +155,27 @@ export interface OfflineFunAsrNanoModelConfig {
   hotwords?: string
 }
 
+export interface OfflineQwen3AsrModelConfig {
+  convFrontend?: string
+  encoder?: string
+  decoder?: string
+  tokenizer?: string
+  maxTotalLen?: number
+  maxNewTokens?: number
+  temperature?: number
+  topP?: number
+  seed?: number
+  hotwords?: string
+}
+
+export interface OfflineCohereTranscribeModelConfig {
+  encoder?: string
+  decoder?: string
+  language?: string
+  usePunct?: number
+  useItn?: number
+}
+
 export interface TdnnModelConfig {
   model?: string
 }
@@ -174,6 +195,8 @@ export interface OfflineModelConfig extends OnlineModelConfig {
   medasr?: OfflineMedAsrCtcModelConfig
   fireRedAsrCtc?: OfflineFireRedAsrCtcModelConfig
   funasrNano?: OfflineFunAsrNanoModelConfig
+  qwen3Asr?: OfflineQwen3AsrModelConfig
+  cohereTranscribe?: OfflineCohereTranscribeModelConfig
   tdnn?: TdnnModelConfig
   teleSpeechCtc?: string
   // other optional offline-specific entries are represented by SimpleModelConfig above
@@ -201,6 +224,8 @@ export class OfflineStream {
   free(): void
   /** Append audio samples (Float32Array, range [-1, 1]) */
   acceptWaveform(sampleRate: number, samples: Float32Array): void
+  setOption(key: string, value: string): void
+  getOption(key: string): string
 }
 
 /** Offline recognizer class. */
@@ -227,6 +252,8 @@ export class OnlineStream {
   free(): void
   acceptWaveform(sampleRate: number, samples: Float32Array): void
   inputFinished(): void
+  setOption(key: string, value: string): void
+  getOption(key: string): string
 }
 
 /** Online recognizer class (not exported from the JS module directly, but used/returned). */
@@ -276,6 +303,8 @@ export function initSherpaOnnxOfflineOmnilingualAsrCtcModelConfig(config: Offlin
 export function initSherpaOnnxOfflineMedAsrCtcModelConfig(config: OfflineMedAsrCtcModelConfig, Module: any): InitResult
 export function initSherpaOnnxOfflineFireRedAsrCtcModelConfig(config: OfflineFireRedAsrCtcModelConfig, Module: any): InitResult
 export function initSherpaOnnxOfflineFunAsrNanoModelConfig(config: OfflineFunAsrNanoModelConfig, Module: any): InitResult
+export function initSherpaOnnxOfflineQwen3AsrModelConfig(config: OfflineQwen3AsrModelConfig, Module: any): InitResult
+export function initSherpaOnnxOfflineCohereTranscribeModelConfig(config: OfflineCohereTranscribeModelConfig, Module: any): InitResult
 export function initSherpaOnnxOfflineWhisperModelConfig(config: WhisperModelConfig, Module: any): InitResult
 export function initSherpaOnnxOfflineCanaryModelConfig(config: CanaryModelConfig, Module: any): InitResult
 export function initSherpaOnnxOfflineMoonshineModelConfig(config: MoonshineModelConfig, Module: any): InitResult

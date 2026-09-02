@@ -36,4 +36,3 @@ download_asr() {
 }
 
 download_asr moonshine-tiny-ja-quantized-2026-02-27
-download_asr moonshine-base-zh-quantized-2026-02-27
