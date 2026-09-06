@@ -38,6 +38,8 @@ set(exported_functions
   SherpaOnnxDestroyOfflineStreamResultJson
   SherpaOnnxGetOfflineStreamResult
   SherpaOnnxGetOfflineStreamResultAsJson
+  SherpaOnnxOfflineStreamGetOption
+  SherpaOnnxOfflineStreamSetOption
 )
 
 set(exported_runtime_methods
@@ -47,6 +49,12 @@ set(exported_runtime_methods
 	getValue
 	lengthBytesUTF8
 	UTF8ToString
+	HEAPU8
+	HEAP16
+	HEAP32
+	HEAPU32
+	HEAPF32
+	HEAPF64
 )
 
 set_emcc_flags(MY_FLAGS "${exported_functions}" "${exported_runtime_methods}")

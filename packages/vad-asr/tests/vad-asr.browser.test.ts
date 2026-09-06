@@ -112,6 +112,8 @@ it('transcribes wav samples with the browser vad-asr pipeline', async () => {
       vad.pop()
 
       const stream = recognizer.createStream()
+      stream.setOption('language', 'ja')
+      expect(stream.getOption('language')).toBe('ja')
       stream.acceptWaveform(16000, segment.samples)
       recognizer.decode(stream)
 

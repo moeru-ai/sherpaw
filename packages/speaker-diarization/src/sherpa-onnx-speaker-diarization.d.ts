@@ -5,6 +5,8 @@
 export interface OfflineSpeakerSegmentationPyannoteModelConfig {
   /** Path or URL to the ONNX model. */
   model?: string
+  /** Segmentation window shift as a ratio of the model chunk size. */
+  windowShiftRatio?: number
 }
 
 /** Config for the offline speaker segmentation model. */

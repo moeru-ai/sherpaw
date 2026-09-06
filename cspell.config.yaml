@@ -21,14 +21,26 @@ words:
   - accum
   - AIRI
   - Attributify
+  - AXCL
+  - Axera
   - audioworklet
   - Ayaka
   - bumpp
+  - Branchformer
   - ccall
   - cjkchar
+  - chromedriver
+  - Chromedriver
+  - conv
   - cwrap
+  - CUDA
   - demi
   - downsample
+  - denoiser
+  - Diacritization
+  - diacritization
+  - DPDF
+  - DSHERPA
   - Eeuo
   - emcc
   - emscripten
@@ -40,12 +52,15 @@ words:
   - Fars
   - Fsts
   - funasr
+  - GTCRN
   - HEAPF
   - HEAPU
   - hfup
   - hotwords
   - iconify
+  - Kokoro
   - LIBSTDCPP
+  - LSTM
   - Makito
   - malloc
   - medasr
@@ -53,6 +68,7 @@ words:
   - Neko
   - Nemo
   - noloop
+  - NNAPI
   - npmjs
   - omnilingual
   - Omnilingual
@@ -60,18 +76,28 @@ words:
   - onnxruntime
   - paraformer
   - PORTAUDIO
+  - Punct
   - Pyannote
+  - Qwen
+  - qwen
   - reka
+  - riscv
+  - RKNN
+  - RNNT
   - sherpaw
   - silero
+  - Spacemi
+  - Spleeter
   - sumimakito
   - taze
+  - Tauri
   - Tdnn
   - tele
   - tinyexec
   - tsdown
   - unocss
   - unplugin
+  - VITS
   - VADASR
   - vitest
   - vueuse
@@ -79,6 +105,7 @@ words:
   - webworkers
   - Wenet
   - worklet
+  - XNNPACK
   - xlink
   - xsai
   - zipformer
