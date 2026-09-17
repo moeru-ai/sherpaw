@@ -4,11 +4,15 @@
 
 ## Development
 
+Install [Git LFS](https://git-lfs.com/) and run `git lfs install` before checking out the submodules so that model data files are downloaded.
+
 ```shell
 git clone git@github.com:sumimakito/sherpaw.git
 git submodule init
 git submodule update
 ```
+
+The published Hugging Face models are pinned as submodules under `models/huggingface/`. Each model includes `preload.data`, `preload.js`, and `preload.js.metadata` in `install/bin/wasm/`.
 
 ## Development at the WASM/C level
 
