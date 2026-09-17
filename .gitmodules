@@ -8,3 +8,15 @@
 	url = https://github.com/k2-fsa/sherpa-onnx
 	branch = master
 	shallow = true
+[submodule "models/huggingface/sherpa-onnx-streaming-zipformer-ar_en_id_ja_ru_th_vi_zh-2025-02-10"]
+	path = models/huggingface/sherpa-onnx-streaming-zipformer-ar_en_id_ja_ru_th_vi_zh-2025-02-10
+	url = https://huggingface.co/moeru-ai/sherpa-onnx-streaming-zipformer-ar_en_id_ja_ru_th_vi_zh-2025-02-10
+	branch = main
+[submodule "models/huggingface/sherpaw-paraformer-zh-en"]
+	path = models/huggingface/sherpaw-paraformer-zh-en
+	url = https://huggingface.co/moeru-ai/sherpaw-paraformer-zh-en
+	branch = main
+[submodule "models/huggingface/sherpaw-zipformer-zh-en-2023-02-20"]
+	path = models/huggingface/sherpaw-zipformer-zh-en-2023-02-20
+	url = https://huggingface.co/moeru-ai/sherpaw-zipformer-zh-en-2023-02-20
+	branch = main

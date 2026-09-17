@@ -57,6 +57,7 @@ words:
   - HEAPU
   - hfup
   - hotwords
+  - huggingface
   - iconify
   - Kokoro
   - LIBSTDCPP
