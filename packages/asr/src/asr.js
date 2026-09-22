@@ -2100,6 +2100,12 @@ class OnlineRecognizer {
 
     freeConfig(config, Module)
 
+    // The C API returns a null handle for invalid model files or configuration.
+    // Do not let createStream pass that handle back into WASM.
+    if (!handle) {
+      throw new Error('Failed to create the online recognizer. Check the model files and recognizer type.')
+    }
+
     this.handle = handle
     this.Module = Module
   }
