@@ -1,0 +1,69 @@
+{
+  "provider": "AIHubMix",
+  "model": "tts-1",
+  "format": "mono PCM16 WAV, 16000 Hz",
+  "texts": {
+    "enroll-1": "你好，欢迎参加今天的声音测试。请仔细听这段自然的语音，我们将用它建立一个说话人的声音档案。",
+    "enroll-3": "Today I am recording a few sentences to introduce my voice. The streets are quiet, and a gentle breeze moves through the open window.",
+    "query-zh": "明天下午我们准备一起去图书馆，找几本关于音乐和旅行的书，然后在附近的咖啡店聊一聊。",
+    "query-en": "The weather is getting cooler this week. I would like to take a quiet walk by the river and listen to the birds before dinner."
+  },
+  "files": [
+    {
+      "voice": "alloy",
+      "kind": "enroll-1",
+      "file": "alloy-enroll-1.wav",
+      "sha256": "73923049057aa2bc5cd63287f96f76ca5c656db35c8d849c358c74f45096d0df"
+    },
+    {
+      "voice": "alloy",
+      "kind": "enroll-3",
+      "file": "alloy-enroll-3.wav",
+      "sha256": "e5d0c75df371eb06b2dbfbaacdaaf5e32c402b6249eabb27f4b75f205bca3e53"
+    },
+    {
+      "voice": "alloy",
+      "kind": "query-zh",
+      "file": "alloy-query-zh.wav",
+      "sha256": "b7cfbe03e774976454704d17eb3359a339809425d13255a4bb4cf48b36963cb6"
+    },
+    {
+      "voice": "alloy",
+      "kind": "query-en",
+      "file": "alloy-query-en.wav",
+      "sha256": "72015df8f3e0c51e0f0dedbcb04dcbcc701f4dea31362b6271268a8a5ded4b79"
+    },
+    {
+      "voice": "nova",
+      "kind": "enroll-1",
+      "file": "nova-enroll-1.wav",
+      "sha256": "cefe523b82878ed225706917d9442a8f1f4e6a5a777cf506513557ac25f93e1a"
+    },
+    {
+      "voice": "nova",
+      "kind": "enroll-3",
+      "file": "nova-enroll-3.wav",
+      "sha256": "43b95b5564a80ef6d8f922012f30a0254c3bb7d66d11840a7551c91fd8bc6395"
+    },
+    {
+      "voice": "nova",
+      "kind": "query-zh",
+      "file": "nova-query-zh.wav",
+      "sha256": "d7d6208be84b5556561efdcd039bf54ce404ce4f15e5b0aa9d4f550ca7c1faf3"
+    },
+    {
+      "voice": "nova",
+      "kind": "query-en",
+      "file": "nova-query-en.wav",
+      "sha256": "b6636f5b2f430d287432590cebd3f8984ec85f528beec5cadf8de0abc133ce47"
+    }
+  ],
+  "unknowns": [
+    {
+      "speaker": "liudehua",
+      "file": "liudehua-test-sr-1.wav",
+      "sha256": "a855706ad8e8253e341e3f65892c66d7dfb4bdc83675bcf38b863f2f8d167553",
+      "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/liudehua-test-sr-1.wav"
+    }
+  ]
+}

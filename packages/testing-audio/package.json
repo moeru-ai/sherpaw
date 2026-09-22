@@ -8,15 +8,19 @@
   "license": "Apache-2.0",
   "exports": "./src/index.ts",
   "scripts": {
-    "build:target": "pnpm --filter @sherpaw/xsai-transcription... build && vite build",
+    "build:target": "pnpm --filter @sherpaw/xsai-transcription... build && pnpm --filter @sherpaw/speaker-identification... build && vite build",
     "test": "vitest",
     "test:run": "pnpm run build:target && vitest run",
     "test:existing-build": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:speakers": "pnpm --filter @sherpaw/speaker-identification... build && vitest run --config vitest.speaker.config.ts",
+    "ablate:speakers": "pnpm --filter @sherpaw/speaker-identification... build && node scripts/ablate-speakers.mjs"
   },
   "devDependencies": {
     "@moeru/std": "0.1.0-beta.17",
     "@sherpaw/asr": "workspace:^",
+    "@sherpaw/preloader": "workspace:^",
+    "@sherpaw/speaker-identification": "workspace:^",
     "@sherpaw/vitest-plugin-fakemic": "workspace:^",
     "@sherpaw/xsai-transcription": "workspace:^",
     "@types/audioworklet": "^0.0.90",

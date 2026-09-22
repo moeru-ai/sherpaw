@@ -24,6 +24,6 @@
     "cases/**/*.ts",
     "src/**/*.ts",
     "vite.config.ts",
-    "vitest.config.ts"
+    "vitest*.config.ts"
   ]
 }

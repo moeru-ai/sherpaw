@@ -1,0 +1,992 @@
+{
+  "date": "2026-09-22T17:56:29.380Z",
+  "browser": "143.0.7499.4",
+  "corpus": {
+    "manifest": "packages/testing-audio/cases/speaker-identification/fixtures/manifest.json",
+    "manifestSha256": "466ecede58ae6b03dba6d9dcf345ab28d83c222433698f88876b8bb610094c78",
+    "files": [
+      {
+        "voice": "alloy",
+        "kind": "enroll-1",
+        "file": "alloy-enroll-1.wav",
+        "sha256": "73923049057aa2bc5cd63287f96f76ca5c656db35c8d849c358c74f45096d0df"
+      },
+      {
+        "voice": "alloy",
+        "kind": "enroll-3",
+        "file": "alloy-enroll-3.wav",
+        "sha256": "e5d0c75df371eb06b2dbfbaacdaaf5e32c402b6249eabb27f4b75f205bca3e53"
+      },
+      {
+        "voice": "alloy",
+        "kind": "query-zh",
+        "file": "alloy-query-zh.wav",
+        "sha256": "b7cfbe03e774976454704d17eb3359a339809425d13255a4bb4cf48b36963cb6"
+      },
+      {
+        "voice": "alloy",
+        "kind": "query-en",
+        "file": "alloy-query-en.wav",
+        "sha256": "72015df8f3e0c51e0f0dedbcb04dcbcc701f4dea31362b6271268a8a5ded4b79"
+      },
+      {
+        "voice": "nova",
+        "kind": "enroll-1",
+        "file": "nova-enroll-1.wav",
+        "sha256": "cefe523b82878ed225706917d9442a8f1f4e6a5a777cf506513557ac25f93e1a"
+      },
+      {
+        "voice": "nova",
+        "kind": "enroll-3",
+        "file": "nova-enroll-3.wav",
+        "sha256": "43b95b5564a80ef6d8f922012f30a0254c3bb7d66d11840a7551c91fd8bc6395"
+      },
+      {
+        "voice": "nova",
+        "kind": "query-zh",
+        "file": "nova-query-zh.wav",
+        "sha256": "d7d6208be84b5556561efdcd039bf54ce404ce4f15e5b0aa9d4f550ca7c1faf3"
+      },
+      {
+        "voice": "nova",
+        "kind": "query-en",
+        "file": "nova-query-en.wav",
+        "sha256": "b6636f5b2f430d287432590cebd3f8984ec85f528beec5cadf8de0abc133ce47"
+      }
+    ],
+    "unknowns": [
+      {
+        "speaker": "liudehua",
+        "file": "liudehua-test-sr-1.wav",
+        "sha256": "a855706ad8e8253e341e3f65892c66d7dfb4bdc83675bcf38b863f2f8d167553",
+        "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/liudehua-test-sr-1.wav"
+      }
+    ]
+  },
+  "models": [
+    {
+      "model": "3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced",
+      "modelSha256": "aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2",
+      "dimension": 192,
+      "extractionTimes": [
+        255.40000000596046,
+        201.30000001192093,
+        211.19999998807907,
+        158.7999999821186,
+        218.19999998807907,
+        195.59999999403954,
+        201.7000000178814,
+        180.5,
+        90.59999999403954,
+        73.7000000178814,
+        75.09999999403954,
+        75.69999998807907,
+        74.69999998807907,
+        213.80000001192093,
+        158.69999998807907,
+        200.89999997615814,
+        179.80000001192093,
+        221.5,
+        172.19999998807907,
+        208.90000000596046,
+        179.19999998807907
+      ],
+      "rows": [
+        {
+          "condition": "one-zh",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.9429773688316345,
+              "name": "alloy"
+            },
+            {
+              "score": 0.44906142354011536,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "one-zh",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.6831834316253662,
+              "name": "alloy"
+            },
+            {
+              "score": 0.21279701590538025,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "one-zh",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.8522784113883972,
+              "name": "nova"
+            },
+            {
+              "score": 0.471864253282547,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "one-zh",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.6149178147315979,
+              "name": "nova"
+            },
+            {
+              "score": 0.27812063694000244,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "one-zh",
+          "expected": null,
+          "voice": "liudehua",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.07854218780994415,
+              "name": "nova"
+            },
+            {
+              "score": 0.0352228507399559,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "two-mixed",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.9029450416564941,
+              "name": "alloy"
+            },
+            {
+              "score": 0.4285961985588074,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "two-mixed",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.8690207004547119,
+              "name": "alloy"
+            },
+            {
+              "score": 0.2847612500190735,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "two-mixed",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.8721745610237122,
+              "name": "nova"
+            },
+            {
+              "score": 0.4239456355571747,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "two-mixed",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.7941737174987793,
+              "name": "nova"
+            },
+            {
+              "score": 0.27245667576789856,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "two-mixed",
+          "expected": null,
+          "voice": "liudehua",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.06401845067739487,
+              "name": "nova"
+            },
+            {
+              "score": 0.047736600041389465,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "first-3-seconds",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.8590091466903687,
+              "name": "alloy"
+            },
+            {
+              "score": 0.4401022791862488,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "first-3-seconds",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.7706220746040344,
+              "name": "alloy"
+            },
+            {
+              "score": 0.2606150507926941,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "first-3-seconds",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.7956427931785583,
+              "name": "nova"
+            },
+            {
+              "score": 0.39097678661346436,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "first-3-seconds",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.7587658166885376,
+              "name": "nova"
+            },
+            {
+              "score": 0.2863669991493225,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "quiet-0.1",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.8976181745529175,
+              "name": "alloy"
+            },
+            {
+              "score": 0.4204609990119934,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "quiet-0.1",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.8664126396179199,
+              "name": "alloy"
+            },
+            {
+              "score": 0.2734729051589966,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "quiet-0.1",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.8605533838272095,
+              "name": "nova"
+            },
+            {
+              "score": 0.4410130977630615,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "quiet-0.1",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.791168212890625,
+              "name": "nova"
+            },
+            {
+              "score": 0.27388787269592285,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "over-range-raw",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "zh",
+          "scores": [],
+          "error": "RangeError: PCM samples must be finite and between -1 and 1"
+        },
+        {
+          "condition": "over-range-raw",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "en",
+          "scores": [],
+          "error": "RangeError: PCM samples must be finite and between -1 and 1"
+        },
+        {
+          "condition": "over-range-raw",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "zh",
+          "scores": [],
+          "error": "RangeError: PCM samples must be finite and between -1 and 1"
+        },
+        {
+          "condition": "over-range-raw",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "en",
+          "scores": [],
+          "error": "RangeError: PCM samples must be finite and between -1 and 1"
+        },
+        {
+          "condition": "over-range-normalized",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.9029296040534973,
+              "name": "alloy"
+            },
+            {
+              "score": 0.4305281639099121,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "over-range-normalized",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.8682856559753418,
+              "name": "alloy"
+            },
+            {
+              "score": 0.2866867780685425,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "over-range-normalized",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.8731147646903992,
+              "name": "nova"
+            },
+            {
+              "score": 0.4249335527420044,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "over-range-normalized",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.7905603051185608,
+              "name": "nova"
+            },
+            {
+              "score": 0.27555719017982483,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "leave-one-voice-out",
+          "expected": null,
+          "voice": "alloy",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.4285961985588074,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "leave-one-voice-out",
+          "expected": null,
+          "voice": "alloy",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.2847612500190735,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "leave-one-voice-out",
+          "expected": null,
+          "voice": "nova",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.4239456355571747,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "leave-one-voice-out",
+          "expected": null,
+          "voice": "nova",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.27245667576789856,
+              "name": "alloy"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "model": "3dspeaker_speech_eres2netv2_sv_zh-cn_16k-common",
+      "modelSha256": "bf1a75b9930474cf3389ef415e6e5d38ca96fea4a3a00f7e301d080a58ee2239",
+      "dimension": 192,
+      "extractionTimes": [
+        1573.699999988079,
+        1354.7000000178814,
+        1453.800000011921,
+        1123.199999988079,
+        1562.699999988079,
+        1373.199999988079,
+        1413.4000000059605,
+        1261.2999999821186,
+        620,
+        501.5,
+        497.5,
+        504.30000001192093,
+        497.19999998807907,
+        1500.9000000059605,
+        1098.3999999761581,
+        1556.5,
+        1442.8999999761581,
+        1616.5999999940395,
+        1217.4000000059605,
+        1532.5999999940395,
+        1366.699999988079
+      ],
+      "rows": [
+        {
+          "condition": "one-zh",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.957013726234436,
+              "name": "alloy"
+            },
+            {
+              "score": 0.3134174048900604,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "one-zh",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.8272315263748169,
+              "name": "alloy"
+            },
+            {
+              "score": 0.339864581823349,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "one-zh",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.8219044804573059,
+              "name": "nova"
+            },
+            {
+              "score": 0.35125917196273804,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "one-zh",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.7135167121887207,
+              "name": "nova"
+            },
+            {
+              "score": 0.35647422075271606,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "one-zh",
+          "expected": null,
+          "voice": "liudehua",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.1697714924812317,
+              "name": "alloy"
+            },
+            {
+              "score": 0.13484516739845276,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "two-mixed",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.9289472699165344,
+              "name": "alloy"
+            },
+            {
+              "score": 0.37203145027160645,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "two-mixed",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.9152746796607971,
+              "name": "alloy"
+            },
+            {
+              "score": 0.54164719581604,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "two-mixed",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.8484928607940674,
+              "name": "nova"
+            },
+            {
+              "score": 0.354355126619339,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "two-mixed",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.8929689526557922,
+              "name": "nova"
+            },
+            {
+              "score": 0.46197396516799927,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "two-mixed",
+          "expected": null,
+          "voice": "liudehua",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.16195136308670044,
+              "name": "alloy"
+            },
+            {
+              "score": 0.13324256241321564,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "first-3-seconds",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.8771731853485107,
+              "name": "alloy"
+            },
+            {
+              "score": 0.35781973600387573,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "first-3-seconds",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.8424060940742493,
+              "name": "alloy"
+            },
+            {
+              "score": 0.5827463865280151,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "first-3-seconds",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.807523250579834,
+              "name": "nova"
+            },
+            {
+              "score": 0.30051204562187195,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "first-3-seconds",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.862392783164978,
+              "name": "nova"
+            },
+            {
+              "score": 0.4496341049671173,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "quiet-0.1",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.9008491635322571,
+              "name": "alloy"
+            },
+            {
+              "score": 0.3658851087093353,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "quiet-0.1",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.9111535549163818,
+              "name": "alloy"
+            },
+            {
+              "score": 0.5492455959320068,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "quiet-0.1",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.8141047358512878,
+              "name": "nova"
+            },
+            {
+              "score": 0.31301388144493103,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "quiet-0.1",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.8872298002243042,
+              "name": "nova"
+            },
+            {
+              "score": 0.4581129252910614,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "over-range-raw",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "zh",
+          "scores": [],
+          "error": "RangeError: PCM samples must be finite and between -1 and 1"
+        },
+        {
+          "condition": "over-range-raw",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "en",
+          "scores": [],
+          "error": "RangeError: PCM samples must be finite and between -1 and 1"
+        },
+        {
+          "condition": "over-range-raw",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "zh",
+          "scores": [],
+          "error": "RangeError: PCM samples must be finite and between -1 and 1"
+        },
+        {
+          "condition": "over-range-raw",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "en",
+          "scores": [],
+          "error": "RangeError: PCM samples must be finite and between -1 and 1"
+        },
+        {
+          "condition": "over-range-normalized",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.9285609126091003,
+              "name": "alloy"
+            },
+            {
+              "score": 0.37579482793807983,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "over-range-normalized",
+          "expected": "alloy",
+          "voice": "alloy",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.9175124168395996,
+              "name": "alloy"
+            },
+            {
+              "score": 0.5493942499160767,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "over-range-normalized",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.8466241955757141,
+              "name": "nova"
+            },
+            {
+              "score": 0.35656675696372986,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "over-range-normalized",
+          "expected": "nova",
+          "voice": "nova",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.8930286765098572,
+              "name": "nova"
+            },
+            {
+              "score": 0.4638122618198395,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "leave-one-voice-out",
+          "expected": null,
+          "voice": "alloy",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.37203145027160645,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "leave-one-voice-out",
+          "expected": null,
+          "voice": "alloy",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.54164719581604,
+              "name": "nova"
+            }
+          ]
+        },
+        {
+          "condition": "leave-one-voice-out",
+          "expected": null,
+          "voice": "nova",
+          "language": "zh",
+          "scores": [
+            {
+              "score": 0.354355126619339,
+              "name": "alloy"
+            }
+          ]
+        },
+        {
+          "condition": "leave-one-voice-out",
+          "expected": null,
+          "voice": "nova",
+          "language": "en",
+          "scores": [
+            {
+              "score": 0.46197396516799927,
+              "name": "alloy"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

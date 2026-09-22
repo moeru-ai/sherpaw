@@ -1,0 +1,49 @@
+{
+  "name": "@sherpaw/speaker-identification",
+  "type": "module",
+  "version": "0.0.4",
+  "description": "Local speaker embedding, enrollment, and identification with Sherpa-ONNX WASM",
+  "author": "Makito <i@maki.to>",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sumimakito/sherpaw.git",
+    "directory": "packages/speaker-identification"
+  },
+  "keywords": [],
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json",
+    "./module.wasm": "./dist/prebuilt/speaker-embedding.wasm"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.tests.json",
+    "test:run": "vitest run",
+    "test:prepare": "bash tests/scripts/prepare.sh",
+    "dev": "vite tests/web --host 127.0.0.1",
+    "test:demo": "pnpm run build && vitest run --config vitest.demo.config.ts"
+  },
+  "dependencies": {
+    "@sherpaw/shared": "workspace:^"
+  },
+  "devDependencies": {
+    "@iconify-json/svg-spinners": "^1.2.4",
+    "@sherpaw/preloader": "workspace:^",
+    "@sherpaw/vitest-plugin-fakemic": "workspace:^",
+    "@types/emscripten": "^1.41.5",
+    "@types/node": "^24.6.0",
+    "@vitest/browser-playwright": "^4.1.9",
+    "playwright": "^1.55.0",
+    "tsdown": "^0.15.12",
+    "typescript": "^5.9.3",
+    "vite": "npm:rolldown-vite@7.1.14",
+    "vitest": "^4.1.9"
+  }
+}

@@ -18,6 +18,25 @@ ignorePaths:
 dictionaryDefinitions: []
 dictionaries: []
 words:
+  - formants
+  - rubberband
+  - AIHUBMIX
+  - campplus
+  - dspeaker
+  - ECAPA
+  - eres
+  - fangjun
+  - fbank
+  - GMACs
+  - JSEP
+  - leijun
+  - liudehua
+  - netv
+  - nonfinite
+  - recongition
+  - SOTA
+  - Voxceleb
+  - wespeaker
   - accum
   - AIRI
   - Attributify

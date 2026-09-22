@@ -5,6 +5,7 @@ packages:
   - packages/sandbox
   - packages/shared
   - packages/speaker-diarization
+  - packages/speaker-identification
   - packages/testing-audio
   - packages/vad
   - packages/vad-asr

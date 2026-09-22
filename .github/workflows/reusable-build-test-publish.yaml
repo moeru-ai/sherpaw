@@ -73,9 +73,16 @@ jobs:
         run: |
           packages/asr/tests/scripts/prepare-models.sh
           packages/vad-asr/tests/scripts/prepare-models.sh
+          packages/speaker-identification/tests/scripts/prepare.sh
+          models/3dspeaker_speech_eres2netv2_sv_zh-cn_16k-common/download.sh
 
       - name: Run tests
         run: pnpm run test
+
+      - name: Run speaker demo and fixed audio cases
+        run: |
+          pnpm -F @sherpaw/speaker-identification test:demo
+          pnpm -F @sherpaw/testing-audio test:speakers
 
       - if: inputs.publish
         name: Set up NPM token
