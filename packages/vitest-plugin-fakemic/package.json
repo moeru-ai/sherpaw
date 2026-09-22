@@ -1,7 +1,7 @@
 {
   "name": "@sherpaw/vitest-plugin-fakemic",
   "type": "module",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "private": true,
   "description": "Fake microphone test runtime and Vitest integration",
   "author": "Moeru AI",
