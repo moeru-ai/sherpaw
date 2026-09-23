@@ -1,8 +1,8 @@
 import { loadVirtualData } from '@sherpaw/preloader'
 import { createExtractor, createInMemoryDB, initSpeakerIdentificationModule } from '@sherpaw/speaker-identification'
 
-import { normalizeRecording } from '../../../../playgrounds/speaker-identification/src/recorder'
 import { decodeWavPcm16 } from '../../../asr/tests/helpers/wav'
+import { normalizeRecording } from '../../../sandbox/src/features/speaker-identification/recorder'
 import manifest from './fixtures/manifest.json'
 
 const voices = [...new Set(manifest.files.map(file => file.voice))]

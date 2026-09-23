@@ -92,8 +92,9 @@ async function handleRequest(request: WorkerRequest, reportProgress: (progress: 
   const start = performance.now()
   const embedding = extractor.extract(request.audio.samples, request.audio.sampleRate)
   const scores = db.matches(embedding, -1, Math.max(1, enrollments.size))
+  const best = scores[0]
   return {
-    match: scores[0]?.score >= 0.6 ? scores[0] : null,
+    match: best && best.score >= 0.6 ? best : null,
     scores,
     milliseconds: performance.now() - start,
   }

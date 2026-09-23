@@ -29,7 +29,7 @@ pnpm -F @sherpaw/testing-audio ablate:speakers
 
 Tests read the local `install/bin/wasm/preload.data` from each model submodule; the data bytes are identical to the original ONNX models. Browser requests remain local.
 
-The six regression cases comprise one file matrix and two Chinese fake-microphone cases per model. File matrices include all four held-out TTS queries and the natural unknown. The browser harness lives in `playgrounds/speaker-identification/tests`, alongside the playground app. Capture follows `getUserMedia -> AudioWorklet -> recorder -> Worker -> WASM`, with a fresh browser per microphone case.
+The six regression cases comprise one file matrix and two Chinese fake-microphone cases per model. File matrices include all four held-out TTS queries and the natural unknown. The browser harness lives in `packages/sandbox/tests/speaker-identification`, alongside the sandbox app. Capture follows `getUserMedia -> AudioWorklet -> recorder -> Worker -> WASM`, with a fresh browser per microphone case.
 
 The explicit ablation command compares Chinese-only and bilingual enrollment, query duration/amplitude, and leave-one-voice-out behavior. It writes English Markdown/JSON reports under `docs/research`; JSON references the fixture manifest instead of embedding its transcripts again. Threshold sweeps reuse the same scores and are not calibration results.
 

@@ -6,9 +6,9 @@ export default defineConfig({
     projects: [
       {
         test: {
-          name: 'speaker-playground',
+          name: 'sandbox-speaker',
           environment: 'node',
-          include: ['tests/demo.test.ts'],
+          include: ['tests/speaker-identification/demo.test.ts'],
           testTimeout: 120000,
           hookTimeout: 120000,
           fileParallelism: false,
@@ -17,7 +17,7 @@ export default defineConfig({
       {
         test: {
           name: 'speaker-recorder',
-          include: ['tests/recorder.browser.test.ts'],
+          include: ['tests/speaker-identification/recorder.browser.test.ts'],
           testTimeout: 120000,
           hookTimeout: 120000,
           browser: {

@@ -37,6 +37,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/speaker-identification': RouteRecordInfo<
+      '/speaker-identification',
+      '/speaker-identification',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
   }
 
   /**
@@ -59,6 +66,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/asr.vue': {
       routes:
         | '/asr'
+      views:
+        | never
+    }
+    'src/pages/speaker-identification.vue': {
+      routes:
+        | '/speaker-identification'
       views:
         | never
     }

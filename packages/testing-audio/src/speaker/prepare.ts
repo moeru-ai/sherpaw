@@ -12,7 +12,7 @@ export interface SpeakerAudioSession extends AudioTestSession {
 export default async function prepare(context: FakemicWebPrepareContext): Promise<SpeakerAudioSession> {
   const server = await createServer({
     configFile: false,
-    root: resolve(import.meta.dirname, '../../../../playgrounds/speaker-identification'),
+    root: resolve(import.meta.dirname, '../../../sandbox'),
     server: { host: '127.0.0.1', port: 0, hmr: false, fs: { allow: [resolve(import.meta.dirname, '../../../..')] } },
   })
   try {
@@ -23,7 +23,7 @@ export default async function prepare(context: FakemicWebPrepareContext): Promis
       const url = new URL(route.request().url())
       return url.hostname === '127.0.0.1' ? route.continue() : route.abort()
     })
-    await page.goto(`${server.resolvedUrls!.local[0]}tests/index.html`)
+    await page.goto(`${server.resolvedUrls!.local[0]}tests/speaker-identification/index.html`)
     await page.waitForFunction(() => Boolean(window.speakerTest))
     return {
       page,

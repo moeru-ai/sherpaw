@@ -5,12 +5,16 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "vue-tsc -b && tsc --noEmit -p tsconfig.speaker-tests.json",
+    "test:speaker": "vitest run --config vitest.speaker.config.ts"
   },
   "dependencies": {
     "@iconify-json/ri": "^1.2.6",
+    "@iconify-json/svg-spinners": "^1.2.4",
     "@sherpaw/asr": "workspace:^",
     "@sherpaw/preloader": "workspace:^",
+    "@sherpaw/speaker-identification": "workspace:^",
     "@tsconfig/strictest": "^2.0.7",
     "@types/audioworklet": "^0.0.90",
     "@types/emscripten": "^1.41.5",
@@ -28,5 +32,11 @@
     "vue": "^3.5.22",
     "vue-router": "^4.6.3",
     "vue-tsc": "^3.1.0"
+  },
+  "devDependencies": {
+    "@sherpaw/vitest-plugin-fakemic": "workspace:^",
+    "@vitest/browser-playwright": "^4.1.9",
+    "playwright": "^1.57.0",
+    "vitest": "^4.1.9"
   }
 }

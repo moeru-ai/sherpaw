@@ -16,16 +16,25 @@ export function normalizeRecording(samples: Float32Array): void {
   // preserving its waveform instead of clipping peaks or changing gain per chunk.
   if (peak > 1) {
     for (let i = 0; i < samples.length; i++)
-      samples[i] /= peak
+      samples[i] = samples[i]! / peak
   }
 }
 
 /** Starts one manual recording. The caller controls when to stop and releases the microphone through stop(). */
-export async function startRecording(onDuration: (seconds: number) => void): Promise<Recording> {
+export async function startRecording(onDuration: (seconds: number) => void, signal?: AbortSignal): Promise<Recording> {
+  signal?.throwIfAborted()
   const context = new AudioContext()
   let stream: MediaStream | undefined
+  /** Triggering workflow: route AbortController -> abortCapture -> stop device tracks and close the audio context. */
+  function abortCapture() {
+    stream?.getTracks().forEach(track => track.stop())
+    if (context.state !== 'closed')
+      void context.close().catch(() => {})
+  }
+  signal?.addEventListener('abort', abortCapture, { once: true })
   try {
     await context.audioWorklet.addModule(new URL('./capture.worklet.js', import.meta.url))
+    signal?.throwIfAborted()
     await context.resume()
     stream = await navigator.mediaDevices.getUserMedia({ audio: {
       echoCancellation: false,
@@ -33,6 +42,7 @@ export async function startRecording(onDuration: (seconds: number) => void): Pro
       autoGainControl: false,
       channelCount: 1,
     } })
+    signal?.throwIfAborted()
     const source = context.createMediaStreamSource(stream)
     const capture = new AudioWorkletNode(context, 'speaker-test-capture')
     const mute = context.createGain()
@@ -58,7 +68,9 @@ export async function startRecording(onDuration: (seconds: number) => void): Pro
       stop() {
         stopped ??= (async () => {
           stream!.getTracks().forEach(track => track.stop())
-          await context.close()
+          signal?.removeEventListener('abort', abortCapture)
+          if (context.state !== 'closed')
+            await context.close()
           capture.port.onmessage = null
           const samples = new Float32Array(length)
           let offset = 0
@@ -76,7 +88,9 @@ export async function startRecording(onDuration: (seconds: number) => void): Pro
   }
   catch (error) {
     stream?.getTracks().forEach(track => track.stop())
-    await context.close()
+    signal?.removeEventListener('abort', abortCapture)
+    if (context.state !== 'closed')
+      await context.close()
     throw error
   }
 }

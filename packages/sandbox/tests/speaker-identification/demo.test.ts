@@ -11,9 +11,9 @@ let url: string
 
 beforeAll(async () => {
   server = await createServer({
-    configFile: false,
-    root: resolve(import.meta.dirname, '..'),
-    server: { host: '127.0.0.1', port: 0, hmr: false, fs: { allow: [resolve(import.meta.dirname, '../../..')] } },
+    root: resolve(import.meta.dirname, '../..'),
+    configFile: resolve(import.meta.dirname, '../../vite.config.ts'),
+    server: { host: '127.0.0.1', port: 0, hmr: false, fs: { allow: [resolve(import.meta.dirname, '../../../..')] } },
   })
   await server.listen()
   url = server.resolvedUrls!.local[0]
@@ -32,8 +32,8 @@ it('loads without example audio and allows typing a speaker name in a short view
       if (/-enroll-\d\.wav/.test(request.url()))
         exampleRequests.push(request.url())
     })
-    await page.goto(url)
-    await page.addScriptTag({ type: 'module', url: `${url}tests/api.ts` })
+    await page.goto(`${url}speaker-identification`)
+    await page.addScriptTag({ type: 'module', url: `${url}tests/speaker-identification/api.ts` })
     await page.waitForFunction(() => Boolean(window.speakerTest))
     await page.locator('.model-setup > summary').click()
     await page.getByRole('button', { name: '加载模型', exact: true }).click()
@@ -59,12 +59,12 @@ it('loads without example audio and allows typing a speaker name in a short view
 it('registers multiple manual recordings and keeps independent query results without blocking new recordings', async () => {
   const browser = await chromium.launch({
     headless: true,
-    args: createChromiumFileMicrophoneArguments(resolve(import.meta.dirname, '../../../packages/speaker-identification/tests/fixtures/fangjun-sr-1.wav')),
+    args: createChromiumFileMicrophoneArguments(resolve(import.meta.dirname, '../../../speaker-identification/tests/fixtures/fangjun-sr-1.wav')),
   })
   try {
     const page = await browser.newPage({ permissions: ['microphone'] })
-    await page.goto(url)
-    await page.addScriptTag({ type: 'module', url: `${url}tests/api.ts` })
+    await page.goto(`${url}speaker-identification`)
+    await page.addScriptTag({ type: 'module', url: `${url}tests/speaker-identification/api.ts` })
     await page.waitForFunction(() => Boolean(window.speakerTest))
     await page.locator('.model-setup > summary').click()
     await page.getByRole('button', { name: '加载模型', exact: true }).click()
@@ -164,8 +164,8 @@ it('appends recordings to one speaker using every saved embedding', async () => 
   const browser = await chromium.launch({ headless: true })
   try {
     const page = await browser.newPage()
-    await page.goto(url)
-    await page.addScriptTag({ type: 'module', url: `${url}tests/api.ts` })
+    await page.goto(`${url}speaker-identification`)
+    await page.addScriptTag({ type: 'module', url: `${url}tests/speaker-identification/api.ts` })
     await page.waitForFunction(() => Boolean(window.speakerTest))
     const result = await page.evaluate(async () => {
       await window.speakerTest.init()
@@ -191,8 +191,8 @@ it('renames and removes speakers and rebuilds the centroid when a sample is dele
   const browser = await chromium.launch({ headless: true })
   try {
     const page = await browser.newPage()
-    await page.goto(url)
-    await page.addScriptTag({ type: 'module', url: `${url}tests/api.ts` })
+    await page.goto(`${url}speaker-identification`)
+    await page.addScriptTag({ type: 'module', url: `${url}tests/speaker-identification/api.ts` })
     await page.waitForFunction(() => Boolean(window.speakerTest))
     const result = await page.evaluate(async () => {
       const api = window.speakerTest
@@ -224,6 +224,66 @@ it('renames and removes speakers and rebuilds the centroid when a sample is dele
     expect(scores.get('renamed')).toBeCloseTo(scores.get('reference')!, 6)
     expect(result.removed.sampleCount).toBe(0)
     expect(result.after.scores.map(match => match.name)).toEqual(['reference'])
+  }
+  finally {
+    await browser.close()
+  }
+})
+
+it('releases the microphone and Worker when leaving the route and starts a fresh session on return', async () => {
+  const browser = await chromium.launch({
+    headless: true,
+    args: createChromiumFileMicrophoneArguments(resolve(import.meta.dirname, '../../../speaker-identification/tests/fixtures/fangjun-sr-1.wav')),
+  })
+  try {
+    const page = await browser.newPage({ permissions: ['microphone'] })
+    const errors: string[] = []
+    page.on('pageerror', error => errors.push(error.message))
+    await page.addInitScript(() => {
+      const getUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices)
+      const tracks: MediaStreamTrack[] = []
+      navigator.mediaDevices.getUserMedia = async (constraints) => {
+        const stream = await getUserMedia(constraints)
+        tracks.push(...stream.getTracks())
+        return stream
+      }
+      Object.defineProperty(window, 'speakerTracksStopped', { get: () => tracks.length > 0 && tracks.every(track => track.readyState === 'ended') })
+      const NativeWorker = window.Worker
+      let activeWorkers = 0
+      window.Worker = class extends NativeWorker {
+        constructor(script: string | URL, options?: WorkerOptions) {
+          super(script, options)
+          activeWorkers++
+        }
+
+        terminate() {
+          activeWorkers--
+          super.terminate()
+        }
+      }
+      Object.defineProperty(window, 'speakerWorkers', { get: () => activeWorkers })
+    })
+    await page.goto(url)
+    const homeLinkSize = await page.getByRole('link', { name: 'ASR', exact: true }).evaluate(element => getComputedStyle(element).fontSize)
+    await page.getByRole('link', { name: 'Speaker identification', exact: true }).click()
+    await page.locator('.model-setup > summary').click()
+    await page.locator('#load').click()
+    await page.waitForFunction(() => !document.querySelector<HTMLButtonElement>('#enroll')!.disabled)
+    await page.locator('#speaker-name').fill('Leaving route')
+    await page.locator('#enroll').click()
+    await page.waitForFunction(() => document.querySelector('.voice-item')?.getAttribute('data-state') === 'recording')
+    await page.getByRole('link', { name: '← Sandbox' }).click()
+    await page.waitForFunction('window.speakerTracksStopped && window.speakerWorkers === 0')
+    expect(await page.getByRole('link', { name: 'ASR', exact: true }).evaluate(element => getComputedStyle(element).fontSize)).toBe(homeLinkSize)
+    await page.getByRole('link', { name: 'Speaker identification', exact: true }).click()
+    expect(await page.locator('.voice-item').count()).toBe(0)
+    expect(await page.locator('#enroll').isDisabled()).toBe(true)
+    await page.locator('.model-setup > summary').click()
+    await page.locator('#load').click()
+    await page.waitForFunction(() => !document.querySelector<HTMLButtonElement>('#enroll')!.disabled)
+    await page.getByRole('link', { name: '← Sandbox' }).click()
+    await page.waitForFunction('window.speakerWorkers === 0')
+    expect(errors).toEqual([])
   }
   finally {
     await browser.close()

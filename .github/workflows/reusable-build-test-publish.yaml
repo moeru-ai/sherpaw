@@ -80,7 +80,7 @@ jobs:
 
       - name: Run speaker demo and fixed audio cases
         run: |
-          pnpm -F @sherpaw/playground-speaker-identification test:run
+          pnpm -F @sherpaw/sandbox test:speaker
           pnpm -F @sherpaw/testing-audio test:speakers
 
       - if: inputs.publish

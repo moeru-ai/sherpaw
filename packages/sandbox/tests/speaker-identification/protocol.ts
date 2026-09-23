@@ -1,4 +1,4 @@
-import type { EnrollmentResult, IdentificationResult, LoadingProgress } from '../src/protocol'
+import type { EnrollmentResult, IdentificationResult, LoadingProgress } from '../../src/features/speaker-identification/protocol'
 
 export interface SpeakerTestAPI {
   init: (model?: string, onProgress?: (progress: LoadingProgress) => void) => Promise<void>

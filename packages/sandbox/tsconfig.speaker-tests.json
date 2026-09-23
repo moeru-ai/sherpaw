@@ -19,9 +19,8 @@
     "skipLibCheck": true
   },
   "include": [
-    "src",
-    "tests",
-    "vite.config.ts",
-    "vitest.config.ts"
+    "src/features/speaker-identification",
+    "tests/speaker-identification",
+    "vitest.speaker.config.ts"
   ]
 }

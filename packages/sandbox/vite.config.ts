@@ -4,6 +4,7 @@ import VueRouter from 'unplugin-vue-router/vite'
 import { defineConfig } from 'vite'
 
 export default defineConfig({
+  worker: { format: 'es' },
   plugins: [
     VueRouter(),
     vue(),

@@ -1,10 +1,16 @@
 import type { AudioClip, LoadingProgress, WorkerRequest, WorkerResponses } from './protocol'
 
-const worker = new Worker(new URL('./speaker.worker.ts', import.meta.url), { type: 'module' })
+let worker: Worker | undefined
 let sequence = 0
 const pending = new Map<number, { resolve: (value: unknown) => void, reject: (error: Error) => void, onProgress?: (progress: LoadingProgress) => void }>()
 
 function callWorker<T extends WorkerRequest>(request: T, onProgress?: (progress: LoadingProgress) => void): Promise<WorkerResponses[T['type']]> {
+  if (!worker) {
+    worker = new Worker(new URL('./speaker.worker.ts', import.meta.url), { type: 'module' })
+    worker.onmessage = completeRequest
+    worker.onerror = rejectWorkerRequests
+  }
+  const currentWorker = worker
   const id = ++sequence
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve: value => resolve(value as WorkerResponses[T['type']]), reject, onProgress })
@@ -12,7 +18,7 @@ function callWorker<T extends WorkerRequest>(request: T, onProgress?: (progress:
       ? [request.audio.samples.buffer]
       : request.type === 'enroll' ? request.audio.map(audio => audio.samples.buffer) : []
     try {
-      worker.postMessage({ id, request }, transfer)
+      currentWorker.postMessage({ id, request }, transfer)
     }
     catch (error) {
       pending.delete(id)
@@ -34,16 +40,12 @@ function completeRequest(event: MessageEvent) {
   else
     callback?.resolve(event.data.result)
 }
-worker.onmessage = completeRequest
-
 /** Triggering workflow: Worker error -> rejectWorkerRequests -> reject outstanding UI rows. */
 function rejectWorkerRequests(event: ErrorEvent) {
   for (const callback of pending.values())
     callback.reject(new Error(event.message))
   pending.clear()
 }
-worker.onerror = rejectWorkerRequests
-
 export const speakerClient = {
   init(model: string, onProgress?: (progress: LoadingProgress) => void) {
     return callWorker({ type: 'init', model }, onProgress)
@@ -54,13 +56,13 @@ export const speakerClient = {
   identify(audio: AudioClip, onProgress?: (progress: LoadingProgress) => void) {
     return callWorker({ type: 'identify', audio }, onProgress)
   },
+  /** Triggering workflow: route or harness disposal -> dispose -> terminate inference and reject outstanding requests. */
   async dispose() {
-    try {
-      await callWorker({ type: 'dispose' })
-    }
-    finally {
-      worker.terminate()
-    }
+    worker?.terminate()
+    worker = undefined
+    for (const callback of pending.values())
+      callback.reject(new Error('Speaker session closed'))
+    pending.clear()
   },
   rename(name: string, newName: string) {
     return callWorker({ type: 'rename', name, newName })

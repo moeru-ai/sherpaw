@@ -12,7 +12,7 @@ for (const file of [...manifest.files, ...manifest.unknowns]) {
   if (createHash('sha256').update(bytes).digest('hex') !== file.sha256)
     throw new Error(`Fixture checksum mismatch: ${file.file}`)
 }
-const server = await createServer({ configFile: false, root: resolve(root, 'playgrounds/speaker-identification'), server: { host: '127.0.0.1', port: 0, hmr: false, fs: { allow: [root] } } })
+const server = await createServer({ configFile: false, root: resolve(root, 'packages/sandbox'), server: { host: '127.0.0.1', port: 0, hmr: false, fs: { allow: [root] } } })
 const browser = await chromium.launch({ headless: true })
 const report = { date: new Date().toISOString(), browser: browser.version(), corpus: { manifest: 'packages/testing-audio/cases/speaker-identification/fixtures/manifest.json', manifestSha256: createHash('sha256').update(await readFile(resolve(caseRoot, 'fixtures/manifest.json'))).digest('hex'), files: manifest.files, unknowns: manifest.unknowns }, models: [] }
 try {
@@ -20,7 +20,7 @@ try {
   for (const model of ['sherpaw-campplus-zh-en-advanced', 'sherpaw-eres2netv2-zh-cn']) {
     const page = await browser.newPage()
     await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort())
-    await page.goto(`${server.resolvedUrls.local[0]}tests/index.html`)
+    await page.goto(`${server.resolvedUrls.local[0]}tests/speaker-identification/index.html`)
     const path = resolve(root, 'models/huggingface', model, 'install/bin/wasm/preload.data')
     const bytes = await readFile(path)
     const result = await page.evaluate(async ({ script, model, fixtures }) => {

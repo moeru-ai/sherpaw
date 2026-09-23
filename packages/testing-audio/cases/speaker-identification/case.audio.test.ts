@@ -7,7 +7,7 @@ import { fixturePath, fixtureRoot, modelPath, models, verifyCorpus, voices } fro
 import manifest from './fixtures/manifest.json'
 
 // Uses the same Worker and capture adapter as the demo, without loading its UI.
-import '../../../../playgrounds/speaker-identification/tests/protocol'
+import '../../../sandbox/tests/speaker-identification/protocol'
 
 beforeAll(verifyCorpus)
 

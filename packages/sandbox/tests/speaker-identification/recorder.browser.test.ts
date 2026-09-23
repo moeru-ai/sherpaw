@@ -4,8 +4,8 @@ import { loadVirtualData } from '@sherpaw/preloader'
 import { createExtractor, initSpeakerIdentificationModule } from '@sherpaw/speaker-identification'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 
-import { modelUrl, readAudio } from '../../../packages/speaker-identification/tests/audio'
-import { normalizeRecording, startRecording } from '../src/recorder'
+import { modelUrl, readAudio } from '../../../speaker-identification/tests/audio'
+import { normalizeRecording, startRecording } from '../../src/features/speaker-identification/recorder'
 
 let extractor: Extractor
 
@@ -80,4 +80,28 @@ it('preserves normal recording levels and rejects nonfinite device samples', () 
   expect(samples).toEqual(original)
   for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])
     expect(() => normalizeRecording(new Float32Array([0.1, value]))).toThrow('无效数值')
+})
+
+it('stops a late microphone stream when the route is left while permission is pending', async () => {
+  const source = new AudioContext()
+  const destination = source.createMediaStreamDestination()
+  let grantPermission!: (stream: MediaStream) => void
+  const microphone = vi.spyOn(navigator.mediaDevices, 'getUserMedia').mockImplementation(() => new Promise((resolve) => {
+    grantPermission = resolve
+  }))
+  const lifetime = new AbortController()
+  const recording = startRecording(() => {}, lifetime.signal)
+  const rejected = expect(recording).rejects.toThrow()
+  try {
+    await vi.waitFor(() => expect(microphone).toHaveBeenCalledOnce())
+    lifetime.abort()
+    grantPermission(destination.stream)
+    await rejected
+    expect(destination.stream.getTracks().every(track => track.readyState === 'ended')).toBe(true)
+  }
+  finally {
+    microphone.mockRestore()
+    destination.stream.getTracks().forEach(track => track.stop())
+    await source.close()
+  }
 })

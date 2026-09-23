@@ -49,8 +49,7 @@
     "lint": "eslint --cache .",
     "up": "taze -w -r -I && pnpm prune && pnpm dedupe",
     "publish:lib": "pnpm -r publish --access public --no-git-checks",
-    "spellcheck": "cspell .",
-    "dev:speaker": "pnpm -F @sherpaw/playground-speaker-identification dev"
+    "spellcheck": "cspell ."
   },
   "devDependencies": {
     "@antfu/eslint-config": "^6.2.0",

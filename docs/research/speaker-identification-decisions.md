@@ -21,4 +21,4 @@ Public APIs remain `createExtractor` and `createInMemoryDB`. The application own
 
 The smaller corpus is a regression fixture, not an accuracy benchmark. Historical unknown-speaker failures remain documented even when the corresponding audio is no longer part of routine CI. Prompt translations in research metadata are explicitly labeled; exact Mandarin transcripts remain with the retained audio fixtures.
 
-Validation commands are documented in the package READMEs. The library has five browser tests, the playground has four interaction tests and four recorder tests, and the compact fixed corpus has six cases across the two models. Model preparation and published assets are already in `main`; this feature uses their pinned Hugging Face submodules.
+Validation commands are documented in the package READMEs. The library has five browser tests, the sandbox has five interaction/lifecycle tests and five recorder tests, and the compact fixed corpus has six cases across the two models. Model preparation and published assets are already in `main`; this feature uses their pinned Hugging Face submodules.
