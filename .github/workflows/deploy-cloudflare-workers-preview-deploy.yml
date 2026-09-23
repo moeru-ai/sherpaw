@@ -95,8 +95,8 @@ jobs:
         include:
           - app_name: sandbox
             wrangler_config_path: ./packages/sandbox/wrangler.toml
-            build_directory: ./packages/sandbox/dist-cloudflare
-            build_command: pnpm -F @sherpaw/sandbox run build:cloudflare
+            build_directory: ./packages/sandbox/dist
+            build_command: pnpm -F @sherpaw/sandbox run build
 
     steps:
       - name: Download artifact - metadata
@@ -154,12 +154,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Prepare speaker models
-        run: |
-          for model in models/huggingface/sherpaw-campplus-zh-en-advanced models/huggingface/sherpaw-eres2netv2-zh-cn; do
-            git submodule update --init -- "$model"
-            git -C "$model" lfs pull
-          done
+      - run: pnpm -F @sherpaw/speaker-identification run test:prepare
 
       - name: Build packages
         run: pnpm --filter '@sherpaw/sandbox^...' run build

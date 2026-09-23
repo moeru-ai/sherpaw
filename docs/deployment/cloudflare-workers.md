@@ -37,9 +37,9 @@ From the repository root:
 pnpm install --frozen-lockfile
 pnpm -F @sherpaw/speaker-identification run test:prepare
 pnpm --filter '@sherpaw/sandbox^...' run build
-pnpm -F @sherpaw/sandbox run build:cloudflare
+pnpm -F @sherpaw/sandbox run build
 pnpm dlx wrangler@4 deploy --dry-run --config packages/sandbox/wrangler.toml
 pnpm dlx wrangler@4 dev --local --config packages/sandbox/wrangler.toml
 ```
 
-The output is `packages/sandbox/dist-cloudflare`. Export the storage variables before building to exercise uploads and URL rewriting; use a separate `SANDBOX_WARP_DRIVE_PREFIX` for local checks. The build uploads model assets when storage is configured, even if the subsequent Wrangler command is a dry run. Wrangler's dry run only skips publishing the Worker. Open the URL printed by Wrangler to check routes, microphone recording, and model downloads locally.
+The output is `packages/sandbox/dist`. Export the storage variables before building to exercise uploads and URL rewriting; use a separate `SANDBOX_WARP_DRIVE_PREFIX` for local checks. The build uploads model assets when storage is configured, even if the subsequent Wrangler command is a dry run. Wrangler's dry run only skips publishing the Worker. Open the URL printed by Wrangler to check routes, microphone recording, and model downloads locally.

@@ -7,8 +7,7 @@
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "vue-tsc -b && tsc --noEmit -p tsconfig.speaker-tests.json",
-    "test:speaker": "vitest run --config vitest.speaker.config.ts",
-    "build:cloudflare": "vue-tsc -b && vite build --mode cloudflare"
+    "test:speaker": "vitest run --config vitest.speaker.config.ts"
   },
   "dependencies": {
     "@iconify-json/ri": "^1.2.6",

@@ -5,8 +5,7 @@ import Basemove, { createS3Provider } from 'unplugin-basemove/vite'
 import VueRouter from 'unplugin-vue-router/vite'
 import { defineConfig } from 'vite'
 
-export default defineConfig(({ mode }) => ({
-  build: { outDir: mode === 'cloudflare' ? 'dist-cloudflare' : 'dist' },
+export default defineConfig({
   worker: { format: 'es' },
   plugins: [
     VueRouter(),
@@ -28,4 +27,4 @@ export default defineConfig(({ mode }) => ({
         })
       : undefined,
   ],
-}))
+})

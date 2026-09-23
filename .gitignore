@@ -176,5 +176,4 @@ typed-router.d.ts
 .claude/**local**
 
 # Cloudflare deployment outputs
-**/dist-cloudflare/
 **/.wrangler/
