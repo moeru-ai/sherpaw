@@ -11,3 +11,5 @@ packages:
   - packages/vad-asr
   - packages/vitest-plugin-fakemic
   - packages/xsai-transcription
+allowBuilds:
+  vue-demi: true
