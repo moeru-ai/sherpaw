@@ -4,6 +4,7 @@
 include(../HelperFunctions.cmake)
 
 set(exported_functions
+    SherpaOnnxFileExists
 
 	# Speaker Embedding
 	SherpaOnnxCreateSpeakerEmbeddingExtractor
@@ -17,7 +18,6 @@ set(exported_functions
 	# Online Stream
 	SherpaOnnxOnlineStreamAcceptWaveform
 	SherpaOnnxOnlineStreamInputFinished
-	SherpaOnnxOnlineStreamReset
 	SherpaOnnxDestroyOnlineStream
 
 	# Embedding Manager
@@ -59,4 +59,12 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${MY_FLAGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MY_FLAGS}")
 set(CMAKE_EXECUTABLE_LINKER_FLAGS "${CMAKE_EXECUTABLE_LINKER_FLAGS} ${MY_FLAGS}")
 
-plan_build(speaker-embedding)
+add_executable(speaker-embedding ../sherpa-onnx-wasm-main.cc)
+target_link_libraries(speaker-embedding sherpa-onnx-c-api)
+install(TARGETS speaker-embedding DESTINATION bin/wasm/speaker-embedding)
+install(
+  FILES
+  "$<TARGET_FILE_DIR:speaker-embedding>/speaker-embedding.js"
+  "$<TARGET_FILE_DIR:speaker-embedding>/speaker-embedding.wasm"
+  DESTINATION "${PROJECT_SOURCE_DIR}/../packages/speaker-identification/src/prebuilt"
+)

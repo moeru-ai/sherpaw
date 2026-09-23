@@ -18,5 +18,8 @@
         </div>
       </RouterLink>
     </div>
+    <RouterLink to="/speaker-identification" text-3xl underline>
+      Speaker identification
+    </RouterLink>
   </div>
 </template>

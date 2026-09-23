@@ -6,8 +6,8 @@ export default defineConfig(() => {
       projects: [
         'packages/asr',
         'packages/preloader',
-        'packages/sandbox',
         'packages/speaker-diarization',
+        'packages/speaker-identification',
         'packages/vad',
         'packages/vad-asr',
         'packages/vitest-plugin-fakemic',

@@ -163,10 +163,13 @@ models/
 # Audio binaries
 *.wav
 *.mp3
+# Reviewed, immutable speaker-identification test corpus
+!packages/testing-audio/cases/speaker-identification/fixtures/*.wav
 
 packages/*/tests/model/**/*
 packages/*/tests/fixtures/**/*
 **/tests/**/*.png
+**/.vitest-attachments/
 typed-router.d.ts
 
 # Coding Agent

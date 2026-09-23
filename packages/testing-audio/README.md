@@ -6,7 +6,7 @@ This package runs a recorded microphone through the real Sherpaw browser pipelin
 input.wav -> Chromium fake microphone -> AudioWorklet -> Web Worker -> Sherpa-ONNX WASM -> transcript
 ```
 
-The test loads every model maintained under the repository's `models` directory. It serves each generated `preload.data` and `preload.js.metadata` file directly to Chromium without copying the large files into the Vite build.
+The transcription cases load each ASR model maintained under the repository's `models` directory. It serves each generated `preload.data` and `preload.js.metadata` file directly to Chromium without copying the large files into the Vite build.
 
 The English fixture comes from AIRI. The Chinese fixture says `你好，欢迎使用语音识别测试。`. AIHubMix `tts-1` generated it with the `alloy` voice. The stored fixture does not contain the API key.
 
@@ -44,3 +44,14 @@ Each test task starts a separate Chromium process. Fakemic gives that process a 
 Use this package to check browser audio capture, Worker transport, WASM recognition, and transcript output together.
 
 Do not use this package for small recognizer or transport tests. Those tests belong to the package that owns the code.
+
+## Speaker identification
+
+The [speaker cases](cases/speaker-identification/README.md) use a compact fixed corpus with two synthetic voices, held-out Chinese/English sentences, and one unknown natural speaker, and both CAM++ / ERes2NetV2. They run locally through the same recorder and Worker as the speaker demo. No TTS request is made during testing.
+
+```sh
+pnpm -F @sherpaw/testing-audio test:speakers
+pnpm -F @sherpaw/testing-audio ablate:speakers
+```
+
+`test:run` also includes these cases. Download both speaker models before the first run; the case README lists the commands. The speaker runtime serves the shared harness on an isolated Vite port, so it does not replace the running demo server.

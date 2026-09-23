@@ -1,0 +1,72 @@
+<main>
+      <header class="app-header">
+        <div class="brand"><div class="brand-title">Sherpa-ONNX WASM</div><div class="brand-subtitle">Speaker Identification Playground</div></div>
+        <details class="model-setup">
+          <summary>Model setup <span id="model-badge" class="badge">未加载</span><span class="chevron" aria-hidden="true">⌄</span></summary>
+          <section class="model-panel" aria-label="模型">
+            <label for="model">识别模型</label>
+            <div class="model-toolbar">
+              <select id="model"><option value="cam">CAM++ · 28 MB</option><option value="eres">ERes2NetV2 · 71 MB</option></select>
+              <button id="load"><span class="spinner" hidden></span><span class="button-label">加载模型</span></button>
+            </div>
+            <p id="model-status" class="hint" role="status">选择模型后，开始添加声线。</p>
+            <div id="model-loading" hidden><progress id="model-progress" max="1" aria-label="模型加载进度"></progress></div>
+          </section>
+        </details>
+      </header>
+      <div class="page-heading">
+        <h1>Speaker identification</h1>
+        <p>录入声线，再试着认出说话的人。<span class="local-badge"><i></i> 本地运行</span></p>
+      </div>
+      <div class="workspace">
+        <section class="voices-panel panel" aria-labelledby="voices-heading">
+          <div class="panel-heading"><h2 id="voices-heading">声线库 <span id="voice-count" class="count">0</span></h2></div>
+          <form id="enrollment-form" class="controls">
+            <input id="speaker-name" aria-label="声线名字" placeholder="输入名字" maxlength="100" autocomplete="off" required>
+            <button id="enroll" type="submit" disabled>开始录制</button>
+          </form>
+          <p id="enroll-status" class="hint" role="status">同一个名字可以添加多段录音。</p>
+          <div id="voices" class="voice-list"></div>
+          <div id="voices-empty" class="empty"><strong>添加第一条声线</strong><span>输入名字并录音，也可以邀请其他人加入。</span></div>
+        </section>
+        <section class="recordings-panel panel" aria-labelledby="recordings-heading">
+          <div class="panel-heading"><h2 id="recordings-heading">识别记录 <span id="record-count" class="count">0</span></h2><button id="record" disabled>＋ 创建录制</button></div>
+          <div class="table-scroll">
+            <table class="results-table">
+              <thead><tr><th>录制 / 模型</th><th>时长</th><th>识别结果</th><th class="numeric">最高相似度</th><th class="numeric">耗时</th><th>状态</th><th>候选分数</th></tr></thead>
+              <tbody id="recordings"></tbody>
+            </table>
+          </div>
+          <div id="recording-empty" class="empty"><strong>准备好后，录一段声音</strong><span>停止即识别，每次结果保留在这里，方便对比。</span></div>
+          <div class="table-footer"><span>停止录制后自动识别，可继续创建下一条</span><span>阈值 0.6</span></div>
+        </section>
+      </div>
+      <footer><span>音频仅在本机处理 · 相似度不是概率</span><span>声线保存在当前页面；刷新或切换模型需重新注册</span></footer>
+    </main>
+    <template id="speaker-template">
+      <article class="speaker-group">
+        <div class="speaker-heading"><span class="avatar" aria-hidden="true"></span><strong class="speaker-title"></strong><button class="append secondary" type="button">＋ 录音</button><details class="speaker-menu"><summary aria-label="声线操作">⋯</summary><div class="menu-items"><button class="rename manage-action" type="button">重命名</button><button class="remove-speaker manage-action danger" type="button">删除声线</button></div></details></div>
+        <form class="rename-form" hidden><input class="rename-input" aria-label="新的声线名字" maxlength="100" required><button class="manage-action" type="submit">保存</button><button class="cancel-rename secondary" type="button">取消</button></form>
+        <p class="group-message error" role="status" hidden></p>
+        <details class="samples" open><summary><span class="sample-count">0 段录音</span></summary><div class="voice-samples"></div></details>
+      </article>
+    </template>
+    <template id="voice-template">
+      <div class="voice-item" data-state="permission">
+        <span class="row-name"></span><span class="row-duration muted">—</span>
+        <div class="row-work"><span class="row-status" role="status"></span><progress class="row-progress" aria-label="声线处理进度" hidden></progress></div>
+        <button class="stop" type="button" disabled>停止录制</button>
+        <button class="remove-sample manage-action" type="button" aria-label="删除样本" title="删除样本" disabled>×</button>
+      </div>
+    </template>
+    <template id="record-template">
+      <tr class="record-item" data-state="permission">
+        <td><div class="record-title"><strong class="row-name"></strong><button class="remove-record" type="button" aria-label="删除记录" title="录制结束并处理完成后可删除" disabled><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7" /></svg></button></div><span class="row-meta muted"></span><button class="stop" type="button" disabled>停止录制</button></td>
+        <td class="row-duration muted">—</td>
+        <td class="match-name">—</td>
+        <td class="match-score numeric">—</td>
+        <td class="row-time numeric muted">—</td>
+        <td><div class="row-work"><span class="row-status" role="status"></span><progress class="row-progress" aria-label="录音处理进度" hidden></progress></div></td>
+        <td class="detail-cell"><div class="result" hidden><div class="scores"></div></div></td>
+      </tr>
+    </template>

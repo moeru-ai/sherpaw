@@ -1,4 +1,4 @@
-/// <reference types="emscripten" />
+/// <reference types="emscripten" preserve="true" />
 
 export type Ptr = number
 
