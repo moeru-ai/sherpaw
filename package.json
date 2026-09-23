@@ -3,7 +3,7 @@
   "type": "module",
   "version": "0.0.4",
   "private": true,
-  "packageManager": "pnpm@10.18.2",
+  "packageManager": "pnpm@12.5.1",
   "description": "",
   "author": {
     "name": "Makito",
@@ -65,14 +65,5 @@
     "tsdown": "^0.15.12",
     "typescript": "^5.9.3",
     "vitest": "^4.1.9"
-  },
-  "pnpm": {
-    "overrides": {
-      "strip-literal>js-tokens": "10.0.0",
-      "vite": "npm:rolldown-vite@7.1.14"
-    },
-    "onlyBuiltDependencies": [
-      "vue-demi"
-    ]
   }
 }
