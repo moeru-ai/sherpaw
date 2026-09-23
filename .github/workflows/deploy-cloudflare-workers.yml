@@ -2,49 +2,45 @@ name: Cloudflare Workers
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 concurrency:
-  group: cloudflare-production
-  cancel-in-progress: false
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/build-cloudflare-sandbox
-      - uses: actions/upload-artifact@v7
-        with:
-          name: cloudflare-sandbox
-          path: packages/sandbox/dist-cloudflare
-          if-no-files-found: error
-          retention-days: 7
-
   deploy:
-    needs: build
+    name: Deploy - sandbox
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+
     environment:
       name: Production
-      url: ${{ steps.deploy.outputs.url }}
+      url: ${{ steps.deploy.outputs.deployment-url }}
+
     steps:
       - uses: actions/checkout@v6
+      - uses: pnpm/setup@v2
         with:
-          persist-credentials: false
-      - uses: actions/download-artifact@v5
+          runtime: node@26.7.0
+          cache: true
+          install: false
+      # Install globally so Wrangler does not add itself to the pnpm workspace.
+      - run: pnpm i -g wrangler@4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter '@sherpaw/sandbox^...' run build
+      - name: Build sandbox
+        run: pnpm -F @sherpaw/sandbox run build:cloudflare
+
+      - uses: cloudflare/wrangler-action@v4
+        id: deploy
         with:
-          name: cloudflare-sandbox
-          path: packages/sandbox/dist-cloudflare
-      - id: deploy
-        uses: ./.github/actions/deploy-cloudflare-sandbox
-        with:
-          api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --config packages/sandbox/wrangler.toml
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy -c ./packages/sandbox/wrangler.toml
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}

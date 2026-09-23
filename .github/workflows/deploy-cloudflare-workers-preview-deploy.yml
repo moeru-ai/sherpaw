@@ -2,102 +2,234 @@ name: Cloudflare Workers (Preview) Deploy
 
 on:
   workflow_run:
-    workflows: [Cloudflare Workers (Preview) Prepare]
-    types: [completed]
-
-permissions:
-  contents: read
+    workflows:
+      - Cloudflare Workers (Preview) Prepare
+    types:
+      - completed
 
 jobs:
-  metadata:
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request'
+  ask-for-approval:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    name: Ask for approval to deploy - ${{ matrix.app_name }}
     runs-on: ubuntu-latest
     permissions:
+      pull-requests: write
       contents: read
       actions: read
-      pull-requests: write
-    outputs:
-      pr-number: ${{ steps.validate.outputs.pr-number }}
-      head-sha: ${{ steps.validate.outputs.head-sha }}
+
+    strategy:
+      matrix:
+        include:
+          - app_name: sandbox
+
     steps:
-      # workflow_run uses the default branch. Never check out PR code in this workflow.
-      - uses: actions/checkout@v6
+      - name: Download artifact - metadata
+        uses: dawidd6/action-download-artifact@v19
         with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-      - uses: actions/download-artifact@v5
-        with:
+          workflow_conclusion: success
+          run_id: ${{ github.event.workflow_run.id }}
           name: preview-meta
           path: preview-meta
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ github.token }}
-      - id: validate
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const { readFile } = await import('node:fs/promises')
-            const { validatePreview, commentPreview } = await import(`${process.env.GITHUB_WORKSPACE}/.github/scripts/cloudflare-preview.mjs`)
-            const metadata = JSON.parse(await readFile('preview-meta/preview-meta.json', 'utf8'))
-            const { prNumber, headSha } = await validatePreview({ github, context, metadata })
-            core.setOutput('pr-number', prNumber)
-            core.setOutput('head-sha', headSha)
-            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
-            await commentPreview({ github, context, prNumber,
-              body: `Cloudflare preview for \`${headSha.slice(0, 7)}\` is ready to deploy.\n\n[Open the deployment run](${runUrl}) and approve the **Preview** environment if review is required.` })
+          allow_forks: true
 
-  deploy:
-    needs: metadata
+      - name: Parse metadata
+        id: meta
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFile, readFile } from 'node:fs/promises'
+
+          const metadata = JSON.parse(await readFile('preview-meta/preview-meta.json', 'utf8'))
+          if (
+            !/^\d+$/.test(metadata.prNumber)
+            || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(metadata.repositoryFullName)
+            || !/^[a-f0-9]{40}$/i.test(metadata.headSha)
+          ) {
+            throw new Error('Preview metadata has an invalid shape')
+          }
+
+          await appendFile(process.env.GITHUB_OUTPUT, [
+            `PR_NUM=${metadata.prNumber}`,
+            `REPO_FULL_NAME=${metadata.repositoryFullName}`,
+            `HEAD_SHA=${metadata.headSha}`,
+            '',
+          ].join('\n'))
+          NODE
+
+      - name: Find Comment
+        if: ${{ always() }}
+        uses: peter-evans/find-comment@v4
+        id: fc
+        with:
+          issue-number: ${{ steps.meta.outputs.PR_NUM }}
+          comment-author: 'github-actions[bot]'
+          body-includes: to Cloudflare Workers (Preview) for *${{ matrix.app_name }}*
+
+      - name: Comment on require approval
+        uses: peter-evans/create-or-update-comment@v5
+        with:
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          issue-number: ${{ steps.meta.outputs.PR_NUM }}
+          edit-mode: replace
+          body: |
+            ## ⏳ Approval required for deploying to Cloudflare Workers (Preview) for *${{ matrix.app_name }}*.
+
+            | Name                    | Link                                                                                   |
+            |:------------------------|:---------------------------------------------------------------------------------------|
+            | 🔭 Waiting for approval | For maintainers, approve [here](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+            Hey, maintainers, kindly take some time to review and approve this deployment when you are available. Thank you! 🙏
+
+  on-success:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    name: Deploy - ${{ matrix.app_name }}
     runs-on: ubuntu-latest
+    environment: Preview
+
     permissions:
       contents: read
       actions: read
       pull-requests: write
-    concurrency:
-      group: cloudflare-preview-${{ needs.metadata.outputs.pr-number }}
-      cancel-in-progress: true
-    environment:
-      name: Preview
-      url: ${{ steps.deploy.outputs.url }}
+
+    strategy:
+      matrix:
+        include:
+          - app_name: sandbox
+            wrangler_config_path: ./packages/sandbox/wrangler.toml
+            build_directory: ./packages/sandbox/dist-cloudflare
+            build_command: pnpm -F @sherpaw/sandbox run build:cloudflare
+
     steps:
-      - uses: actions/checkout@v6
+      - name: Download artifact - metadata
+        uses: dawidd6/action-download-artifact@v19
         with:
-          ref: ${{ github.sha }}
+          workflow_conclusion: success
+          run_id: ${{ github.event.workflow_run.id }}
+          name: preview-meta
+          path: preview-meta
+          allow_forks: true
+
+      - name: Parse metadata
+        id: meta
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFile, readFile } from 'node:fs/promises'
+
+          const metadata = JSON.parse(await readFile('preview-meta/preview-meta.json', 'utf8'))
+          if (
+            !/^\d+$/.test(metadata.prNumber)
+            || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(metadata.repositoryFullName)
+            || !/^[a-f0-9]{40}$/i.test(metadata.headSha)
+          ) {
+            throw new Error('Preview metadata has an invalid shape')
+          }
+
+          await appendFile(process.env.GITHUB_OUTPUT, [
+            `PR_NUM=${metadata.prNumber}`,
+            `REPO_FULL_NAME=${metadata.repositoryFullName}`,
+            `HEAD_SHA=${metadata.headSha}`,
+            '',
+          ].join('\n'))
+          NODE
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ steps.meta.outputs.REPO_FULL_NAME }}
+          ref: ${{ steps.meta.outputs.HEAD_SHA }}
+          fetch-depth: 1
           persist-credentials: false
-      - name: Check PR again after environment approval
-        uses: actions/github-script@v8
-        env:
-          PR_NUM: ${{ needs.metadata.outputs.pr-number }}
-          HEAD_SHA: ${{ needs.metadata.outputs.head-sha }}
+          # https://gh.io/securely-using-pull_request_target
+          allow-unsafe-pr-checkout: true
+
+      - name: Setup pnpm
+        uses: pnpm/setup@v2
         with:
-          script: |
-            const { validatePreview } = await import(`${process.env.GITHUB_WORKSPACE}/.github/scripts/cloudflare-preview.mjs`)
-            await validatePreview({ github, context, metadata: { prNumber: process.env.PR_NUM, headSha: process.env.HEAD_SHA } })
-      - uses: actions/download-artifact@v5
+          runtime: node@26.7.0
+          cache: true
+          install: false
+
+      # Install globally so Wrangler does not add itself to the pnpm workspace.
+      - run: pnpm i -g wrangler@4
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm --filter '@sherpaw/sandbox^...' run build
+
+      - name: Build ${{ matrix.app_name }}
+        id: build
+        run: ${{ matrix.build_command }}
+        continue-on-error: true
+
+      - name: Find Comment
+        if: ${{ always() }}
+        uses: peter-evans/find-comment@v4
+        id: fc
         with:
-          name: cloudflare-sandbox
-          path: packages/sandbox/dist-cloudflare
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ github.token }}
-      - id: deploy
-        uses: ./.github/actions/deploy-cloudflare-sandbox
+          issue-number: ${{ steps.meta.outputs.PR_NUM }}
+          comment-author: 'github-actions[bot]'
+          body-includes: to Cloudflare Workers (Preview) for *${{ matrix.app_name }}*
+
+      - name: Comment on build failure
+        if: ${{ steps.build.outcome != 'success' }}
+        uses: peter-evans/create-or-update-comment@v5
         with:
-          api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: versions upload --config packages/sandbox/wrangler.toml --preview-alias pr-${{ needs.metadata.outputs.pr-number }}
-      - name: Update preview link
-        if: always() && !cancelled()
-        uses: actions/github-script@v8
-        env:
-          PR_NUM: ${{ needs.metadata.outputs.pr-number }}
-          HEAD_SHA: ${{ needs.metadata.outputs.head-sha }}
-          DEPLOY_URL: ${{ steps.deploy.outputs.url }}
-          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          issue-number: ${{ steps.meta.outputs.PR_NUM }}
+          edit-mode: replace
+          body: |
+            ## ❌ Deploy to Cloudflare Workers (Preview) for *${{ matrix.app_name }}* failed.
+
+            | Name                 | Link                                                                                   |
+            |:---------------------|:---------------------------------------------------------------------------------------|
+            | 🔍 Latest deploy log | https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }} |
+
+      - name: Fail if build failed
+        if: ${{ steps.build.outcome != 'success' }}
+        run: |
+          echo "Build step failed; marking workflow as failed."
+          exit 1
+
+      - name: Wrangler Upload
+        if: ${{ steps.build.outcome == 'success' }}
+        id: wrangler-versions-upload
+        uses: cloudflare/wrangler-action@v4
         with:
-          script: |
-            const { validatePreview, commentPreview, previewAlias } = await import(`${process.env.GITHUB_WORKSPACE}/.github/scripts/cloudflare-preview.mjs`)
-            const { prNumber, headSha } = await validatePreview({ github, context, metadata: { prNumber: process.env.PR_NUM, headSha: process.env.HEAD_SHA } })
-            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
-            const body = process.env.DEPLOY_OUTCOME === 'success'
-              ? `Cloudflare preview for \`${headSha.slice(0, 7)}\`\n\n- [PR preview](${previewAlias(process.env.DEPLOY_URL, prNumber)})\n- [This version](${process.env.DEPLOY_URL})\n- [Deployment logs](${runUrl})`
-              : `Cloudflare preview for \`${headSha.slice(0, 7)}\` failed. [Check the deployment logs](${runUrl}).`
-            await commentPreview({ github, context, prNumber, body })
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: versions upload -c ${{ matrix.wrangler_config_path }} --preview-alias pr-${{ steps.meta.outputs.PR_NUM }} --message "GitHub Actions uploaded preview for Pull Request ${{ steps.meta.outputs.PR_NUM }}" --tag v0.0.1-pr.${{ steps.meta.outputs.PR_NUM }}
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare preview URLs
+        if: ${{ steps.build.outcome == 'success' }}
+        id: preview-urls
+        run: |
+          deployment_url="${{ steps.wrangler-versions-upload.outputs.deployment-url }}"
+          if [ -z "$deployment_url" ]; then
+            echo "Deployment URL from wrangler upload is empty." >&2
+            exit 1
+          fi
+
+          host_without_scheme="${deployment_url#https://}"
+          host_without_scheme="${host_without_scheme#http://}"
+          preview_alias_url="https://pr-${{ steps.meta.outputs.PR_NUM }}-${host_without_scheme#*-}"
+
+          echo "deploy_preview_url=$deployment_url" >> "$GITHUB_OUTPUT"
+          echo "pull_request_preview_url=$preview_alias_url" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update comment
+        if: ${{ steps.build.outcome == 'success' }}
+        uses: peter-evans/create-or-update-comment@v5
+        with:
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          issue-number: ${{ steps.meta.outputs.PR_NUM }}
+          edit-mode: replace
+          body: |
+            ## ✅ Deploy to Cloudflare Workers (Preview) for *${{ matrix.app_name }}* ready!
+
+            | Name                    | Link                                                                                        |
+            |:------------------------|:--------------------------------------------------------------------------------------------|
+            | 🔍 Latest deploy log    | https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }} |
+            | 😎 Deploy Preview       | ${{ steps.preview-urls.outputs.deploy_preview_url }}                                         |
+            | 🚀 Pull Request Preview | ${{ steps.preview-urls.outputs.pull_request_preview_url }}                                   |

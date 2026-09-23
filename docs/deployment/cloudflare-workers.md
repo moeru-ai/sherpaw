@@ -6,19 +6,19 @@ The deployment serves the sandbox home page, `/asr`, and `/speaker-identificatio
 
 1. Create GitHub environments named **Production** and **Preview**. Add a required reviewer to **Preview** to approve deployments from PRs, including forks.
 2. Set `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in each environment. The token needs **Account / Workers Scripts / Edit** for the target account. See [Cloudflare's CI setup](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/).
-3. Enable a `workers.dev` subdomain in that Cloudflare account. The Worker is named `moeru-ai-sherpaw` in `packages/sandbox/wrangler.toml`. If you change its name, also update the preview alias helper and its test in `.github/scripts/`.
+3. Enable a `workers.dev` subdomain in that Cloudflare account. The Worker is named `moeru-ai-sherpaw` in `packages/sandbox/wrangler.toml`.
 4. Merge these workflows to `main`, then run **Cloudflare Workers** on `main` once (or let the main push trigger it). This creates the production Worker before preview versions are uploaded. The `workflow_run` preview deployment workflow must exist on the default branch to run.
 
 No account ID, custom domain, or API token is committed. Creating environments and setting secrets are repository administration steps; the workflows do not configure them automatically.
 
 ## Production and previews
 
-- **Cloudflare Workers** builds on pushes to `main` or a manual run on `main`. A separate job deploys the artifact through **Production**.
-- **Cloudflare Workers (Preview) Prepare** builds PRs targeting `main` without Cloudflare secrets or a write-capable token. It uploads the static site and PR metadata as artifacts retained for seven days. The build uses GitHub's PR merge checkout.
-- **Cloudflare Workers (Preview) Deploy** runs after a successful preparation. It checks the source run, repository, PR state, and head commit, then posts a deployment status comment. Its deployment job waits for **Preview** environment approval when required reviewers are configured.
-- After approval, the workflow checks the PR head again, uploads a Worker version with alias `pr-<number>`, and updates the same comment with a stable PR URL and the version URL. It does not promote the preview to production. Superseded or closed PRs are rejected; rerun preparation if artifacts expire.
+- **Cloudflare Workers** builds and deploys in one job through **Production**, on pushes to `main` or a manual run.
+- **Cloudflare Workers (Preview) Prepare** only uploads the PR number, source repository, and head commit as a metadata artifact. It does not check out or build the app. Unlike AIRI's prepare workflow, it has no manual trigger because manual runs have no PR metadata.
+- **Cloudflare Workers (Preview) Deploy** follows AIRI's `ask-for-approval` and `on-success` jobs, with a sandbox matrix entry. The first job posts the approval link; the second waits for **Preview** environment review.
+- After approval, the deployment job checks out the recorded PR commit, installs dependencies, builds the sandbox, and uploads a Worker version with alias `pr-<number>`. It updates the PR comment with the version URL and stable PR URL. Build failures update the same comment. The preview does not replace production.
 
-The privileged preview workflow checks out only the default branch and runs its deployment configuration and scripts. It never installs dependencies or runs build commands from the PR. The PR artifact is treated as static data and checked for oversized files and symlinks before upload. Reviewers should still review the site content before approving a public preview.
+As in AIRI, approval authorizes running the recorded PR commit in the deployment job. Review that commit before approving the **Preview** environment. The build and deployment steps are written directly in the workflows, without repository-local composite actions or helper scripts.
 
 ## Models and static asset limits
 
@@ -32,12 +32,10 @@ From the repository root:
 
 ```sh
 pnpm install --frozen-lockfile
-node --test .github/scripts/cloudflare.test.mjs
-pnpm --filter '@sherpaw/sandbox^...' build
-pnpm -F @sherpaw/sandbox build:cloudflare
-node .github/scripts/validate-cloudflare-assets.mjs packages/sandbox/dist-cloudflare
-pnpm dlx wrangler@4.136.3 deploy --dry-run --config packages/sandbox/wrangler.toml
-pnpm dlx wrangler@4.136.3 dev --local --config packages/sandbox/wrangler.toml
+pnpm --filter '@sherpaw/sandbox^...' run build
+pnpm -F @sherpaw/sandbox run build:cloudflare
+pnpm dlx wrangler@4 deploy --dry-run --config packages/sandbox/wrangler.toml
+pnpm dlx wrangler@4 dev --local --config packages/sandbox/wrangler.toml
 ```
 
 The output is `packages/sandbox/dist-cloudflare`. A dry run validates packaging without publishing to Cloudflare. Open the URL printed by Wrangler to check routes, microphone recording, and model downloads locally.
