@@ -16,17 +16,18 @@ The earlier six-voice study remains in the [historical report](../../../../docs/
 
 ## Run
 
-Prepare both models once, using the separate model-preparation PR:
+Prepare the two published model packs at their pinned Hugging Face submodule revisions (requires Git LFS):
 
 ```sh
-models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced/download.sh
-models/3dspeaker_speech_eres2netv2_sv_zh-cn_16k-common/download.sh
+pnpm -F @sherpaw/speaker-identification test:prepare
 ```
 
 ```sh
 pnpm -F @sherpaw/testing-audio test:speakers
 pnpm -F @sherpaw/testing-audio ablate:speakers
 ```
+
+Tests read the local `install/bin/wasm/preload.data` from each model submodule; the data bytes are identical to the original ONNX models. Browser requests remain local.
 
 The six regression cases comprise one file matrix and two Chinese fake-microphone cases per model. File matrices include all four held-out TTS queries and the natural unknown. Capture follows `getUserMedia -> AudioWorklet -> recorder -> Worker -> WASM`, with a fresh browser per microphone case.
 

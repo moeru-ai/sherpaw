@@ -17,11 +17,11 @@ const browser = await chromium.launch({ headless: true })
 const report = { date: new Date().toISOString(), browser: browser.version(), corpus: { manifest: 'packages/testing-audio/cases/speaker-identification/fixtures/manifest.json', manifestSha256: createHash('sha256').update(await readFile(resolve(caseRoot, 'fixtures/manifest.json'))).digest('hex'), files: manifest.files, unknowns: manifest.unknowns }, models: [] }
 try {
   await server.listen()
-  for (const model of ['3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced', '3dspeaker_speech_eres2netv2_sv_zh-cn_16k-common']) {
+  for (const model of ['sherpaw-campplus-zh-en-advanced', 'sherpaw-eres2netv2-zh-cn']) {
     const page = await browser.newPage()
     await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort())
     await page.goto(`${server.resolvedUrls.local[0]}test.html`)
-    const path = resolve(root, 'models', model, 'model/normalized/speaker-embedding.onnx')
+    const path = resolve(root, 'models/huggingface', model, 'install/bin/wasm/preload.data')
     const bytes = await readFile(path)
     const result = await page.evaluate(async ({ script, model, fixtures }) => {
       const { runAblation } = await import(/* @vite-ignore */ script)

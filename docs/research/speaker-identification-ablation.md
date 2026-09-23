@@ -1,6 +1,6 @@
 # Speaker identification: compact regression ablation
 
-Run: 2026-09-22T17:56:29.380Z. Chromium 143.0.7499.4, local CPU / single-thread WASM.
+Run: 2026-09-23T01:24:14.256Z. Chromium 143.0.7499.4, local CPU / single-thread WASM.
 
 Uses eight saved TTS utterances (alloy and nova) plus one upstream natural-speaker negative. Enrollment and query texts are distinct. The JSON contains file/model hashes and every candidate score; original transcripts live only in the fixture manifest.
 

@@ -18,8 +18,8 @@ const enrollStatus = document.querySelector<HTMLParagraphElement>('#enroll-statu
 const voices = document.querySelector<HTMLDivElement>('#voices')!
 const recordings = document.querySelector<HTMLTableSectionElement>('#recordings')!
 const models: Record<string, { name: string, url: string }> = {
-  cam: { name: 'CAM++', url: new URL('../../../../models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced/model/normalized/speaker-embedding.onnx', import.meta.url).href },
-  eres: { name: 'ERes2NetV2', url: new URL('../../../../models/3dspeaker_speech_eres2netv2_sv_zh-cn_16k-common/model/normalized/speaker-embedding.onnx', import.meta.url).href },
+  cam: { name: 'CAM++', url: new URL('../../../../models/huggingface/sherpaw-campplus-zh-en-advanced/install/bin/wasm/preload.data', import.meta.url).href },
+  eres: { name: 'ERes2NetV2', url: new URL('../../../../models/huggingface/sherpaw-eres2netv2-zh-cn/install/bin/wasm/preload.data', import.meta.url).href },
 }
 const registered = new Set<string>()
 interface SpeakerGroup {

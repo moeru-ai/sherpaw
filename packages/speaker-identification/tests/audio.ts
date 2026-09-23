@@ -15,4 +15,4 @@ export async function readAudio(name: string) {
   return decodeWavPcm16(await response.arrayBuffer())
 }
 
-export const modelUrl = new URL('../../../models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced/model/normalized/speaker-embedding.onnx', import.meta.url)
+export const modelUrl = new URL('../../../models/huggingface/sherpaw-campplus-zh-en-advanced/install/bin/wasm/preload.data', import.meta.url)
