@@ -174,3 +174,6 @@ typed-router.d.ts
 
 # Coding Agent
 .claude/**local**
+
+# Cloudflare deployment outputs
+**/.wrangler/

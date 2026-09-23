@@ -1,0 +1,53 @@
+name: Cloudflare Workers
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy - sandbox
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+
+    environment:
+      name: Production
+      url: ${{ steps.deploy.outputs.deployment-url }}
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@26.7.0
+          cache: true
+          install: false
+      # Install globally so Wrangler does not add itself to the pnpm workspace.
+      - run: pnpm i -g wrangler@4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -F @sherpaw/speaker-identification run test:prepare
+      - run: pnpm --filter '@sherpaw/sandbox^...' run build
+      - name: Build sandbox
+        run: pnpm -F @sherpaw/sandbox run build
+        env:
+          S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_REGION: ${{ secrets.S3_REGION }}
+          WARP_DRIVE_PUBLIC_BASE: ${{ secrets.WARP_DRIVE_PUBLIC_BASE }}
+
+      - uses: cloudflare/wrangler-action@v4
+        id: deploy
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy -c ./packages/sandbox/wrangler.toml
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
