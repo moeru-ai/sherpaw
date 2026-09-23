@@ -27,7 +27,7 @@ The page and tests load unchanged ONNX bytes from the pinned Hugging Face model 
 
 ## Deploy
 
-The [Cloudflare Workers deployment guide](../../docs/deployment/cloudflare-workers.md) covers production, reviewed PR previews, required secrets, and local deployment checks. Its separate build mode loads the pinned speaker models from Hugging Face to stay within Workers' static asset size limit.
+The [Cloudflare Workers deployment guide](../../docs/deployment/cloudflare-workers.md) covers production, reviewed PR previews, required secrets, and local deployment checks. As in AIRI, `unplugin-basemove` uploads large model assets to S3-compatible storage and rewrites their URLs to stay within Workers' static asset size limit.
 
 ## Validate
 

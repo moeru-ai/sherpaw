@@ -2,8 +2,6 @@ import { icons } from '@iconify-json/svg-spinners'
 
 import type { LoadingProgress } from './protocol'
 
-import camModelUrl from '../../../../../models/huggingface/sherpaw-campplus-zh-en-advanced/install/bin/wasm/preload.data?url'
-import eresModelUrl from '../../../../../models/huggingface/sherpaw-eres2netv2-zh-cn/install/bin/wasm/preload.data?url'
 import { speakerClient } from './client'
 import { startRecording } from './recorder'
 import { renderResult } from './result-view'
@@ -22,8 +20,8 @@ export function mountSpeakerPage(root: HTMLElement) {
   const voices = root.querySelector<HTMLDivElement>('#voices')!
   const recordings = root.querySelector<HTMLTableSectionElement>('#recordings')!
   const models: Record<string, { name: string, url: string }> = {
-    cam: { name: 'CAM++', url: camModelUrl },
-    eres: { name: 'ERes2NetV2', url: eresModelUrl },
+    cam: { name: 'CAM++', url: new URL('../../../../../models/huggingface/sherpaw-campplus-zh-en-advanced/install/bin/wasm/preload.data', import.meta.url).href },
+    eres: { name: 'ERes2NetV2', url: new URL('../../../../../models/huggingface/sherpaw-eres2netv2-zh-cn/install/bin/wasm/preload.data', import.meta.url).href },
   }
   const registered = new Set<string>()
   interface SpeakerGroup {
