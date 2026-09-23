@@ -20,3 +20,11 @@
 	path = models/huggingface/sherpaw-zipformer-zh-en-2023-02-20
 	url = https://huggingface.co/moeru-ai/sherpaw-zipformer-zh-en-2023-02-20
 	branch = main
+[submodule "models/huggingface/sherpaw-campplus-zh-en-advanced"]
+	path = models/huggingface/sherpaw-campplus-zh-en-advanced
+	url = https://huggingface.co/moeru-ai/sherpaw-campplus-zh-en-advanced
+	branch = main
+[submodule "models/huggingface/sherpaw-eres2netv2-zh-cn"]
+	path = models/huggingface/sherpaw-eres2netv2-zh-cn
+	url = https://huggingface.co/moeru-ai/sherpaw-eres2netv2-zh-cn
+	branch = main
