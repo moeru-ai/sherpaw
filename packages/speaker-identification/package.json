@@ -1,7 +1,7 @@
 {
   "name": "@sherpaw/speaker-identification",
   "type": "module",
-  "version": "0.0.4",
+  "version": "0.1.0",
   "description": "Local speaker embedding, enrollment, and identification with Sherpa-ONNX WASM",
   "author": "Makito <i@maki.to>",
   "license": "Apache-2.0",
