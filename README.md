@@ -14,6 +14,15 @@ git submodule update
 
 The published Hugging Face models are pinned as submodules under `models/huggingface/`. Each model includes `preload.data`, `preload.js`, and `preload.js.metadata` in `install/bin/wasm/`.
 
+Speaker embedding model packs are also available:
+
+| Model | Hugging Face repository | Model data size |
+| --- | --- | --- |
+| CAM++ Chinese/English advanced | [sherpaw-campplus-zh-en-advanced](https://huggingface.co/moeru-ai/sherpaw-campplus-zh-en-advanced) | 28.28 MB |
+| ERes2NetV2 Chinese common | [sherpaw-eres2netv2-zh-cn](https://huggingface.co/moeru-ai/sherpaw-eres2netv2-zh-cn) | 71.44 MB |
+
+Both packs expose `/speaker-embedding.onnx` in the virtual filesystem and require a separate speaker embedding runtime. Their model cards and manifests record source attribution, packaging details, and SHA-256 hashes. The data files contain the unchanged upstream ONNX bytes. Use the pinned submodule revisions for reproducible downloads.
+
 ## Development at the WASM/C level
 
 ### Prerequisites
