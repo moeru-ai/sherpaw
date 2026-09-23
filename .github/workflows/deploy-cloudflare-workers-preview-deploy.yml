@@ -1,0 +1,103 @@
+name: Cloudflare Workers (Preview) Deploy
+
+on:
+  workflow_run:
+    workflows: [Cloudflare Workers (Preview) Prepare]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  metadata:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write
+    outputs:
+      pr-number: ${{ steps.validate.outputs.pr-number }}
+      head-sha: ${{ steps.validate.outputs.head-sha }}
+    steps:
+      # workflow_run uses the default branch. Never check out PR code in this workflow.
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v5
+        with:
+          name: preview-meta
+          path: preview-meta
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - id: validate
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { readFile } = await import('node:fs/promises')
+            const { validatePreview, commentPreview } = await import(`${process.env.GITHUB_WORKSPACE}/.github/scripts/cloudflare-preview.mjs`)
+            const metadata = JSON.parse(await readFile('preview-meta/preview-meta.json', 'utf8'))
+            const { prNumber, headSha } = await validatePreview({ github, context, metadata })
+            core.setOutput('pr-number', prNumber)
+            core.setOutput('head-sha', headSha)
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            await commentPreview({ github, context, prNumber,
+              body: `Cloudflare preview for \`${headSha.slice(0, 7)}\` is ready to deploy.\n\n[Open the deployment run](${runUrl}) and approve the **Preview** environment if review is required.` })
+
+  deploy:
+    needs: metadata
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write
+    concurrency:
+      group: cloudflare-preview-${{ needs.metadata.outputs.pr-number }}
+      cancel-in-progress: true
+    environment:
+      name: Preview
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check PR again after environment approval
+        uses: actions/github-script@v8
+        env:
+          PR_NUM: ${{ needs.metadata.outputs.pr-number }}
+          HEAD_SHA: ${{ needs.metadata.outputs.head-sha }}
+        with:
+          script: |
+            const { validatePreview } = await import(`${process.env.GITHUB_WORKSPACE}/.github/scripts/cloudflare-preview.mjs`)
+            await validatePreview({ github, context, metadata: { prNumber: process.env.PR_NUM, headSha: process.env.HEAD_SHA } })
+      - uses: actions/download-artifact@v5
+        with:
+          name: cloudflare-sandbox
+          path: packages/sandbox/dist-cloudflare
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - id: deploy
+        uses: ./.github/actions/deploy-cloudflare-sandbox
+        with:
+          api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: versions upload --config packages/sandbox/wrangler.toml --preview-alias pr-${{ needs.metadata.outputs.pr-number }}
+      - name: Update preview link
+        if: always() && !cancelled()
+        uses: actions/github-script@v8
+        env:
+          PR_NUM: ${{ needs.metadata.outputs.pr-number }}
+          HEAD_SHA: ${{ needs.metadata.outputs.head-sha }}
+          DEPLOY_URL: ${{ steps.deploy.outputs.url }}
+          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
+        with:
+          script: |
+            const { validatePreview, commentPreview, previewAlias } = await import(`${process.env.GITHUB_WORKSPACE}/.github/scripts/cloudflare-preview.mjs`)
+            const { prNumber, headSha } = await validatePreview({ github, context, metadata: { prNumber: process.env.PR_NUM, headSha: process.env.HEAD_SHA } })
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            const body = process.env.DEPLOY_OUTCOME === 'success'
+              ? `Cloudflare preview for \`${headSha.slice(0, 7)}\`\n\n- [PR preview](${previewAlias(process.env.DEPLOY_URL, prNumber)})\n- [This version](${process.env.DEPLOY_URL})\n- [Deployment logs](${runUrl})`
+              : `Cloudflare preview for \`${headSha.slice(0, 7)}\` failed. [Check the deployment logs](${runUrl}).`
+            await commentPreview({ github, context, prNumber, body })

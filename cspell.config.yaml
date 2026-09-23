@@ -2,6 +2,8 @@ version: "0.2"
 ignorePaths:
   - "**/build/**/*"
   - "**/dist/**/*"
+  - "**/dist-cloudflare/**/*"
+  - "**/.wrangler/**/*"
   - "**/*.tsbuildinfo"
   - "**/*.onnx"
   - models/**/*

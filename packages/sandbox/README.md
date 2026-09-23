@@ -23,7 +23,11 @@ Open `/speaker-identification` at the URL printed by Vite. Load a model, registe
 - `../speaker-identification`: the public extractor/database API and library tests.
 - `../testing-audio/cases/speaker-identification`: the fixed, reviewed audio corpus.
 
-The page and tests load unchanged ONNX bytes from the pinned Hugging Face model submodules. A sandbox build includes model/WASM assets and excludes the test harness. Prepare the model submodules before building.
+The page and tests load unchanged ONNX bytes from the pinned Hugging Face model submodules. A normal sandbox build includes model/WASM assets and excludes the test harness. Prepare the model submodules before building.
+
+## Deploy
+
+The [Cloudflare Workers deployment guide](../../docs/deployment/cloudflare-workers.md) covers production, reviewed PR previews, required secrets, and local deployment checks. Its separate build mode loads the pinned speaker models from Hugging Face to stay within Workers' static asset size limit.
 
 ## Validate
 
