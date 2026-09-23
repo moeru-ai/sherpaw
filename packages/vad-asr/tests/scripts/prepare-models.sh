@@ -11,10 +11,17 @@ download() {
 mkdir -p $CACHE_DIR
 mkdir -p $MODELS_DIR
 
-# Download VAD model
-vad_model_path=$MODELS_DIR/silero_vad.onnx
+# Download the Silero VAD v5 model. v4 (silero_vad.onnx) detects many sung
+# songs as speech; v5 does not.
+vad_model_path=$MODELS_DIR/silero_vad_v5.onnx
+vad_model_sha256=6b99cbfd39246b6706f98ec13c7c50c6b299181f2474fa05cbc8046acc274396
 if [[ ! -f $vad_model_path ]]; then
-	download https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx $vad_model_path
+	download https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad_v5.onnx $vad_model_path
+fi
+if ! echo "$vad_model_sha256  $vad_model_path" | shasum -a 256 --check --status; then
+	echo "SHA-256 mismatch for $vad_model_path" >&2
+	rm -f "$vad_model_path"
+	exit 1
 fi
 
 download_asr() {
