@@ -1,4 +1,4 @@
-import type { AudioClip } from '../protocol'
+import type { AudioClip } from './protocol'
 
 export interface Recording {
   stop: () => Promise<AudioClip>

@@ -12,7 +12,7 @@ let url: string
 beforeAll(async () => {
   server = await createServer({
     configFile: false,
-    root: resolve(import.meta.dirname, 'web'),
+    root: resolve(import.meta.dirname, '..'),
     server: { host: '127.0.0.1', port: 0, hmr: false, fs: { allow: [resolve(import.meta.dirname, '../../..')] } },
   })
   await server.listen()
@@ -33,7 +33,7 @@ it('loads without example audio and allows typing a speaker name in a short view
         exampleRequests.push(request.url())
     })
     await page.goto(url)
-    await page.addScriptTag({ type: 'module', url: `${url}test-api.ts` })
+    await page.addScriptTag({ type: 'module', url: `${url}tests/api.ts` })
     await page.waitForFunction(() => Boolean(window.speakerTest))
     await page.locator('.model-setup > summary').click()
     await page.getByRole('button', { name: '加载模型', exact: true }).click()
@@ -59,12 +59,12 @@ it('loads without example audio and allows typing a speaker name in a short view
 it('registers multiple manual recordings and keeps independent query results without blocking new recordings', async () => {
   const browser = await chromium.launch({
     headless: true,
-    args: createChromiumFileMicrophoneArguments(resolve(import.meta.dirname, 'fixtures/fangjun-sr-1.wav')),
+    args: createChromiumFileMicrophoneArguments(resolve(import.meta.dirname, '../../../packages/speaker-identification/tests/fixtures/fangjun-sr-1.wav')),
   })
   try {
     const page = await browser.newPage({ permissions: ['microphone'] })
     await page.goto(url)
-    await page.addScriptTag({ type: 'module', url: `${url}test-api.ts` })
+    await page.addScriptTag({ type: 'module', url: `${url}tests/api.ts` })
     await page.waitForFunction(() => Boolean(window.speakerTest))
     await page.locator('.model-setup > summary').click()
     await page.getByRole('button', { name: '加载模型', exact: true }).click()
@@ -165,7 +165,7 @@ it('appends recordings to one speaker using every saved embedding', async () => 
   try {
     const page = await browser.newPage()
     await page.goto(url)
-    await page.addScriptTag({ type: 'module', url: `${url}test-api.ts` })
+    await page.addScriptTag({ type: 'module', url: `${url}tests/api.ts` })
     await page.waitForFunction(() => Boolean(window.speakerTest))
     const result = await page.evaluate(async () => {
       await window.speakerTest.init()
@@ -192,7 +192,7 @@ it('renames and removes speakers and rebuilds the centroid when a sample is dele
   try {
     const page = await browser.newPage()
     await page.goto(url)
-    await page.addScriptTag({ type: 'module', url: `${url}test-api.ts` })
+    await page.addScriptTag({ type: 'module', url: `${url}tests/api.ts` })
     await page.waitForFunction(() => Boolean(window.speakerTest))
     const result = await page.evaluate(async () => {
       const api = window.speakerTest

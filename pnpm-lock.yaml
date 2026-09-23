@@ -221,15 +221,9 @@ importers:
         specifier: workspace:^
         version: link:../shared
     devDependencies:
-      '@iconify-json/svg-spinners':
-        specifier: ^1.2.4
-        version: 1.2.4
       '@sherpaw/preloader':
         specifier: workspace:^
         version: link:../preloader
-      '@sherpaw/vitest-plugin-fakemic':
-        specifier: workspace:^
-        version: link:../vitest-plugin-fakemic
       '@types/emscripten':
         specifier: ^1.41.5
         version: 1.41.5
@@ -239,9 +233,6 @@ importers:
       '@vitest/browser-playwright':
         specifier: ^4.1.9
         version: 4.1.9(playwright@1.57.0)(rolldown-vite@7.1.14(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@24.9.2)(jiti@2.6.1)(yaml@2.8.3))(vitest@4.1.9)
-      playwright:
-        specifier: ^1.55.0
-        version: 1.57.0
       tsdown:
         specifier: ^0.15.12
         version: 0.15.12(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)(vue-tsc@3.1.2(typescript@5.9.3))
@@ -394,6 +385,43 @@ importers:
       vitest:
         specifier: ^4.1.9
         version: 4.1.9(@types/node@24.9.2)(@vitest/browser-playwright@4.1.9)(@vitest/coverage-v8@4.1.9)(vite@8.0.16(@types/node@24.9.2)(jiti@2.6.1)(yaml@2.8.3))
+
+  playgrounds/speaker-identification:
+    dependencies:
+      '@iconify-json/svg-spinners':
+        specifier: ^1.2.4
+        version: 1.2.4
+      '@sherpaw/preloader':
+        specifier: workspace:^
+        version: link:../../packages/preloader
+      '@sherpaw/speaker-identification':
+        specifier: workspace:^
+        version: link:../../packages/speaker-identification
+    devDependencies:
+      '@sherpaw/vitest-plugin-fakemic':
+        specifier: workspace:^
+        version: link:../../packages/vitest-plugin-fakemic
+      '@types/emscripten':
+        specifier: ^1.41.5
+        version: 1.41.5
+      '@types/node':
+        specifier: ^24.6.0
+        version: 24.9.2
+      '@vitest/browser-playwright':
+        specifier: ^4.1.9
+        version: 4.1.9(playwright@1.57.0)(rolldown-vite@7.1.14(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@24.9.2)(jiti@2.6.1)(yaml@2.8.3))(vitest@4.1.9)
+      playwright:
+        specifier: ^1.57.0
+        version: 1.57.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vite:
+        specifier: npm:rolldown-vite@7.1.14
+        version: rolldown-vite@7.1.14(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@24.9.2)(jiti@2.6.1)(yaml@2.8.3)
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@24.9.2)(@vitest/browser-playwright@4.1.9)(@vitest/coverage-v8@4.1.9)(rolldown-vite@7.1.14(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@24.9.2)(jiti@2.6.1)(yaml@2.8.3))
 
   playgrounds/xsai:
     dependencies:

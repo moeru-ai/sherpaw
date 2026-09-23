@@ -23,6 +23,8 @@ Speaker embedding model packs are also available:
 
 Both packs expose `/speaker-embedding.onnx` in the virtual filesystem and require a separate speaker embedding runtime. Their model cards and manifests record source attribution, packaging details, and SHA-256 hashes. The data files contain the unchanged upstream ONNX bytes. Use the pinned submodule revisions for reproducible downloads.
 
+The [speaker identification playground](playgrounds/speaker-identification) runs with `pnpm dev:speaker`.
+
 Speaker identification is available in [`@sherpaw/speaker-identification`](packages/speaker-identification/README.md), with WASM embedding extraction, enrollment, scored identification, and verification. Download and preload-pack scripts are available for CAM++ Chinese/English advanced and ERes2NetV2 Chinese. See the [model research](docs/research/speaker-identification.md) and [browser / fake-microphone experiments](docs/research/speaker-identification-experiments.md).
 
 ## Development at the WASM/C level

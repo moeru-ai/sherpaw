@@ -66,21 +66,21 @@ jobs:
       - name: Install Playwright Dependencies
         run: pnpm exec playwright install chromium --with-deps
 
-      - name: Build
-        run: pnpm run build
-
       - name: Prepare test models
         run: |
           packages/asr/tests/scripts/prepare-models.sh
           packages/vad-asr/tests/scripts/prepare-models.sh
           packages/speaker-identification/tests/scripts/prepare.sh
 
+      - name: Build
+        run: pnpm run build
+
       - name: Run tests
         run: pnpm run test
 
       - name: Run speaker demo and fixed audio cases
         run: |
-          pnpm -F @sherpaw/speaker-identification test:demo
+          pnpm -F @sherpaw/playground-speaker-identification test:run
           pnpm -F @sherpaw/testing-audio test:speakers
 
       - if: inputs.publish

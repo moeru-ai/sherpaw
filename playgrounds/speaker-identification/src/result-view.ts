@@ -1,4 +1,4 @@
-import type { IdentificationResult } from '../protocol'
+import type { IdentificationResult } from './protocol'
 
 function scoreBar(score: number, label: string) {
   const container = document.createElement('span')

@@ -3,7 +3,7 @@ import type { Extractor, InMemoryDB } from '@sherpaw/speaker-identification'
 import { loadVirtualData } from '@sherpaw/preloader'
 import { createExtractor, createInMemoryDB, initSpeakerIdentificationModule } from '@sherpaw/speaker-identification'
 
-import type { LoadingProgress, WorkerRequest } from '../protocol'
+import type { LoadingProgress, WorkerRequest } from './protocol'
 
 import { createEnrollments } from './enrollments'
 

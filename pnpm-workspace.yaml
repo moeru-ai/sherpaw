@@ -1,4 +1,5 @@
 packages:
+  - playgrounds/speaker-identification
   - playgrounds/xsai
   - packages/asr
   - packages/preloader

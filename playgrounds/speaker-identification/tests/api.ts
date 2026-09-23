@@ -1,6 +1,6 @@
-import { modelUrl, readAudio } from '../audio'
-import { speakerClient } from './client'
-import { startRecording } from './recorder'
+import { modelUrl, readAudio } from '../../../packages/speaker-identification/tests/audio'
+import { speakerClient } from '../src/client'
+import { startRecording } from '../src/recorder'
 
 // Only the automated fixture tests use timed recording and saved WAV files.
 window.speakerTest = {

@@ -1,4 +1,4 @@
-import type { AudioClip, LoadingProgress, WorkerRequest, WorkerResponses } from '../protocol'
+import type { AudioClip, LoadingProgress, WorkerRequest, WorkerResponses } from './protocol'
 
 const worker = new Worker(new URL('./speaker.worker.ts', import.meta.url), { type: 'module' })
 let sequence = 0
