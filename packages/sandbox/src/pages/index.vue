@@ -21,5 +21,8 @@
     <RouterLink to="/speaker-identification" text-3xl underline>
       Speaker identification
     </RouterLink>
+    <RouterLink to="/kws" text-3xl underline>
+      Keyword spotting
+    </RouterLink>
   </div>
 </template>

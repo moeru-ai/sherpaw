@@ -53,10 +53,12 @@ spotter.dispose()
 - `score` defaults to `1` and must be positive. `threshold` defaults to `0.25` and must be in `(0, 1]`. Both must fit a finite, normal float32 value. Zero is excluded because upstream interprets it as “use the default.”
 - `setKeywords()` snapshots entries at call time and rebuilds the detector and stream in call order. Only a successful rebuild replaces the active vocabulary. Invalid updates reject without losing the current detector, and later updates still run. The old and new detectors briefly coexist in memory. Reloads can pause processing and reset all audio history and the timestamp origin.
 - `processAudio()` accepts normalized finite `Float32Array` mono PCM in `[-1, 1]` and integer sample rates from 8000 to 192000 Hz. Keep the sample rate constant until the next successful vocabulary update; changes are rejected before entering WASM. Upstream resamples to 16 kHz. It feeds audio, decodes every ready step, reads each result and resets after every hit. Empty input returns `[]`. For finite recordings, append about one second of silence to allow trailing blanks and the final feature window to complete.
-- Detections contain `label`, `tokens`, `startTime` and `timestamps`. Times are seconds, preserved from upstream: token timestamps are relative to `startTime` in the current stream. They do not track wall time or include audio discarded while paused. Updating the vocabulary starts a new stream.
+- Detections contain `label`, `tokens`, `startTime` and `timestamps`. Times are seconds, preserved from upstream. Token timestamps belong to the upstream decoder segment and may restart after a hit/reset; do not interpret them as absolute positions in the original recording. They do not track wall time or include audio discarded while paused. Updating the vocabulary starts a new stream.
 - `dispose()` releases the owned stream and detector and is safe to repeat. Pending updates reject and subsequent operations fail. It leaves caller-owned model files loaded for reuse; the caller may unlink them when no longer needed.
 
 Audio capture and text-to-token conversion are the caller's responsibility. The Promise returned by `setKeywords()` orders updates; it does not move native model loading to another thread. Run this package in a Web Worker to keep loading and inference off the UI thread.
+
+The [sandbox playground](../sandbox/README.md#keyword-spotting-playground) at `/kws` provides microphone and audio-file input, an editable token vocabulary, live replacement, pause/resume and detection history.
 
 ## Models and verification
 

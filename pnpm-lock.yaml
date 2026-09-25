@@ -308,6 +308,9 @@ importers:
       '@sherpaw/asr':
         specifier: workspace:^
         version: link:../asr
+      '@sherpaw/kws':
+        specifier: workspace:^
+        version: link:../kws
       '@sherpaw/preloader':
         specifier: workspace:^
         version: link:../preloader

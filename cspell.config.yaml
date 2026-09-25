@@ -58,6 +58,8 @@ words:
   - CUDA
   - demi
   - downsample
+  - downmix
+  - downmixed
   - denoiser
   - Diacritization
   - diacritization
@@ -91,6 +93,7 @@ words:
   - Neko
   - Nemo
   - noloop
+  - nums
   - NNAPI
   - npmjs
   - omnilingual

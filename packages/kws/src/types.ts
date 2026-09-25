@@ -43,9 +43,9 @@ export interface KeywordSpotterConfig {
 
 export interface Detection {
   label: string
-  /** Upstream segment start, in seconds since the current stream was created. */
+  /** Upstream segment start time in seconds, passed through unchanged. */
   startTime: number
-  /** Upstream token timestamps in seconds relative to startTime. */
+  /** Upstream segment-relative token times in seconds; may restart after a hit. */
   timestamps: number[]
   tokens: string[]
 }
