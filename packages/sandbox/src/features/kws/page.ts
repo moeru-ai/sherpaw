@@ -5,6 +5,7 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 import { createKWSClient } from './client'
 import { startMicrophone } from './microphone'
 import { modelURLs } from './models'
+import { keywordPresets } from './presets'
 
 interface Draft {
   id: number
@@ -23,12 +24,9 @@ export function useKWSPlayground() {
   const seconds = ref(0)
   const activeLabels = ref<string[]>([])
   const history = ref<(Detection & { id: number, source: string })[]>([])
-  const drafts = ref<Draft[]>([
-    { id: 1, label: '周望军', tokens: 'zh ōu w àng j ūn', score: '1', threshold: '0.25' },
-    { id: 2, label: '落实', tokens: 'l uò sh í', score: '1', threshold: '0.25' },
-    { id: 3, label: 'LIGHT UP', tokens: 'L AY1 T AH1 P', score: '1', threshold: '0.25' },
-  ])
-  let rowId = 3
+  const preset = ref(keywordPresets[0]!)
+  let rowId = 0
+  const drafts = ref<Draft[]>(createDrafts(preset.value.entries))
   let hitId = 0
   let disposed = false
   let inputGeneration = 0
@@ -41,6 +39,27 @@ export function useKWSPlayground() {
     message.value = progress
   }
   const client = createKWSClient(showProgress)
+
+  function createDrafts(keywords: KeywordEntry[]): Draft[] {
+    return keywords.map(entry => ({
+      id: ++rowId,
+      label: entry.label,
+      tokens: entry.tokens.join(' '),
+      score: String(entry.score ?? 1),
+      threshold: String(entry.threshold ?? 0.25),
+    }))
+  }
+
+  /** Triggering workflow: kws.vue preset button `click` -> {@link selectPreset} -> draft replacement; {@link applyKeywords} activates it. */
+  function selectPreset(id: string) {
+    const selected = keywordPresets.find(preset => preset.id === id)
+    if (!selected)
+      return
+    preset.value = selected
+    drafts.value = createDrafts(selected.entries)
+    error.value = ''
+    message.value = ready.value ? '已填入预设，点击「应用词表」使其生效。' : '已填入预设，加载模型后开始检测。'
+  }
 
   function entries(): KeywordEntry[] {
     return drafts.value.map(row => ({
@@ -242,5 +261,5 @@ export function useKWSPlayground() {
   }
   onBeforeUnmount(dispose)
 
-  return { ready, busy, listening, paused, error, message, seconds, activeLabels, drafts, history, loadModel, applyKeywords, pauseDetection, addKeyword, removeKeyword, listen, stopMicrophone, testFile, clearHistory }
+  return { ready, busy, listening, paused, error, message, seconds, activeLabels, drafts, history, preset, keywordPresets, selectPreset, loadModel, applyKeywords, pauseDetection, addKeyword, removeKeyword, listen, stopMicrophone, testFile, clearHistory }
 }

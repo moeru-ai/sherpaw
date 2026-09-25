@@ -25,10 +25,60 @@ afterAll(async () => {
   await server?.close()
 })
 
-async function load(page: Page) {
+async function load(page: Page, useFixtureKeywords = true) {
+  // Upstream audio regression cases have their own vocabulary; they must not
+  // dictate the presets shown to people using the playground.
+  if (useFixtureKeywords) {
+    const keywords = [
+      { label: '周望军', tokens: 'zh ōu w àng j ūn' },
+      { label: '落实', tokens: 'l uò sh í' },
+      { label: 'LIGHT UP', tokens: 'L AY1 T AH1 P' },
+    ]
+    for (const [index, keyword] of keywords.entries()) {
+      await page.getByLabel(`关键词 ${index + 1} 名称`).fill(keyword.label)
+      await page.getByLabel(`关键词 ${index + 1} tokens`).fill(keyword.tokens)
+    }
+  }
   await page.getByRole('button', { name: '加载模型', exact: true }).click()
   await expect.poll(() => page.getByRole('button', { name: '开始监听', exact: true }).isEnabled(), { timeout: 30000 }).toBe(true)
 }
+
+it('loads both wake-word presets with the real model and keeps draft changes explicit', async () => {
+  const browser = await chromium.launch({ headless: true })
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } })
+    await page.goto(`${url}kws`)
+    const labels = () => page.locator('.keyword-row > label:first-child input').evaluateAll(inputs => inputs.map(input => (input as HTMLInputElement).value))
+    const english = ['Hey Iru', 'Hello Iru', 'Iru Iru']
+    const chinese = ['你好肥鱼', '大肥鱼', '肥鱼肥鱼']
+    await expect.poll(labels).toEqual(english)
+    await load(page, false)
+    expect(await page.locator('.active-words .word').allTextContents()).toEqual(english)
+
+    await page.getByRole('button', { name: '肥鱼 · 中文' }).click()
+    expect(await labels()).toEqual(chinese)
+    expect(await page.locator('.active-words .word').allTextContents()).toEqual(english)
+    await page.getByRole('button', { name: '应用词表' }).click()
+    await expect.poll(() => page.locator('.active-words .word').allTextContents()).toEqual(chinese)
+    expect(await page.getByRole('alert').count()).toBe(0)
+    await file(page)
+    expect(await page.locator('.hit').count()).toBe(0)
+
+    // Editing a preset must not modify its definition when selected again.
+    await page.getByLabel('关键词 1 名称').fill('edited')
+    await page.getByRole('button', { name: 'Iru · English' }).click()
+    expect(await labels()).toEqual(english)
+    await page.getByRole('button', { name: '肥鱼 · 中文' }).click()
+    expect(await labels()).toEqual(chinese)
+    await page.getByRole('button', { name: 'Iru · English' }).click()
+    await page.getByRole('button', { name: '应用词表' }).click()
+    await expect.poll(() => page.locator('.active-words .word').allTextContents()).toEqual(english)
+    await page.screenshot({ path: '/tmp/sherpaw-kws-presets.png', fullPage: true })
+  }
+  finally {
+    await browser.close()
+  }
+})
 
 async function file(page: Page, filename = 'zh_5.wav') {
   await page.getByLabel('测试音频文件').setInputFiles(resolve(fixtures, filename))

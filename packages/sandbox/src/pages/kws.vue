@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useKWSPlayground } from '../features/kws/page'
 
-const { ready, busy, listening, paused, error, message, seconds, activeLabels, drafts, history, loadModel, applyKeywords, pauseDetection, addKeyword, removeKeyword, listen, stopMicrophone, testFile, clearHistory } = useKWSPlayground()
+const { ready, busy, listening, paused, error, message, seconds, activeLabels, drafts, history, preset, keywordPresets, selectPreset, loadModel, applyKeywords, pauseDetection, addKeyword, removeKeyword, listen, stopMicrophone, testFile, clearHistory } = useKWSPlayground()
 </script>
 
 <template>
@@ -45,10 +45,18 @@ const { ready, busy, listening, paused, error, message, seconds, activeLabels, d
         <p class="hint">
           Token 需已按模型编码，以空格分隔；不会自动将原文转成拼音或音素。
         </p>
+        <div class="presets" aria-label="预设词表">
+          <button v-for="option in keywordPresets" :key="option.id" class="secondary" :aria-pressed="preset.id === option.id" :disabled="!!busy" @click="selectPreset(option.id)">
+            {{ option.name }}
+          </button>
+        </div>
+        <p class="hint">
+          {{ preset.note }} 选择预设后点击「应用词表」生效。
+        </p>
         <div class="drafts">
           <div v-for="(row, index) in drafts" :key="row.id" class="keyword-row">
-            <label>显示名称<input v-model="row.label" :aria-label="`关键词 ${index + 1} 名称`" :disabled="!!busy" placeholder="例如：LIGHT UP"></label>
-            <label class="tokens">已编码 token<input v-model="row.tokens" :aria-label="`关键词 ${index + 1} tokens`" :disabled="!!busy" spellcheck="false" placeholder="L AY1 T AH1 P"></label>
+            <label>显示名称<input v-model="row.label" :aria-label="`关键词 ${index + 1} 名称`" :disabled="!!busy" placeholder="例如：Hey Iru"></label>
+            <label class="tokens">已编码 token<input v-model="row.tokens" :aria-label="`关键词 ${index + 1} tokens`" :disabled="!!busy" spellcheck="false" placeholder="HH EY1 IY1 R UW0"></label>
             <div class="settings">
               <label>增强分数<input v-model="row.score" :aria-label="`关键词 ${index + 1} 分数`" :disabled="!!busy" type="number" min="0" step="any" placeholder="1"></label>
               <label>触发阈值<input v-model="row.threshold" :aria-label="`关键词 ${index + 1} 阈值`" :disabled="!!busy" type="number" min="0" max="1" step="any" placeholder="0.25"></label>
@@ -173,6 +181,8 @@ button:disabled, .file-button.disabled { opacity: .45; cursor: not-allowed; }
 .stop { background: #9b3333; }
 .hint { color: #788391; font-size: 12px; margin-top: 12px; }
 .drafts { margin: 18px 0; }
+.presets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.presets button[aria-pressed="true"] { color: #27624a; background: #ecf4f1; border-color: #b7d5c5; }
 .keyword-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.8fr); gap: 12px; padding: 16px; border: 1px solid #e9edf1; border-radius: 10px; background: #fcfcfd; margin-bottom: 12px; }
 label { display: block; color: #6b7684; font-size: 12px; }
 input { display: block; border: 1px solid #dce2e9; border-radius: 6px; background: white; color: #273444; width: 100%; padding: 8px 10px; margin-top: 5px; font-size: 13px; }
