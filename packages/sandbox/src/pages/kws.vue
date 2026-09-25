@@ -51,7 +51,7 @@ const { ready, busy, listening, paused, error, message, seconds, activeLabels, d
           </button>
         </div>
         <p class="hint">
-          {{ preset.note }} 选择预设后点击「应用词表」生效。
+          {{ preset.note }} 模型加载后，选择预设立即生效。
         </p>
         <div class="drafts">
           <div v-for="(row, index) in drafts" :key="row.id" class="keyword-row">

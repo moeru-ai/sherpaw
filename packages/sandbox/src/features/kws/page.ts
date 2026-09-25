@@ -50,15 +50,18 @@ export function useKWSPlayground() {
     }))
   }
 
-  /** Triggering workflow: kws.vue preset button `click` -> {@link selectPreset} -> draft replacement; {@link applyKeywords} activates it. */
-  function selectPreset(id: string) {
+  /** Triggering workflow: kws.vue preset button `click` -> {@link selectPreset} -> draft replacement and {@link applyKeywords} when loaded. */
+  async function selectPreset(id: string) {
     const selected = keywordPresets.find(preset => preset.id === id)
     if (!selected)
       return
     preset.value = selected
     drafts.value = createDrafts(selected.entries)
     error.value = ''
-    message.value = ready.value ? '已填入预设，点击「应用词表」使其生效。' : '已填入预设，加载模型后开始检测。'
+    if (ready.value)
+      await applyKeywords()
+    else
+      message.value = '已选择预设，加载模型后开始检测。'
   }
 
   function entries(): KeywordEntry[] {

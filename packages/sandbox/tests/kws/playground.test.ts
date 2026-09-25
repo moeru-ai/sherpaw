@@ -43,7 +43,7 @@ async function load(page: Page, useFixtureKeywords = true) {
   await expect.poll(() => page.getByRole('button', { name: '开始监听', exact: true }).isEnabled(), { timeout: 30000 }).toBe(true)
 }
 
-it('loads both wake-word presets with the real model and keeps draft changes explicit', async () => {
+it('activates selected presets immediately with the real model and keeps manual edits explicit', async () => {
   const browser = await chromium.launch({ headless: true })
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } })
@@ -57,8 +57,6 @@ it('loads both wake-word presets with the real model and keeps draft changes exp
 
     await page.getByRole('button', { name: '肥鱼 · 中文' }).click()
     expect(await labels()).toEqual(chinese)
-    expect(await page.locator('.active-words .word').allTextContents()).toEqual(english)
-    await page.getByRole('button', { name: '应用词表' }).click()
     await expect.poll(() => page.locator('.active-words .word').allTextContents()).toEqual(chinese)
     expect(await page.getByRole('alert').count()).toBe(0)
     await file(page)
@@ -66,12 +64,14 @@ it('loads both wake-word presets with the real model and keeps draft changes exp
 
     // Editing a preset must not modify its definition when selected again.
     await page.getByLabel('关键词 1 名称').fill('edited')
+    expect(await page.locator('.active-words .word').allTextContents()).toEqual(chinese)
     await page.getByRole('button', { name: 'Iru · English' }).click()
+    await expect.poll(() => page.locator('.active-words .word').allTextContents()).toEqual(english)
     expect(await labels()).toEqual(english)
     await page.getByRole('button', { name: '肥鱼 · 中文' }).click()
+    await expect.poll(() => page.locator('.active-words .word').allTextContents()).toEqual(chinese)
     expect(await labels()).toEqual(chinese)
     await page.getByRole('button', { name: 'Iru · English' }).click()
-    await page.getByRole('button', { name: '应用词表' }).click()
     await expect.poll(() => page.locator('.active-words .word').allTextContents()).toEqual(english)
     await page.screenshot({ path: '/tmp/sherpaw-kws-presets.png', fullPage: true })
   }
