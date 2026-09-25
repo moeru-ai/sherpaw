@@ -1,6 +1,7 @@
 packages:
   - playgrounds/xsai
   - packages/asr
+  - packages/kws
   - packages/preloader
   - packages/sandbox
   - packages/shared

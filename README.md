@@ -29,6 +29,8 @@ Speaker identification is available in [`@sherpaw/speaker-identification`](packa
 
 ## Development at the WASM/C level
 
+Streaming keyword spotting is available in [`@sherpaw/kws`](packages/kws/README.md). It accepts caller-provided PCM and encoded model tokens, supports replacing the complete vocabulary while running, and loads models separately through `@sherpaw/preloader`.
+
 ### Prerequisites
 
 Follow Sherpa-ONNX's [Install Emscripten](https://k2-fsa.github.io/sherpa/onnx/wasm/install-emscripten.html#install-emscripten) and Emscripten's [Download and install](https://emscripten.org/docs/getting_started/downloads) guides to set up the Emscripten SDK.

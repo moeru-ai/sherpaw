@@ -127,6 +127,8 @@ words:
   - wavs
   - webworkers
   - Wenet
+  - wenetspeech
+  - stof
   - worklet
   - XNNPACK
   - xlink
