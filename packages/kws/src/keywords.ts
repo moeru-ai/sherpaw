@@ -4,13 +4,22 @@ export function readTokens(text: string): Set<string> {
   const tokens = new Set<string>()
   const ids = new Set<number>()
   for (const line of text.split(/\r?\n/u)) {
-    if (!line.trim())
+    const trimmed = line.trim()
+    if (!trimmed)
       continue
-    const match = /^(\S+)\s+(\d+)$/u.exec(line.trim())
-    if (!match || tokens.has(match[1]) || ids.has(Number(match[2])) || Number(match[2]) > 2147483647)
-      throw new Error('Invalid or duplicate entry in model tokens file')
-    tokens.add(match[1])
-    ids.add(Number(match[2]))
+    const match = /^(\S+)\s+(\d+)$/u.exec(trimmed)
+    if (!match)
+      throw new Error('Expected a token followed by an integer ID')
+
+    const [, token, rawId] = match
+    const id = Number(rawId)
+    if (id > 2147483647)
+      throw new Error(`Token ID exceeds int32 range: ${rawId}`)
+    if (tokens.has(token) || ids.has(id))
+      throw new Error(`Duplicate token or ID: ${token} ${rawId}`)
+
+    tokens.add(token)
+    ids.add(id)
   }
   if (!tokens.size)
     throw new Error('Model tokens file is empty')
@@ -46,6 +55,8 @@ export function encodeKeywords(entries: readonly KeywordEntry[], vocabulary: Set
     // Labels may contain spaces, newlines and syntax characters. Only the
     // generated identifier reaches the upstream text parser and JSON writer.
     let id = `sherpaw_${index}`
+    // Upstream EncodeBase checks model tokens before interpreting @ as a label.
+    // Keep the complete @identifier out of the vocabulary to avoid that collision.
     while (vocabulary.has(`@${id}`))
       id += '_'
     labels.set(id, entry.label)
