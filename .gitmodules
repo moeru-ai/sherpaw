@@ -28,3 +28,11 @@
 	path = models/huggingface/sherpaw-eres2netv2-zh-cn
 	url = https://huggingface.co/moeru-ai/sherpaw-eres2netv2-zh-cn
 	branch = main
+[submodule "models/huggingface/sherpaw-x-asr-zh-en-480ms-int8"]
+	path = models/huggingface/sherpaw-x-asr-zh-en-480ms-int8
+	url = https://huggingface.co/moeru-ai/sherpaw-x-asr-zh-en-480ms-int8
+	branch = main
+[submodule "models/huggingface/sherpaw-x-asr-zh-en-480ms-fp32"]
+	path = models/huggingface/sherpaw-x-asr-zh-en-480ms-fp32
+	url = https://huggingface.co/moeru-ai/sherpaw-x-asr-zh-en-480ms-fp32
+	branch = main

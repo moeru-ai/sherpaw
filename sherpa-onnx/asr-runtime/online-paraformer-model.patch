@@ -1,0 +1,31 @@
+--- online-paraformer-model.cc
++++ online-paraformer-model.cc
+@@ -1,3 +1,4 @@
++#include "asr-bridge.h"
+ // sherpa-onnx/csrc/online-paraformer-model.cc
+ //
+ // Copyright (c)  2022-2023  Xiaomi Corporation
+@@ -66,6 +67,11 @@
+     std::array<Ort::Value, 2> inputs = {std::move(features),
+                                         std::move(features_length)};
+ 
++    if (asr_web_enabled) {
++      auto outputs = AsrWebRun("encoder", encoder_input_names_ptr_.data(),
++                               inputs.data(), inputs.size());
++      if (!outputs.empty()) return outputs;
++    }
+     return encoder_sess_->Run(
+         {}, encoder_input_names_ptr_.data(), inputs.data(), inputs.size(),
+         encoder_output_names_ptr_.data(), encoder_output_names_ptr_.size());
+@@ -88,6 +94,11 @@
+       decoder_inputs.push_back(std::move(v));
+     }
+ 
++    if (asr_web_enabled) {
++      auto outputs = AsrWebRun("decoder", decoder_input_names_ptr_.data(),
++                               decoder_inputs.data(), decoder_inputs.size());
++      if (!outputs.empty()) return outputs;
++    }
+     return decoder_sess_->Run({}, decoder_input_names_ptr_.data(),
+                               decoder_inputs.data(), decoder_inputs.size(),
+                               decoder_output_names_ptr_.data(),

@@ -16,3 +16,8 @@ add_subdirectory(vad)
 add_subdirectory(vad-asr)
 add_subdirectory(speaker-diarization)
 add_subdirectory(speaker-embedding)
+
+option(SHERPAW_ASR_RUNTIME "Build sandbox streaming ASR runtimes" OFF)
+if(SHERPAW_ASR_RUNTIME)
+  add_subdirectory(asr-runtime)
+endif()

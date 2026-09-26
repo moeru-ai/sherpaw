@@ -1,0 +1,21 @@
+--- online-zipformer2-transducer-model.cc
++++ online-zipformer2-transducer-model.cc
+@@ -1,3 +1,4 @@
++#include "asr-bridge.h"
+ // sherpa-onnx/csrc/online-zipformer2-transducer-model.cc
+ //
+ // Copyright (c)  2023  Xiaomi Corporation
+@@ -482,7 +483,12 @@
+     encoder_inputs.push_back(std::move(v));
+   }
+ 
+-  auto encoder_out = encoder_sess_->Run(
++  std::vector<Ort::Value> encoder_out;
++  if (asr_web_enabled) {
++    encoder_out = AsrWebRun("encoder", encoder_input_names_ptr_.data(),
++                           encoder_inputs.data(), encoder_inputs.size());
++  }
++  if (encoder_out.empty()) encoder_out = encoder_sess_->Run(
+       {}, encoder_input_names_ptr_.data(), encoder_inputs.data(),
+       encoder_inputs.size(), encoder_output_names_ptr_.data(),
+       encoder_output_names_ptr_.size());

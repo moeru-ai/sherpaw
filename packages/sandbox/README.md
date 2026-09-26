@@ -40,3 +40,13 @@ pnpm -F @sherpaw/sandbox preview
 ```
 
 Speaker tests cover UI interactions, route cleanup, sample management, recording peaks, and long recordings. Fixed audio cases use the same Worker/recorder with external browser requests blocked. Tests never generate TTS audio.
+
+## Streaming ASR models
+
+The `/asr` selector offers Paraformer zh-en, X-ASR zh-en (INT8 or FP32), and
+Chinese Zipformer 2025. Use **Load model** to preload, then **Start** to open the microphone.
+X-ASR and Zipformer use dedicated Workers. X-ASR FP32 offers an experimental
+WebGPU encoder with CPU decoder/joiner; other catalog variants use CPU/WASM.
+Paraformer also offers experimental WebGPU backends. These sandbox experiments require additional
+model assets and locally built WASM bridges; follow the
+[ASR preparation and validation guide](../../docs/research/asr-model-catalog.md).

@@ -145,6 +145,7 @@ packages/lib/README.md
 
 # Misc build outputs
 build/
+sherpa-onnx/build-asr-runtime/
 
 # Models (PyTorch pickle, ONNX, etc.)
 models/
@@ -154,6 +155,7 @@ models/
 !models/**/build.sh
 !models/**/download.sh
 !models/**/pack.sh
+!/models/asr-catalog.json
 *.onnx
 *.pb
 *.pt
@@ -177,3 +179,10 @@ typed-router.d.ts
 
 # Cloudflare deployment outputs
 **/.wrangler/
+
+# Local ASR catalog assets and generated WASM runtime
+packages/sandbox/public/asr-models/
+packages/sandbox/public/asr-runtime/
+
+# Generated X-ASR preload package manifests (published inside HF model repos)
+models/sherpa-onnx-x-asr-*/package-manifest.json
