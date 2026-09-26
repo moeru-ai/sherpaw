@@ -26,7 +26,7 @@ loadVirtualData({
 
 const spotter = createKeywordSpotter(module, {
   model: { encoder: 'encoder.onnx', decoder: 'decoder.onnx', joiner: 'joiner.onnx', tokens: 'tokens.txt' },
-  keywords: [{ tokens: ['zh', 'ōu', 'w', 'àng', 'j', 'ūn'], label: '周望军' }],
+  keywords: [{ matches: [{ tokens: ['zh', 'ōu', 'w', 'àng', 'j', 'ūn'] }], label: '周望军' }],
 })
 
 // Feed microphone/other mono PCM, typically in 20–100 ms chunks.
@@ -37,23 +37,44 @@ function onAudio(samples: Float32Array, sampleRate: number) {
 
 // Replace the ENTIRE vocabulary. Await completion before using the new words.
 await spotter.setKeywords([
-  { tokens: ['l', 'uò', 'sh', 'í'], label: '落实', score: 1, threshold: 0.25 },
+  { matches: [{ tokens: ['l', 'uò', 'sh', 'í'] }], label: '落实', score: 1, threshold: 0.25 },
 ])
 await spotter.setKeywords([]) // Pause; incoming audio is discarded.
-await spotter.setKeywords([{ tokens: ['l', 'uò', 'sh', 'í'], label: '落实' }])
+await spotter.setKeywords([{ matches: [{ tokens: ['l', 'uò', 'sh', 'í'] }], label: '落实' }])
 spotter.dispose()
 ```
 
 `initKWSModule()` loads the bundled SIMD WASM via a URL relative to the JS module. Preserve `dist/prebuilt/kws.wasm` when serving the package. Bundlers can also resolve the `@sherpaw/kws/module.wasm` export. Serve external models from your origin or with suitable CORS headers. Existing `loadData()` model packs work as well; model paths refer to the same runtime's virtual filesystem. Keep those files unchanged while the spotter is alive.
 
+## Multiple pronunciations
+
+Group alternative pronunciations inside one keyword. For the bilingual model used by the sandbox:
+
+```ts
+await spotter.setKeywords([
+  {
+    label: '肥鱼肥鱼',
+    threshold: 0.1,
+    matches: [
+      { tokens: ['f', 'éi', 'y', 'ú', 'f', 'éi', 'y', 'ú'] },
+      { tokens: ['f', 'ēi', 'y', 'ú', 'f', 'ēi', 'y', 'ú'] },
+    ],
+  },
+])
+```
+
+Each match can optionally override `score` or `threshold`; otherwise it inherits the keyword's settings. `setKeywords()` still replaces the entire vocabulary, so include every keyword you want to keep listening for. The library handles expansion into native keyword lines and maps every pronunciation back to the parent label.
+
+This replaces the earlier flat `{ label, tokens }` shape from this PR. Wrap a single pronunciation in `matches: [{ tokens }]`; combine repeated-label pronunciation entries into one keyword's `matches` array.
+
 ## Contract
 
 - `createKeywordSpotter(module, { model, keywords, maxActivePaths? })` is synchronous and requires loaded, compatible KWS transducer model files and at least one keyword. The runtime uses 16 kHz, 80-dimensional features, one CPU inference thread, one trailing blank and `maxActivePaths` search candidates (default `4`, a positive int32 integer). Larger values preserve more pronunciation candidates at a higher CPU cost. This setting is retained across vocabulary replacement and pause/resume.
-- Each entry has `{ tokens: string[], label: string, score?: number, threshold?: number }`. Tokens must exactly match the model's `tokens.txt`. Labels are returned unchanged and may include spaces. Empty labels, empty token sequences, unknown tokens and duplicate token sequences are rejected. Multiple pronunciations may share a label.
-- `score` defaults to `1` and must be positive. `threshold` defaults to `0.25` and must be in `(0, 1]`. Both must fit a finite, normal float32 value. Zero is excluded because upstream interprets it as “use the default.”
+- Each entry has `{ label: string, matches: KeywordMatch[], score?: number, threshold?: number }`. Each match contains `{ tokens: string[], score?: number, threshold?: number }` and represents one complete pronunciation. A keyword must have at least one match. Any match returns the keyword's label unchanged; labels may include spaces. Tokens must exactly match the model's `tokens.txt`. Empty labels, empty match/token arrays, unknown tokens and duplicate token sequences anywhere in the vocabulary are rejected.
+- Keyword-level `score` defaults to `1` and must be positive. `threshold` defaults to `0.25` and must be in `(0, 1]`. Matches inherit these values and may override either separately. All supplied settings, including keyword defaults, must fit a finite, normal float32 value. Zero is excluded because upstream interprets it as “use the default.”
 - `setKeywords()` snapshots entries at call time and rebuilds the detector and stream in call order. Only a successful rebuild replaces the active vocabulary. Invalid updates reject without losing the current detector, and later updates still run. The old and new detectors briefly coexist in memory. Reloads can pause processing and reset all audio history and the timestamp origin.
 - `processAudio()` accepts normalized finite `Float32Array` mono PCM in `[-1, 1]` and integer sample rates from 8000 to 192000 Hz. Keep the sample rate constant until the next successful vocabulary update; changes are rejected before entering WASM. Upstream resamples to 16 kHz. It feeds audio, decodes every ready step, reads each result and resets after every hit. Empty input returns `[]`. For finite recordings, append about one second of silence to allow trailing blanks and the final feature window to complete.
-- Detections contain `label`, `tokens`, `startTime` and `timestamps`. Times are seconds, preserved from upstream. Token timestamps belong to the upstream decoder segment and may restart after a hit/reset; do not interpret them as absolute positions in the original recording. They do not track wall time or include audio discarded while paused. Updating the vocabulary starts a new stream.
+- Detections contain the keyword's `label`, the matched pronunciation's `tokens`, `startTime` and `timestamps`. Times are seconds, preserved from upstream. Token timestamps belong to the upstream decoder segment and may restart after a hit/reset; do not interpret them as absolute positions in the original recording. They do not track wall time or include audio discarded while paused. Updating the vocabulary starts a new stream.
 - `dispose()` releases the owned stream and detector and is safe to repeat. Pending updates reject and subsequent operations fail. It leaves caller-owned model files loaded for reuse; the caller may unlink them when no longer needed.
 
 Audio capture and text-to-token conversion are the caller's responsibility. The Promise returned by `setKeywords()` orders updates; it does not move native model loading to another thread. Run this package in a Web Worker to keep loading and inference off the UI thread.

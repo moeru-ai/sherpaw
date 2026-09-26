@@ -41,24 +41,13 @@ export function useKWSPlayground() {
   const client = createKWSClient(showProgress)
 
   function createDrafts(keywords: KeywordEntry[]): Draft[] {
-    // Preset pronunciations share a label and settings in one editable row.
-    const rows = new Map<string, Draft>()
-    for (const entry of keywords) {
-      const row = rows.get(entry.label)
-      if (row) {
-        row.tokens += `\n${entry.tokens.join(' ')}`
-      }
-      else {
-        rows.set(entry.label, {
-          id: ++rowId,
-          label: entry.label,
-          tokens: entry.tokens.join(' '),
-          score: String(entry.score ?? 1),
-          threshold: String(entry.threshold ?? 0.25),
-        })
-      }
-    }
-    return [...rows.values()]
+    return keywords.map(entry => ({
+      id: ++rowId,
+      label: entry.label,
+      tokens: entry.matches.map(match => match.tokens.join(' ')).join('\n'),
+      score: String(entry.score ?? 1),
+      threshold: String(entry.threshold ?? 0.25),
+    }))
   }
 
   /** Triggering workflow: kws.vue preset button `click` -> {@link selectPreset} -> draft replacement and {@link applyKeywords} when loaded. */
@@ -76,15 +65,14 @@ export function useKWSPlayground() {
   }
 
   function entries(): KeywordEntry[] {
-    return drafts.value.flatMap((row) => {
+    return drafts.value.map((row) => {
       const lines = row.tokens.split(/\r?\n/u).map(line => line.trim()).filter(Boolean)
-      // Preserve an empty row so validation rejects it rather than dropping it.
-      return (lines.length ? lines : ['']).map(line => ({
+      return {
         label: row.label,
-        tokens: line ? line.split(/\s+/u) : [],
+        matches: lines.map(line => ({ tokens: line.split(/\s+/u) })),
         score: String(row.score).trim() ? Number(row.score) : undefined,
         threshold: String(row.threshold).trim() ? Number(row.threshold) : undefined,
-      }))
+      }
     })
   }
 

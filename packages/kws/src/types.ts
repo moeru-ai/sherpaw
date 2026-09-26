@@ -17,10 +17,20 @@ export interface KWSModule extends WebAssemblyModule {
   _SherpawKeywordResultStartTime: (result: number) => number
 }
 
-export interface KeywordEntry {
+export interface KeywordMatch {
   /** Already encoded model tokens; no text, pinyin, phoneme or BPE conversion. */
   tokens: string[]
+  /** Override the keyword's boost for this pronunciation. */
+  score?: number
+  /** Override the keyword's threshold for this pronunciation. */
+  threshold?: number
+}
+
+export interface KeywordEntry {
+  /** Returned unchanged when any match is detected. */
   label: string
+  /** At least one complete pronunciation; token sequences must be unique. */
+  matches: KeywordMatch[]
   /** Positive, finite normal float32 boost. Default: 1. */
   score?: number
   /** Probability in (0, 1]. Default: 0.25. */

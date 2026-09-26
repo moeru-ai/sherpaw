@@ -8,9 +8,9 @@ import type { Detection, KeywordEntry, KeywordSpotter, KWSModel, KWSModule } fro
 import { createKeywordSpotter, initKWSModule } from '../dist/index.js'
 
 const files = import.meta.glob<string>('./models/**/*.{onnx,txt,wav}', { eager: true, query: '?url', import: 'default' })
-const first: KeywordEntry = { tokens: ['zh', 'ōu', 'w', 'àng', 'j', 'ūn'], label: '周望军' }
-const second: KeywordEntry = { tokens: ['l', 'uò', 'sh', 'í'], label: '落实' }
-const english: KeywordEntry = { tokens: ['L', 'AY1', 'T', 'AH1', 'P'], label: 'LIGHT UP' }
+const first: KeywordEntry = { matches: [{ tokens: ['zh', 'ōu', 'w', 'àng', 'j', 'ūn'] }], label: '周望军' }
+const second: KeywordEntry = { matches: [{ tokens: ['l', 'uò', 'sh', 'í'] }], label: '落实' }
+const english: KeywordEntry = { matches: [{ tokens: ['L', 'AY1', 'T', 'AH1', 'P'] }], label: 'LIGHT UP' }
 
 async function bytes(directory: string, filename: string): Promise<ArrayBuffer> {
   const url = files[`./models/${directory}/${filename}`]
@@ -82,8 +82,8 @@ describe.each([
     try {
       const hits = feed(spotter, samples)
       expect(hits.map(hit => hit.label)).toEqual([first.label, second.label])
-      expect(hits[0].tokens).toEqual(first.tokens)
-      expect(hits[0].timestamps).toHaveLength(first.tokens.length)
+      expect(hits[0].tokens).toEqual(first.matches[0].tokens)
+      expect(hits[0].timestamps).toHaveLength(first.matches[0].tokens.length)
       expect(hits[0].startTime).toBeGreaterThanOrEqual(0)
       expect(hits[0].timestamps[0]).toBeGreaterThan(0)
       expect(feed(spotter, samples).map(hit => hit.label)).toEqual([first.label, second.label])
@@ -103,12 +103,29 @@ describe.each([
     }
   })
 
+  it('maps multiple matches to one keyword and replaces the entire match group', async () => {
+    const spotter = createKeywordSpotter(module, {
+      model,
+      keywords: [{ label: 'grouped', matches: [...first.matches, ...second.matches] }],
+    })
+    try {
+      const hits = feed(spotter, samples)
+      expect(hits.map(hit => hit.label)).toEqual(['grouped', 'grouped'])
+      expect(hits.map(hit => hit.tokens)).toEqual([first.matches[0].tokens, second.matches[0].tokens])
+      await spotter.setKeywords([{ label: 'grouped', matches: second.matches }])
+      expect(feed(spotter, samples).map(hit => hit.tokens)).toEqual([second.matches[0].tokens])
+    }
+    finally {
+      spotter.dispose()
+    }
+  })
+
   it('rejects invalid updates without losing the active keyword, replaces, pauses and resumes', async () => {
     const spotter = createKeywordSpotter(module, { model, keywords: [first] })
     try {
       expect(feed(spotter, unrelated)).toEqual([])
       expect(feed(spotter, new Float32Array(32000))).toEqual([])
-      await expect(spotter.setKeywords([{ ...first, tokens: ['NOT_A_MODEL_TOKEN'] }])).rejects.toThrow(/token/)
+      await expect(spotter.setKeywords([{ ...first, matches: [{ tokens: ['NOT_A_MODEL_TOKEN'] }] }])).rejects.toThrow(/token/)
       await expect(spotter.setKeywords([{ ...first, threshold: 2 }])).rejects.toThrow(/threshold/)
       expect(feed(spotter, samples).map(hit => hit.label)).toEqual([first.label])
       // Update with a partially accepted utterance: none of it may survive.

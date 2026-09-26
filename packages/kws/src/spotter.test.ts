@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import type { KeywordEntry, KWSModule } from './types'
+import type { KeywordEntry, KeywordMatch, KWSModule } from './types'
 
 import { encodeKeywords, readTokens } from './keywords'
 import { createKeywordSpotter } from './spotter'
 
 const model = { encoder: 'encoder', decoder: 'decoder', joiner: 'joiner', tokens: 'tokens' }
-const keyword = { tokens: ['a'], label: 'first' }
+const keyword = { matches: [{ tokens: ['a'] }], label: 'first' }
 
 function runtime() {
   let next = 4
@@ -76,10 +76,11 @@ function runtime() {
 describe('keyword validation', () => {
   const vocabulary = readTokens('<blk> 0\na 1\nb 2\n')
   it.each([
-    { tokens: [], label: 'empty' },
-    { tokens: ['unknown'], label: 'bad' },
-    { tokens: ['a\nb'], label: 'injection' },
-    { tokens: ['a'], label: ' ' },
+    { matches: [], label: 'empty' },
+    { matches: [{ tokens: [] }], label: 'empty' },
+    { matches: [{ tokens: ['unknown'] }], label: 'bad' },
+    { matches: [{ tokens: ['a\nb'] }], label: 'injection' },
+    { matches: [{ tokens: ['a'] }], label: ' ' },
     { ...keyword, score: Number.NaN },
     { ...keyword, score: 0 },
     { ...keyword, score: 1e40 },
@@ -88,12 +89,17 @@ describe('keyword validation', () => {
     { ...keyword, threshold: -1 },
     { ...keyword, threshold: 1.1 },
     { ...keyword, threshold: Number.POSITIVE_INFINITY },
+    { ...keyword, matches: [{ tokens: ['a'], score: 0 }] },
+    { ...keyword, matches: [{ tokens: ['a'], threshold: 2 }] },
+    { ...keyword, score: -1, matches: [{ tokens: ['a'], score: 1 }] },
   ])('rejects malformed entries: %j', (entry) => {
     expect(() => encodeKeywords([entry], vocabulary)).toThrow()
   })
   it('rejects duplicate sequences, sparse input, and malformed token files', () => {
     expect(() => encodeKeywords([keyword, keyword], vocabulary)).toThrow(/Duplicate/)
+    expect(() => encodeKeywords([{ ...keyword, matches: [{ tokens: ['a'] }, { tokens: ['a'] }] }], vocabulary)).toThrow(/Duplicate/)
     expect(() => encodeKeywords(Array.from({ length: 1 }) as KeywordEntry[], vocabulary)).toThrow()
+    expect(() => encodeKeywords([{ ...keyword, matches: Array.from({ length: 1 }) as KeywordMatch[] }], vocabulary)).toThrow()
     for (const text of ['', 'a', 'a 1\nb 1', 'a 1\na 2'])
       expect(() => readTokens(text)).toThrow()
   })
@@ -106,12 +112,51 @@ describe('keyword validation', () => {
 })
 
 describe('native ownership and updates', () => {
+  it('inherits settings, applies match overrides, and returns one label for all matches', () => {
+    const r = runtime()
+    const spotter = createKeywordSpotter(r.typed, {
+      model,
+      keywords: [{
+        label: 'one keyword',
+        score: 1.5,
+        threshold: 0.1,
+        matches: [
+          { tokens: ['a'] },
+          { tokens: ['b'], score: 2, threshold: 0.2 },
+          { tokens: ['a', 'b'], score: 3 },
+          { tokens: ['b', 'a'], threshold: 0.3 },
+        ],
+      }],
+    })
+    expect(r.configs[0]).toBe('a :1.5 #0.1 @sherpaw_0\nb :2 #0.2 @sherpaw_0\na b :3 #0.1 @sherpaw_0\nb a :1.5 #0.3 @sherpaw_0')
+    for (const token of ['a', 'b'])
+      r.results.push(JSON.stringify({ keyword: 'sherpaw_0', tokens: [token], start_time: 0, timestamps: [0.4] }))
+    const hits = spotter.processAudio(new Float32Array(32), 16000)
+    expect(hits.map(hit => hit.label)).toEqual(['one keyword', 'one keyword'])
+    expect(hits.map(hit => hit.tokens)).toEqual([['a'], ['b']])
+    spotter.dispose()
+    expect(r.detectors.size + r.streams.size + r.allocated.size).toBe(0)
+  })
+
+  it('preserves the whole active keyword when any replacement match is invalid', async () => {
+    const r = runtime()
+    const spotter = createKeywordSpotter(r.typed, { model, keywords: [keyword] })
+    await expect(spotter.setKeywords([{
+      label: 'replacement',
+      matches: [{ tokens: ['b'] }, { tokens: ['unknown'] }],
+    }])).rejects.toThrow(/unknown/)
+    expect(r.module._SherpawCreateKeywordSpotter).toHaveBeenCalledTimes(1)
+    r.results.push(JSON.stringify({ keyword: 'sherpaw_0', tokens: ['a'], start_time: 0, timestamps: [0.4] }))
+    expect(spotter.processAudio(new Float32Array(32), 16000)[0].label).toBe('first')
+    spotter.dispose()
+  })
+
   it('preserves the configured search beam through vocabulary replacement and pause/resume', async () => {
     const r = runtime()
     const config = { model, keywords: [keyword], maxActivePaths: 16 }
     const spotter = createKeywordSpotter(r.typed, config)
     config.maxActivePaths = 4
-    await spotter.setKeywords([{ tokens: ['b'], label: 'second' }])
+    await spotter.setKeywords([{ matches: [{ tokens: ['b'] }], label: 'second' }])
     await spotter.setKeywords([])
     await spotter.setKeywords([keyword])
     expect(r.module._SherpawCreateKeywordSpotter.mock.calls.map(call => call[5])).toEqual([16, 16, 16])
@@ -149,9 +194,9 @@ describe('native ownership and updates', () => {
   it('copies requests, applies them in order, and recovers after rejection', async () => {
     const r = runtime()
     const spotter = createKeywordSpotter(r.typed, { model, keywords: [keyword] })
-    const entry = { tokens: ['b'], label: 'second' }
+    const entry = { matches: [{ tokens: ['b'] }], label: 'second' }
     const first = spotter.setKeywords([entry])
-    entry.tokens[0] = 'unknown'
+    entry.matches[0].tokens[0] = 'unknown'
     const invalid = spotter.setKeywords([entry])
     const pause = spotter.setKeywords([])
     await expect(invalid).rejects.toThrow(/unknown/)

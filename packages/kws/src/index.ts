@@ -1,6 +1,6 @@
 import type { KWSModule } from './types'
 
-export type { Detection, KeywordEntry, KeywordSpotter, KeywordSpotterConfig, KWSModel, KWSModule } from './types'
+export type { Detection, KeywordEntry, KeywordMatch, KeywordSpotter, KeywordSpotterConfig, KWSModel, KWSModule } from './types'
 
 export { createKeywordSpotter } from './spotter'
 
