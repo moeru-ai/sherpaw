@@ -6,7 +6,7 @@ export default defineConfig({
   test: {
     projects: [fakemic({
       name: 'asr-realtime',
-      include: ['tests/asr/realtime.audio.test.ts', 'tests/asr/realtime-metrics.test.ts'],
+      include: ['tests/asr/realtime.audio.test.ts', 'tests/asr/realtime-metrics.test.ts', 'tests/asr/gpu-diagnostics.test.ts'],
       testTimeout: 240000,
       runtime: web({
         name: 'chrome-hardware-webgpu',

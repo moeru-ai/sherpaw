@@ -21,7 +21,7 @@
   },
   "include": [
     "tests/asr",
-    "src/features/webgpu-experiment",
+    "src/features/asr",
     "vitest.asr-realtime.config.ts"
   ]
 }

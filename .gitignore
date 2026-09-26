@@ -145,7 +145,7 @@ packages/lib/README.md
 
 # Misc build outputs
 build/
-sherpa-onnx/build-webgpu-experiment/
+sherpa-onnx/build-asr-runtime/
 
 # Models (PyTorch pickle, ONNX, etc.)
 models/

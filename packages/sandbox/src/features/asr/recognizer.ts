@@ -1,15 +1,14 @@
-import type { LiveRecognizer } from '../webgpu-experiment/live-asr'
-import type { ModelBackend, ModelReply, ModelRequest, ModelSnapshot } from './catalog'
+import type { Recognizer, RecognizerOptions, RecognizerReply, RecognizerRequest, RecognizerSnapshot } from './types'
 
-import ModelWorker from './model.worker?worker'
+import RuntimeWorker from './runtime.worker?worker'
 
-/** Triggering workflow: ASR Load/Start -> selected model -> dedicated worker -> LiveRecognizer PCM interface. */
-export async function createModelRecognizer(modelId: string, report: (status: string) => void, backend: ModelBackend = 'cpu'): Promise<LiveRecognizer> {
-  const worker = new ModelWorker()
+/** Triggering workflow: ASR Load/Start -> selected model -> dedicated worker -> Recognizer PCM interface. */
+export async function createRecognizer(options: RecognizerOptions, report: (status: string) => void): Promise<Recognizer> {
+  const worker = new RuntimeWorker()
   let nextId = 0
   let closed = false
-  let snapshot: ModelSnapshot = { text: '', decodedChunks: 0 }
-  const pending = new Map<number, { resolve: (value: ModelSnapshot) => void, reject: (error: Error) => void, timer: ReturnType<typeof setTimeout> }>()
+  let snapshot: RecognizerSnapshot = { text: '', decodedChunks: 0, gpuDispatches: 0 }
+  const pending = new Map<number, { resolve: (value: RecognizerSnapshot) => void, reject: (error: Error) => void, timer: ReturnType<typeof setTimeout> }>()
 
   function close(error = new Error('Model worker released')) {
     if (closed)
@@ -24,7 +23,7 @@ export async function createModelRecognizer(modelId: string, report: (status: st
   }
 
   /** Triggering workflow: native worker reply -> progress/error/transcript -> waiting load or audio request. */
-  worker.onmessage = (event: MessageEvent<ModelReply>) => {
+  worker.onmessage = (event: MessageEvent<RecognizerReply>) => {
     const message = event.data
     if (message.status) {
       report(message.status)
@@ -48,8 +47,8 @@ export async function createModelRecognizer(modelId: string, report: (status: st
   /** Triggering workflow: WASM/worker crash -> reject pending requests -> terminate and release model memory. */
   worker.onerror = event => close(new Error(event.message || 'ASR worker crashed'))
 
-  function send(request: ModelRequest, transfer: Transferable[] = []) {
-    return new Promise<ModelSnapshot>((resolve, reject) => {
+  function send(request: RecognizerRequest, transfer: Transferable[] = []) {
+    return new Promise<RecognizerSnapshot>((resolve, reject) => {
       if (closed) {
         reject(new Error('Model worker released'))
         return
@@ -61,17 +60,25 @@ export async function createModelRecognizer(modelId: string, report: (status: st
   }
 
   try {
-    await send({ id: nextId++, kind: 'load', modelId, backend, baseUrl: new URL(import.meta.env.BASE_URL, location.href).href })
+    await send({ id: nextId++, kind: 'load', options, baseUrl: new URL(import.meta.env.BASE_URL, location.href).href })
     return {
-      /** Triggering workflow: microphone pump -> transferred PCM -> CatalogAccept -> partial/final text. */
+      /** Triggering workflow: microphone pump -> transferred PCM -> adapter.accept -> partial/final text. */
       async accept(samples) {
         // Keep caller-owned buffers intact (test fixtures can be reused).
         const copy = samples.slice()
         return (await send({ id: nextId++, kind: 'accept', samples: copy }, [copy.buffer])).text
       },
-      /** Triggering workflow: Stop -> CatalogFinish -> drain trailing streaming context -> final text. */
+      /** Triggering workflow: Stop -> adapter.finish -> drain trailing streaming context -> final text. */
       async finish() { return (await send({ id: nextId++, kind: 'finish' })).text },
-      async dispose() { close() },
+      /** Triggering workflow: Stop/model change -> adapter cleanup -> terminate the owning Worker. */
+      async dispose() {
+        if (closed)
+          return
+        try {
+          await send({ id: nextId++, kind: 'dispose' })
+        }
+        finally { close() }
+      },
       stats: () => ({ decodedChunks: snapshot.decodedChunks, gpuDispatches: snapshot.gpuDispatches ?? 0 }),
     }
   }

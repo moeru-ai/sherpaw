@@ -1,10 +1,10 @@
 import type { FakemicWebPrepareContext } from '@sherpaw/vitest-plugin-fakemic'
 
-import type { RealtimeEvent } from '../../src/features/webgpu-experiment/realtime-metrics'
+import type { RealtimeEvent } from '../../src/features/asr/realtime-metrics'
 
 declare global {
   interface Window {
-    __asrRealtimeTest: { events: RealtimeEvent[], tracks: MediaStreamTrack[] }
+    __asrRealtimeTest: { events: RealtimeEvent[], tracks: MediaStreamTrack[], gpuDispatch?: GPUComputePassEncoder['dispatchWorkgroups'] }
   }
 }
 
@@ -14,7 +14,7 @@ export default async function prepare(context: FakemicWebPrepareContext) {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(String(error)))
   await page.addInitScript(() => {
-    window.__asrRealtimeTest = { events: [], tracks: [] }
+    window.__asrRealtimeTest = { events: [], tracks: [], gpuDispatch: globalThis.GPUComputePassEncoder?.prototype.dispatchWorkgroups }
     /** Triggering workflow: sandbox publishMetrics -> realtime CustomEvent -> captured test timeline. */
     window.addEventListener('sherpaw:asr-realtime', (event) => {
       window.__asrRealtimeTest.events.push((event as CustomEvent<RealtimeEvent>).detail)
@@ -38,6 +38,7 @@ export default async function prepare(context: FakemicWebPrepareContext) {
     },
     snapshot: () => page.evaluate(() => ({
       events: window.__asrRealtimeTest.events,
+      mainThreadGpuUntouched: window.__asrRealtimeTest.gpuDispatch === globalThis.GPUComputePassEncoder?.prototype.dispatchWorkgroups,
       tracks: window.__asrRealtimeTest.tracks.map(track => track.readyState),
       error: document.querySelector('[role=alert]')?.textContent ?? '',
     })),

@@ -1,20 +1,18 @@
 <script setup lang="ts">
 import type { AudioProcessorMessage } from '../audio-processor.protocol'
-import type { ModelBackend } from '../features/asr-models/catalog'
-import type { LiveBackend, LiveRecognizer } from '../features/webgpu-experiment/live-asr'
-import type { RealtimeEvent, RealtimeSnapshot } from '../features/webgpu-experiment/realtime-metrics'
-import { createOnlineRecognizer } from '@sherpaw/asr'
+import type { RealtimeEvent, RealtimeSnapshot } from '../features/asr/realtime-metrics'
+import type { AsrBackend, Recognizer } from '../features/asr/types'
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import audioProcessor from '../audio-processor.worklet?worker&url'
 import Button from '../components/Button.vue'
 import ModelSetup from '../components/ModelSetup.vue'
-import { asrModels } from '../features/asr-models/catalog'
-import { RealtimeMetrics } from '../features/webgpu-experiment/realtime-metrics'
+import { asrModels } from '../features/asr/catalog'
+import { RealtimeMetrics } from '../features/asr/realtime-metrics'
 import { provideASRStore } from '../store'
 
 const { asrModule } = provideASRStore()
-const backend = ref<LiveBackend | ModelBackend | 'custom'>('cpu')
+const backend = ref<AsrBackend | 'custom'>('cpu')
 const model = ref('paraformer')
 const selectedModel = computed(() => asrModels.find(entry => entry.id === model.value))
 const modelLoaded = ref(false)
@@ -28,7 +26,7 @@ let metrics = new RealtimeMetrics()
 let pendingEndTime = 0
 let lastCapturePublish = 0
 let closed = false
-let engine: LiveRecognizer | undefined
+let engine: Recognizer | undefined
 let audioCtx: AudioContext | undefined
 let microphone: MediaStream | undefined
 let source: MediaStreamAudioSourceNode | undefined
@@ -85,19 +83,14 @@ watch([model, backend], async ([currentModel], [previousModel]) => {
 async function ensureModel() {
   if (engine)
     return
-  if (model.value !== 'paraformer') {
-    const { createModelRecognizer } = await import('../features/asr-models/recognizer')
-    engine = await createModelRecognizer(model.value, message => status.value = message, backend.value === 'webgpu-encoder' ? 'webgpu-encoder' : 'cpu')
-  }
-  else if (backend.value === 'custom') {
-    engine = createCustomRecognizer()
+  if (backend.value === 'custom') {
+    const { createCustomRecognizer } = await import('../features/asr/custom')
+    engine = createCustomRecognizer(asrModule.value)
     status.value = 'CPU / WASM · custom model'
   }
   else {
-    const { createLiveRecognizer } = await import('../features/webgpu-experiment/live-asr')
-    if (backend.value === 'webgpu-encoder')
-      throw new Error('WebGPU encoder backend requires X-ASR FP32')
-    engine = await createLiveRecognizer(backend.value, message => status.value = message)
+    const { createRecognizer } = await import('../features/asr/recognizer')
+    engine = await createRecognizer({ modelId: model.value, backend: backend.value, diagnostics: true }, message => status.value = message)
   }
   modelLoaded.value = true
 }
@@ -118,40 +111,6 @@ async function loadModel() {
     await release()
   }
   finally { phase.value = 'idle' }
-}
-
-function createCustomRecognizer(): LiveRecognizer {
-  if (!asrModule.value)
-    throw new Error('Load and initialize your model in Model setup first.')
-  const recognizer = createOnlineRecognizer(asrModule.value)
-  const stream = recognizer.createStream()
-  const completed: string[] = []
-  function decode() {
-    while (recognizer.isReady(stream)) recognizer.decode(stream)
-    const text = recognizer.getResult(stream).text
-    const result = [...completed, text].join(' ')
-    if (recognizer.isEndpoint(stream)) {
-      if (text)
-        completed.push(text)
-      recognizer.reset(stream)
-    }
-    return result
-  }
-  return {
-    async accept(samples) {
-      stream.acceptWaveform(16000, samples)
-      return decode()
-    },
-    async finish() {
-      stream.setOption('is_final', '1')
-      stream.inputFinished()
-      return decode()
-    },
-    async dispose() {
-      stream.free()
-      recognizer.free()
-    },
-  }
 }
 
 /** Triggering workflow: AudioWorklet data -> pending PCM -> serialized engine.accept -> live transcript. */

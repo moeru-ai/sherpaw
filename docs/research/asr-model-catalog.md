@@ -24,17 +24,31 @@ interactive audio source.
 
 ## Runtime
 
-CPU/WASM is the default. X-ASR and Zipformer use dedicated Workers and a native
-C API for Sherpa feature extraction, endpoint detection, decoding, and flushing.
+CPU/WASM is the default. Each built-in recognizer owns a dedicated Worker.
+The page calls `createRecognizer({ modelId, backend, diagnostics })` and only
+handles recording and display. Model adapters share the Worker protocol, native
+runtime loading, PCM transfer, and ORT session/tensor transport:
+
+- `features/asr/recognizer.ts`, `runtime.worker.ts`, `types.ts`: session boundary.
+- `paraformer.ts`, `transducer.ts`: model-specific initialization and decoding.
+- `custom.ts`: legacy Model setup adapter for its existing main-thread WASM instance.
+- `native.ts`, `onnx.ts`: native and browser inference bridges.
+- `realtime-metrics.ts`, `gpu-diagnostics.ts`: measurement and optional diagnostics.
+- `sherpa-onnx/asr-runtime/`: native runtimes and explicit upstream hook patches.
+
+The native C API retains Sherpa feature extraction, endpoint detection, decoding,
+and flushing. Patches apply to build-local sources with zero fuzz; upstream
+submodules stay unchanged.
 X-ASR FP32 can run its encoder in ONNX Runtime Web while keeping decoder/joiner
 on CPU. Separate synchronous CPU and asynchronous WebGPU WASM builds avoid
 adding async bridge overhead to CPU inference. Paraformer's experimental
 backends use the same tensor transport, including INT64 streaming state.
 No custom GPU operators or model graph changes are required.
 
-GPU dispatch counters verify actual GPU activity; missing hardware support and
-bridge failures produce errors. Quantized operators can fall back to CPU within
-ORT Web, so INT8 WebGPU may be slower than CPU. The X-ASR GPU path copies encoder
+GPU dispatch counters verify actual GPU activity. Instrumentation is disabled
+by default; the sandbox enables it inside the recognizer's Worker. Missing
+hardware support and bridge failures produce errors. Quantized operators can
+fall back to CPU within ORT Web, so INT8 WebGPU may be slower than CPU. The X-ASR GPU path copies encoder
 inputs, outputs, and caches across the bridge each chunk and retains the native
 session for metadata/error recovery. Peak memory and Android/Electron native
 performance have not been validated.
@@ -50,9 +64,9 @@ git submodule update --init --recursive sherpa-onnx/upstream \
 git -C models/huggingface/sherpaw-paraformer-zh-en lfs pull
 pnpm -F @sherpaw/speaker-identification test:prepare
 python3 scripts/prepare-asr-models.py
-bash scripts/build-webgpu-experiment.sh
+bash scripts/build-asr-runtime.sh
 # Additional original FP32 weights for Paraformer's FP32 WebGPU option:
-uv run scripts/prepare-float-asr.py
+uv run scripts/prepare-paraformer-fp32.py
 pnpm --filter @sherpaw/sandbox... build
 pnpm --filter @sherpaw/sandbox dev --host 127.0.0.1 --port 5187
 ```

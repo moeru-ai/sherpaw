@@ -20,6 +20,7 @@ dictionaryDefinitions: []
 dictionaries: []
 words:
   - asyncify
+  - COPYONLY
   - csukuangfj
   - DBUILD
   - DCMAKE
@@ -36,6 +37,7 @@ words:
   - quantizer
   - sentencepiece
   - sess
+  - unstub
   - unpaced
   - webgpu
   - workgroups

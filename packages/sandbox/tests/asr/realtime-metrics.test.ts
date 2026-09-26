@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 
-import { RealtimeMetrics } from '../../src/features/webgpu-experiment/realtime-metrics'
+import { RealtimeMetrics } from '../../src/features/asr/realtime-metrics'
 
 it('includes audio delivered late while the main thread was busy, and excludes non-inference batches from latency percentiles', () => {
   const metrics = new RealtimeMetrics()

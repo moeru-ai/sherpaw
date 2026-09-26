@@ -6,11 +6,10 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { expect, inject } from 'vitest'
 
-import type { ModelBackend } from '../../src/features/asr-models/catalog'
-import type { LiveBackend } from '../../src/features/webgpu-experiment/live-asr'
+import type { AsrBackend } from '../../src/features/asr/types'
 import type { RealtimeSession } from './prepare'
 
-import { asrModels } from '../../src/features/asr-models/catalog'
+import { asrModels } from '../../src/features/asr/catalog'
 
 const { describe, it } = createAudioTestAPI<AudioTestCase, AudioTestTask, { audio: RealtimeSession }>({
   createPlans(name, definition) {
@@ -27,7 +26,7 @@ const { describe, it } = createAudioTestAPI<AudioTestCase, AudioTestTask, { audi
   },
 })
 
-const cases: { model: string, backend: LiveBackend | ModelBackend }[] = [
+const cases: { model: string, backend: AsrBackend }[] = [
   ...(['cpu', 'webgpu', 'webgpu-decoder', 'webgpu-fp32'] as const).map(backend => ({ model: 'paraformer', backend })),
   ...asrModels.map(model => ({ model: model.id, backend: 'cpu' as const })),
   { model: 'x-asr-fp32', backend: 'webgpu-encoder' },
@@ -53,8 +52,11 @@ describe('Model selector and continuous microphone input', () => {
         await audio.page.getByLabel('Inference backend').selectOption(backend)
         await audio.page.getByRole('button', { name: 'Load model', exact: true }).click()
         await audio.page.getByRole('button', { name: 'Start', exact: true }).waitFor({ timeout: 180000 })
-        expect((await audio.snapshot()).error).toBe('')
-        expect((await audio.snapshot()).tracks).toEqual([])
+        const loaded = await audio.snapshot()
+        expect(loaded.error).toBe('')
+        expect(loaded.tracks).toEqual([])
+        expect(loaded.mainThreadGpuUntouched).toBe(true)
+        expect(audio.page.workers()).toHaveLength(1)
         // Do not reselect a model: Start must reuse the preloaded worker.
         await audio.page.getByRole('button', { name: 'Start', exact: true }).click()
         await audio.page.getByRole('button', { name: 'Stop transcription' }).waitFor({ timeout: 180000 })
