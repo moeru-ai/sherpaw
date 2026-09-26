@@ -32,6 +32,8 @@ For a private Iru regression recording, set `SHERPAW_KWS_TEST_RECORDING=/absolut
 
 For the specific Chinese recording described above, set `SHERPAW_KWS_TEST_CHINESE_RECORDING=/absolute/path/chinese.wav`. Its opt-in test checks five recovered phrases through file input, at least three through simulated-microphone input (capture alignment changes the result), and rejection of the standalone-name crop. All three private recording variables can be supplied together.
 
+A fourth natural-speech recording has an unresolved seven-utterance target. Set `SHERPAW_KWS_TEST_NATURAL_RECORDING=/absolute/path/natural.wav` to run its opt-in regression: it currently **fails** with three detections instead of seven. This differs from the earlier tests that document partial successes; do not interpret their passing status as general wake-word reliability. The [Chinese recording analysis](../../docs/research/kws-feiyu-recording.md#fourth-recording-natural-speech-versus-deliberate-articulation) includes the decoder trace and rejected tuning changes.
+
 The implementation lives in `src/features/kws/` and `src/pages/kws.vue`. `pnpm -F @sherpaw/sandbox test:kws` exercises the real UI, Worker, external model assets, file input, microphone capture, vocabulary replacement, error recovery and route cleanup in Chromium. Japanese remains unverified; this playground uses the Chinese/English model.
 
 ## Speaker page organization

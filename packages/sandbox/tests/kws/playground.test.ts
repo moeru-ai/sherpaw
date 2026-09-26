@@ -224,6 +224,25 @@ it.skipIf(!chineseRecording)('recovers Chinese preset phrases in a local recordi
   }
 })
 
+// Intentionally red when the fourth private fixture is supplied: this captures
+// the user's seven-utterance target rather than accepting the current three hits.
+const naturalRecording = process.env.SHERPAW_KWS_TEST_NATURAL_RECORDING
+it.skipIf(!naturalRecording)('detects all seven natural repeated-name utterances (known failure)', async () => {
+  const browser = await chromium.launch({ headless: true })
+  try {
+    const page = await browser.newPage()
+    await page.goto(`${url}kws`)
+    await page.getByRole('button', { name: '肥鱼 · 中文' }).click()
+    await load(page, false)
+    await file(page, naturalRecording!)
+    expect(await page.getByRole('alert').count()).toBe(0)
+    expect(await page.locator('.hit strong').allTextContents()).toEqual(Array.from({ length: 7 }, () => '肥鱼肥鱼'))
+  }
+  finally {
+    await browser.close()
+  }
+})
+
 it('uses the real Worker for files, replaces keywords atomically, pauses and resumes', async () => {
   const browser = await chromium.launch({ headless: true })
   try {

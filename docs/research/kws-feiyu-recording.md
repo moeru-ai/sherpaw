@@ -64,3 +64,50 @@ SHERPAW_KWS_TEST_CHINESE_RECORDING=/absolute/path/chinese.wav pnpm -F @sherpaw/s
 ```
 
 The test checks the five recovered detections in order through file input, plus rejection of the standalone-name crop. Simulated-microphone capture has a different start alignment: observed runs yield three or four hits rather than the file's five. Its assertion waits for the complete recording, requires at least three detections and permits only ordered subsets of the five file detections, with no extra labels. It does not assert file/microphone parity. It explicitly documents the three remaining misses. Without the private fixture, the test is skipped. The regular browser suite checks both presets against all nine unrelated upstream recordings. The two English recording variables can be supplied alongside the Chinese one.
+
+## Fourth recording: natural speech versus deliberate articulation
+
+A new 23.79-second recording contains approximately seven 肥鱼肥鱼 attempts, as confirmed by the speaker, who reported only the last, deliberately articulated attempt triggering during live use. Whole-file average level is -25.3 dBFS and peak is -0.7 dBFS. Local automatic transcription produced repetitive hallucinations and was not used as the ground-truth count.
+
+The unchanged preset detects three in file replay, delivered at approximately 6.0, 13.0 and 21.0 seconds, in both native KWS and browser WASM. The user's live observation and this file replay are different inputs; the three-hit file result does not establish that live capture detected the first two. The confirmed seven-utterance target is now an opt-in **failing** browser regression, rather than an assertion that the current three hits are sufficient.
+
+One simulated-microphone replay delivers two hits. Its AudioContext uses 44.1 kHz in this run (earlier experiments used 48 kHz); replaying the captured PCM through native KWS at 44.1 kHz reproduces the same two hits, around 6.0 and 13.0 seconds. This still differs from the user’s live observation and does not reproduce the exact live input.
+
+### Candidate trace
+
+A temporary diagnostic build of the pinned WASM records candidate token paths and native reset times. It is served only to an isolated local test browser, together with its matching Emscripten JS glue. The trace-enabled build reproduces the same three file hits. Neither diagnostic binary nor private audio/transcripts/traces are committed; upstream source and normal build artifacts are restored afterward.
+
+During the second utterance, around 7.4–9.1 seconds:
+
+- A correct `f ēi y ú` prefix exists among the candidates at 7.88 seconds and is still present at 8.08 seconds.
+- By 8.12 seconds no retained candidate contains that complete first-name prefix. Competing paths include `n ǐ`, the beginning of 你好肥鱼.
+- The second name starts a new `f ... y ú` prefix around 8.4–8.84 seconds. It cannot complete the repeated-name keyword after losing the first half.
+- No complete keyword match is reached in this interval, so the final confidence threshold is not what rejects this attempt.
+- There is no stream reset between 7.36 and 9.28 seconds. A mid-utterance reset therefore does not explain this particular miss.
+
+This identifies candidate loss during decoding as one concrete failure mechanism. It does not prove that every missed utterance has the same cause, or that the acoustic model's training, rather than search behavior, is solely responsible.
+
+### Controlled comparisons
+
+Keep beam 16 and threshold 0.1 unless specified. Every score experiment uses the existing complete-phrase matches, without adding truncated keywords.
+
+| Change | Fourth recording | Third recording |
+| --- | --- | --- |
+| Current bilingual model and preset | 3 repeated-name hits | 5 correct full phrases |
+| Chinese-only WenetSpeech KWS model, epoch 12 or 99 | 2 repeated-name hits | 5 hits, but misses 你好肥鱼 |
+| Add mixed first/second-tone combinations to the repeated name | Same 3 hits | Same 5 hits |
+| Listen only for 肥鱼肥鱼 | 4 hits, including the second attempt | Only the second repeated-name attempt detected; other keywords excluded |
+| Raise only 肥鱼肥鱼 boost to 1.5 | 4 hits, including the second attempt | Drops one 大肥鱼 hit: 4 total |
+| Raise only 肥鱼肥鱼 boost to 2 | 3 hits, loses the last attempt | 5 hits, but a different set of utterances |
+
+Removing competing keywords or increasing the repeated-name boost recovers the traced second attempt. Neither is a demonstrated improvement for the requested complete vocabulary across recordings, so none of these experimental settings replaces the preset. More pronunciation entries alone do not resolve the demonstrated candidate loss.
+
+A further temporary decoder experiment applies keyword context scores **before** the top-k candidate selection, instead of the upstream ordering that adds them afterward. The third recording improves from five to six hits, but the fourth drops from three to two. The first English recording retains its three labels; the second produces seven results including two Iru Iru labels instead of the expected one. The experiment is rejected because it introduces cross-recording regressions, and the original decoder is restored. Moving the boost earlier is not, by itself, a demonstrated fix for the traced failure.
+
+Run the unresolved target explicitly with the fourth local mono PCM16 WAV:
+
+```sh
+SHERPAW_KWS_TEST_NATURAL_RECORDING=/absolute/path/natural.wav pnpm -F @sherpaw/sandbox test:kws -t 'seven natural'
+```
+
+Current result: **FAIL**, expected seven 肥鱼肥鱼 detections, received three. This fixture is optional and stays outside Git; without the environment variable the test is skipped. The earlier passing tests establish specific supported behavior, not general wake-word reliability. No production detector or preset change is made from this fourth-recording investigation.
