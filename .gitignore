@@ -177,3 +177,7 @@ typed-router.d.ts
 
 # Cloudflare deployment outputs
 **/.wrangler/
+
+# Private keyword recording notes
+docs/research/kws-iru-recording.md
+docs/research/kws-feiyu-recording.md

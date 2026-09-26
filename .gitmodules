@@ -28,3 +28,11 @@
 	path = models/huggingface/sherpaw-eres2netv2-zh-cn
 	url = https://huggingface.co/moeru-ai/sherpaw-eres2netv2-zh-cn
 	branch = main
+[submodule "models/huggingface/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20"]
+	path = models/huggingface/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20
+	url = https://huggingface.co/moeru-ai/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20
+	branch = main
+[submodule "models/huggingface/sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01"]
+	path = models/huggingface/sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01
+	url = https://huggingface.co/moeru-ai/sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01
+	branch = main

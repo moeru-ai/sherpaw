@@ -3,7 +3,7 @@ class Capture extends AudioWorkletProcessor {
   /**
    * Triggering workflow:
    * AudioContext rendering -> process -> MessagePort.postMessage
-   * -> recorder.collectAudio -> manual stop -> speakerClient enrollment / identification.
+   * -> microphone.collect -> caller PCM callback.
    */
   process(inputs) {
     const channel = inputs[0]?.[0]
@@ -14,4 +14,4 @@ class Capture extends AudioWorkletProcessor {
     return true
   }
 }
-registerProcessor('speaker-test-capture', Capture)
+registerProcessor('microphone-capture', Capture)

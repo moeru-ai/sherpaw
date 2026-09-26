@@ -69,6 +69,7 @@ jobs:
       - name: Prepare test models
         run: |
           packages/asr/tests/scripts/prepare-models.sh
+          bash packages/kws/tests/scripts/prepare.sh
           packages/vad-asr/tests/scripts/prepare-models.sh
           packages/speaker-identification/tests/scripts/prepare.sh
 
@@ -81,6 +82,7 @@ jobs:
       - name: Run speaker demo and fixed audio cases
         run: |
           pnpm -F @sherpaw/sandbox test:speaker
+          pnpm -F @sherpaw/sandbox test:kws
           pnpm -F @sherpaw/testing-audio test:speakers
 
       - if: inputs.publish

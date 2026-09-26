@@ -5,6 +5,8 @@ export default defineConfig(() => {
     test: {
       projects: [
         'packages/asr',
+        'packages/kws/vitest.config.ts',
+        'packages/kws/vitest.node.config.ts',
         'packages/preloader',
         'packages/speaker-diarization',
         'packages/speaker-identification',

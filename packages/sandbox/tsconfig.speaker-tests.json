@@ -1,23 +1,5 @@
 {
-  "compilerOptions": {
-    "target": "ES2020",
-    "lib": [
-      "ESNext",
-      "DOM"
-    ],
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "types": [
-      "vite/client",
-      "node"
-    ],
-    "strict": true,
-    "noEmit": true,
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "isolatedModules": true,
-    "skipLibCheck": true
-  },
+  "extends": "./tsconfig.tests.json",
   "include": [
     "src/features/speaker-identification",
     "tests/speaker-identification",

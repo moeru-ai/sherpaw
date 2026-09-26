@@ -58,6 +58,8 @@ words:
   - CUDA
   - demi
   - downsample
+  - downmix
+  - downmixed
   - denoiser
   - Diacritization
   - diacritization
@@ -81,6 +83,7 @@ words:
   - hotwords
   - huggingface
   - iconify
+  - Iru
   - Kokoro
   - LIBSTDCPP
   - LSTM
@@ -91,6 +94,7 @@ words:
   - Neko
   - Nemo
   - noloop
+  - nums
   - NNAPI
   - npmjs
   - omnilingual
@@ -127,6 +131,8 @@ words:
   - wavs
   - webworkers
   - Wenet
+  - wenetspeech
+  - stof
   - worklet
   - XNNPACK
   - xlink

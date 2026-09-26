@@ -1,0 +1,45 @@
+{
+  "name": "@sherpaw/kws",
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Streaming keyword spotting with replaceable token vocabularies and standalone Sherpa-ONNX WASM",
+  "author": "Makito <i@maki.to>",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sumimakito/sherpaw.git",
+    "directory": "packages/kws"
+  },
+  "keywords": [],
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json",
+    "./module.wasm": "./dist/prebuilt/kws.wasm"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit -p tsconfig.config.json && tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.tests.json",
+    "test:run": "vitest run --config vitest.node.config.ts",
+    "test:prepare": "bash tests/scripts/prepare.sh",
+    "test:run:browser": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@sherpaw/shared": "workspace:^"
+  },
+  "devDependencies": {
+    "@sherpaw/preloader": "workspace:^",
+    "@types/emscripten": "^1.41.5",
+    "@types/node": "^24.6.0",
+    "@vitest/browser-playwright": "^4.1.9",
+    "tsdown": "^0.15.12",
+    "typescript": "^5.9.3",
+    "vite": "npm:rolldown-vite@7.1.14",
+    "vitest": "^4.1.9"
+  }
+}
