@@ -20,6 +20,8 @@ export const keywordPresets: KeywordPreset[] = [
       // The bilingual model can encode the same accented phrase as pinyin.
       { label: 'Hey Iru', tokens: ['h', 'ēi', 'y', 'ī', 'l', 'ù'], score: 1.5, threshold: 0.1 },
       { label: 'Hello Iru', tokens: ['HH', 'AH0', 'L', 'OW1', 'IY1', 'L', 'UW0'], score: 1.5, threshold: 0.1 },
+      // Hello can stay in English phones while 伊噜 switches to pinyin.
+      { label: 'Hello Iru', tokens: ['HH', 'AH0', 'L', 'OW1', 'y', 'ī', 'l', 'ù'], score: 1.5, threshold: 0.1 },
       { label: 'Iru Iru', tokens: ['IY1', 'L', 'UW0', 'IY1', 'L', 'UW0'], score: 1.5, threshold: 0.1 },
       { label: 'Iru Iru', tokens: ['y', 'ī', 'l', 'ù', 'y', 'ī', 'l', 'ù'], score: 1.5, threshold: 0.1 },
     ],

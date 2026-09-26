@@ -129,6 +129,56 @@ it.skipIf(!recording)('detects all Iru phrases in a local recording through file
   }
 })
 
+const repeatedRecording = process.env.SHERPAW_KWS_TEST_REPEATED_RECORDING
+it.skipIf(!repeatedRecording)('detects mixed-language Hello Iru pronunciations in a local repeated-phrase recording', async () => {
+  const browser = await chromium.launch({ headless: true })
+  try {
+    const page = await browser.newPage()
+    await page.goto(`${url}kws`)
+    await load(page, false)
+    await file(page, repeatedRecording!)
+    // This 27-second recording has five Hello Iru attempts. Three are recovered
+    // in continuous replay; the misses around 16 and 18 seconds remain open.
+    expect(await page.locator('.hit strong').allTextContents()).toEqual([
+      'Hello Iru',
+      'Hello Iru',
+      'Iru Iru',
+      'Hello Iru',
+      'Hey Iru',
+    ])
+    const { samples, sampleRate } = decodeWavPcm16(Uint8Array.from(await readFile(repeatedRecording!)).buffer)
+    // A 160 ms shift recovers all five Hellos in continuous replay. Keep both
+    // results visible instead of treating one successful alignment as reliable.
+    await page.getByRole('button', { name: '清空记录' }).click()
+    const padded = new Float32Array(samples.length + Math.round(sampleRate * 0.16))
+    padded.set(samples, padded.length - samples.length)
+    await page.getByLabel('测试音频文件').setInputFiles({ name: 'repeated-offset.wav', mimeType: 'audio/wav', buffer: Buffer.from(encodeWavPcm16(padded, sampleRate)) })
+    await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain('repeated-offset.wav 检测完成')
+    expect(await page.locator('.hit strong').allTextContents()).toEqual([
+      'Hello Iru',
+      'Hello Iru',
+      'Hello Iru',
+      'Hello Iru',
+      'Iru Iru',
+      'Hello Iru',
+      'Hey Iru',
+    ])
+    // Each complete Hello phrase is detectable with fresh stream state and its
+    // own frame alignment, including the two continuous-replay misses.
+    for (const [start, end] of [[5.5, 8.3], [12, 14.5], [14.7, 16.8], [17, 19.5], [19.7, 22]] as const) {
+      await page.getByRole('button', { name: '清空记录' }).click()
+      const name = `hello-${start}.wav`
+      const buffer = Buffer.from(encodeWavPcm16(samples.slice(Math.round(start * sampleRate), Math.round(end * sampleRate)), sampleRate))
+      await page.getByLabel('测试音频文件').setInputFiles({ name, mimeType: 'audio/wav', buffer })
+      await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain(`${name} 检测完成`)
+      expect(await page.locator('.hit strong').allTextContents()).toEqual(['Hello Iru'])
+    }
+  }
+  finally {
+    await browser.close()
+  }
+})
+
 it('uses the real Worker for files, replaces keywords atomically, pauses and resumes', async () => {
   const browser = await chromium.launch({ headless: true })
   try {

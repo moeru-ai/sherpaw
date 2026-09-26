@@ -16,7 +16,7 @@ A single successful replay was insufficient evidence. Prepending silence changes
 
 Prepend 0–620 ms of zero-valued PCM in 20 ms increments. For each of the 32 cases, create a new stream, feed 100 ms chunks, append one second of trailing silence, and reset after each hit. A case passes only when the complete ordered result is exactly Hey Iru, Hello Iru, Iru Iru, without extra detections.
 
-All rows except the original use the five current pronunciation entries. The model is the fp32 `sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20` release.
+All rows except the original use the five pronunciation entries from the first-recording revision (before the second-recording addition below). The model is the fp32 `sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20` release.
 
 | Configuration | Beam | Score | Threshold | Exact sequences / 32 |
 | --- | ---: | ---: | ---: | ---: |
@@ -67,3 +67,30 @@ SHERPAW_KWS_TEST_RECORDING=/absolute/path/iru.wav pnpm -F @sherpaw/sandbox test:
 ```
 
 The opt-in test expects the three phrases in order. It checks the original file, two previously failing offsets (160 and 480 ms), and the simulated microphone. Without the private input it is skipped. The regular playground suite checks the pronunciation variants against the nine upstream negatives. Library defaults remain unchanged; these score and threshold changes apply only to the Iru playground preset.
+
+## Second recording: repeated Hello Iru
+
+A separate 27.03-second recording from the same speaker contains Hey Iru, Hello Iru, Iru Iru, then four more Hello Iru attempts. Local Whisper transcription in Chinese and English helped locate the utterances; its English output duplicated two phrases, so its raw transcript is not used as an exact detection count. The five Hello regions are approximately 5.5–8.3, 12–14.5, 14.7–16.8, 17–19.5, and 19.7–22 seconds. The recording's average level is -19.0 dBFS, with a 0 dBFS peak. Both recordings and their transcripts remain local.
+
+The previous preset produces only Hey Iru and Iru Iru in this file, with **zero Hello Iru hits**, in both native and browser replay. Keeping the beam, score, threshold, and other entries fixed, adding the full-phrase mixed encoding `HH AH0 L OW1 y ī l ù` recovers three Hello hits, delivered at approximately 7.9, 14.0, and 22.0 seconds. The existing English Hello entry remains available. No greeting-only or name-only entry was added.
+
+Controlled alternatives were less effective: adding `h ā l óu y ī l ù` or changing the English greeting to `HH EH0 L OW1` recovered none; adding the model's observed full-pinyin path `h ǎi l áo y ī l ù` recovered two. With the mixed encoding, score 1, 1.5, or 2 at threshold 0.1, and score 1.5 or 2 at threshold 0.05, all still recovered only three in the unmodified file. This is evidence against fixing the remaining misses simply by lowering the threshold.
+
+The two remaining misses, around 16 and 18 seconds, are detected when their complete phrases are replayed separately. Cropping changes both prior stream state and feature-frame alignment, so it does not isolate which is responsible. Prepending silence to the complete recording also changes the outcome:
+
+| Native replay, 32 start positions | Previous five entries | With mixed Hello entry |
+| --- | ---: | ---: |
+| First recording, exact three-phrase sequence | 25/32 | 25/32 |
+| Second recording, exact seven-phrase sequence | 0/32 | 18/32 |
+| Second recording, total Hello detections across the 32 replays | 10 | 132 |
+| Unrelated upstream audio and three partial-phrase crops | 0 hits | 0 hits |
+
+The second recording contains five Hello attempts per replay. With the addition, 18 start positions recover all five; the other 14 recover three. Four of those failing positions also produce an extra Hey Iru label. These counts describe this local experiment, not general recall or false-alarm rates. The first recording's 192 audio-perturbation cases above were measured before this addition and were not repeated for it.
+
+The browser regression first failed with only Hey Iru and Iru Iru, then passed after adding the mixed entry. It verifies the five total detections in the unmodified file, all seven with 160 ms of leading silence, and one Hello detection from each of the five isolated phrase regions. It deliberately documents the remaining continuous-replay misses instead of describing the preset as reliable. Run it with the specific local mono PCM16 WAV:
+
+```sh
+SHERPAW_KWS_TEST_REPEATED_RECORDING=/absolute/path/repeated-iru.wav pnpm -F @sherpaw/sandbox test:kws
+```
+
+Both optional recording variables can be supplied together. The browser tests use the real Worker and packaged WASM; the 32-position comparison uses native sherpa-onnx 1.13.8. No model, library-default, or microphone-processing change is part of this correction.
