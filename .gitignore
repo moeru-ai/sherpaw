@@ -183,3 +183,6 @@ typed-router.d.ts
 # Local ASR catalog assets and generated WASM runtime
 packages/sandbox/public/asr-models/
 packages/sandbox/public/asr-runtime/
+
+# Generated X-ASR preload package manifests (published inside HF model repos)
+models/sherpa-onnx-x-asr-*/package-manifest.json
