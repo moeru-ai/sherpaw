@@ -1,0 +1,30 @@
+{
+  "models": [
+    {
+      "id": "zipformer-zh",
+      "label": "Zipformer 2025 \u00b7 Chinese only \u00b7 int8",
+      "family": "transducer",
+      "featureDim": 80,
+      "directory": "sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30",
+      "archive": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30.tar.bz2",
+        "bytes": 132634597,
+        "sha256": "5a2832047ea1f97dd0dc595b816c230c4bafad65cfc0341fa57517cadc50afd0"
+      },
+      "modelBytes": 167360920
+    },
+    {
+      "id": "x-asr",
+      "label": "X-ASR zh-en \u00b7 480 ms \u00b7 int8",
+      "family": "transducer",
+      "featureDim": 80,
+      "directory": "sherpa-onnx-x-asr-480ms-streaming-zipformer-transducer-zh-en-punct-int8-2026-06-05",
+      "archive": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-x-asr-480ms-streaming-zipformer-transducer-zh-en-punct-int8-2026-06-05.tar.bz2",
+        "bytes": 133895136,
+        "sha256": "fa5f63d618e5a01526e275a358bb7772e403f84808a4769fba52cffd8160bf74"
+      },
+      "modelBytes": 169227953
+    }
+  ]
+}

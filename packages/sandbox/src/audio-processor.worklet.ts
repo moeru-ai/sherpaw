@@ -1,6 +1,7 @@
 import type { AudioProcessorDataMessage } from './audio-processor.protocol'
 
 declare const sampleRate: number
+declare const currentTime: number
 
 class AudioProcessor extends AudioWorkletProcessor {
   private readonly outSampleRate = 16000
@@ -9,15 +10,18 @@ class AudioProcessor extends AudioWorkletProcessor {
     super()
   }
 
-  private emitData(data: Float32Array) {
+  /** Triggering workflow: process -> PCM data message with audio clock -> ASR receiveAudio and realtime metrics. */
+  private emitData(data: Float32Array, audioEndTime: number) {
     this.port.postMessage({
       type: 'data',
+      audioEndTime,
       sampleRate: this.outSampleRate,
       frames: data.length,
       data: data.buffer,
     } as AudioProcessorDataMessage, [data.buffer as ArrayBuffer])
   }
 
+  /** Triggering workflow: Web Audio render quantum -> channel resampling -> emitData. */
   process(inputs: Float32Array[][], _outputs: Float32Array[][], _parameters: Record<string, Float32Array>): boolean {
     const input = inputs[0]
     if (!input || input.length === 0)
@@ -28,7 +32,7 @@ class AudioProcessor extends AudioWorkletProcessor {
       return true
 
     if (!sampleRate || this.outSampleRate === sampleRate) {
-      this.emitData(channelData)
+      this.emitData(channelData, currentTime + channelData.length / sampleRate)
       return true
     }
 
@@ -49,7 +53,7 @@ class AudioProcessor extends AudioWorkletProcessor {
       offsetResult++
       offsetBuffer = nextOffsetBuffer
     }
-    this.emitData(result)
+    this.emitData(result, currentTime + channelData.length / sampleRate)
 
     return true
   }

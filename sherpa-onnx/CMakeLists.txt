@@ -16,3 +16,8 @@ add_subdirectory(vad)
 add_subdirectory(vad-asr)
 add_subdirectory(speaker-diarization)
 add_subdirectory(speaker-embedding)
+
+option(SHERPAW_WEBGPU_EXPERIMENT "Build browser WebGPU experiment feature bridge" OFF)
+if(SHERPAW_WEBGPU_EXPERIMENT)
+  add_subdirectory(webgpu-experiment)
+endif()
