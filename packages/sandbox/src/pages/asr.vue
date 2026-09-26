@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { AudioProcessorMessage } from '../audio-processor.protocol'
+import type { ModelBackend } from '../features/asr-models/catalog'
 import type { LiveBackend, LiveRecognizer } from '../features/webgpu-experiment/live-asr'
 import type { RealtimeEvent, RealtimeSnapshot } from '../features/webgpu-experiment/realtime-metrics'
 import { createOnlineRecognizer } from '@sherpaw/asr'
@@ -13,7 +14,7 @@ import { RealtimeMetrics } from '../features/webgpu-experiment/realtime-metrics'
 import { provideASRStore } from '../store'
 
 const { asrModule } = provideASRStore()
-const backend = ref<LiveBackend | 'custom'>('cpu')
+const backend = ref<LiveBackend | ModelBackend | 'custom'>('cpu')
 const model = ref('paraformer')
 const selectedModel = computed(() => asrModels.find(entry => entry.id === model.value))
 const modelLoaded = ref(false)
@@ -66,13 +67,13 @@ async function release() {
 }
 
 /** Triggering workflow: model/backend selector change -> release loaded worker -> next Load/Start uses the new selection. */
-watch([model, backend], async () => {
+watch([model, backend], async ([currentModel], [previousModel]) => {
   if (phase.value !== 'idle')
     return
   phase.value = 'loading'
   try {
     await release()
-    if (model.value !== 'paraformer')
+    if (currentModel !== previousModel)
       backend.value = 'cpu'
     error.value = ''
     status.value = `Ready to load · ${selectedModel.value?.label ?? 'Paraformer zh-en'}`
@@ -86,7 +87,7 @@ async function ensureModel() {
     return
   if (model.value !== 'paraformer') {
     const { createModelRecognizer } = await import('../features/asr-models/recognizer')
-    engine = await createModelRecognizer(model.value, message => status.value = message)
+    engine = await createModelRecognizer(model.value, message => status.value = message, backend.value === 'webgpu-encoder' ? 'webgpu-encoder' : 'cpu')
   }
   else if (backend.value === 'custom') {
     engine = createCustomRecognizer()
@@ -94,6 +95,8 @@ async function ensureModel() {
   }
   else {
     const { createLiveRecognizer } = await import('../features/webgpu-experiment/live-asr')
+    if (backend.value === 'webgpu-encoder')
+      throw new Error('WebGPU encoder backend requires X-ASR FP32')
     engine = await createLiveRecognizer(backend.value, message => status.value = message)
   }
   modelLoaded.value = true
@@ -332,12 +335,15 @@ onBeforeUnmount(() => {
       <p v-if="selectedModel" text-sm>
         Model weights: {{ Math.round(selectedModel.modelBytes / 1e6) }} MB.
         Streaming: text appears while you speak.
-        These models currently use CPU / WASM.
+        {{ model === 'x-asr-fp32' ? 'CPU / WASM or experimental WebGPU encoder.' : 'CPU / WASM inference.' }}
       </p>
       <label for="asr-backend" font-semibold>Inference backend</label>
       <select id="asr-backend" v-model="backend" :disabled="phase !== 'idle'" b rounded-lg p-2 bg-white>
         <option value="cpu">
           CPU / WASM{{ model === 'paraformer' ? ' — Paraformer zh-en' : '' }}
+        </option>
+        <option v-if="model === 'x-asr-fp32'" value="webgpu-encoder">
+          WebGPU — FP32 encoder, CPU decoder/joiner (experimental)
         </option>
         <option v-if="model === 'paraformer'" value="webgpu-fp32">
           WebGPU — FP32 encoder + decoder (experimental)

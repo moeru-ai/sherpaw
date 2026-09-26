@@ -9,7 +9,7 @@ export type Model = 'encoder' | 'decoder'
 export type AsrPlacement = 'both' | Model
 export type AsrPrecision = 'int8' | 'fp32' | 'fp16'
 interface Descriptor { name: string, type: number, dims: number[], count: number, ptr: number }
-export interface Bridge {
+export interface TensorBridge {
   HEAPU8: Uint8Array
   HEAPF32: Float32Array
   FS: { writeFile: (path: string, bytes: Uint8Array) => void, unlink: (path: string) => void }
@@ -18,6 +18,10 @@ export interface Bridge {
   UTF8ToString: (ptr: number) => string
   stringToUTF8: (value: string, ptr: number, bytes: number) => void
   lengthBytesUTF8: (value: string) => number
+  runAsr: (model: Model, inputs: Descriptor[]) => Promise<number>
+  asrError?: string
+}
+export interface Bridge extends TensorBridge {
   ccall: (name: string, result: null, types: never[], args: never[], options: { async: true }) => Promise<void>
   _AsrCreate: () => void
   _AsrStart: (web: number) => void
@@ -27,8 +31,6 @@ export interface Bridge {
   _AsrDecode: () => void
   _AsrText: () => number
   _AsrDestroy: () => void
-  runAsr: (model: Model, inputs: Descriptor[]) => Promise<number>
-  asrError?: string
 }
 
 export async function fetchChecked(url: string) {
@@ -44,10 +46,14 @@ export async function loadFloatAsrModel(model: Model, precision: 'fp32' | 'fp16'
   return new Uint8Array(await (await fetchChecked(url)).arrayBuffer())
 }
 
-/** Triggering workflow: ASR session initialization -> local WASM/model fetch -> bridge and model bytes. */
-export async function loadAsrBridge(report: (message: string) => void) {
+export function configureAsrOrt() {
   ort.env.wasm.numThreads = 1
   ort.env.wasm.wasmPaths = { mjs: ortModuleUrl, wasm: ortWasmUrl }
+}
+
+/** Triggering workflow: ASR session initialization -> local WASM/model fetch -> bridge and model bytes. */
+export async function loadAsrBridge(report: (message: string) => void) {
+  configureAsrOrt()
   report('Loading locally built ASR bridge and Paraformer models…')
   const root = `${import.meta.env.BASE_URL}webgpu-experiment/`
   const { default: init } = await import(/* @vite-ignore */ `${root}asr-probe.js`)
@@ -71,7 +77,7 @@ export async function loadAsrBridge(report: (message: string) => void) {
 
 /** Connect the Sherpa session boundary to browser inference, preserving tensor ownership. */
 export function installAsrRunner(
-  bridge: Bridge,
+  bridge: TensorBridge,
   sessions: Partial<Record<Model, ort.InferenceSession>>,
   onRun: (model: Model, ms: number, dispatches: number) => void = () => {},
   getDispatches: () => number = () => 0,
@@ -88,6 +94,8 @@ export function installAsrRunner(
           inputs[input.name] = new ort.Tensor('float32', new Float32Array(bytes.buffer), input.dims)
         else if (input.type === 6)
           inputs[input.name] = new ort.Tensor('int32', new Int32Array(bytes.buffer), input.dims)
+        else if (input.type === 7)
+          inputs[input.name] = new ort.Tensor('int64', new BigInt64Array(bytes.buffer), input.dims)
         else
           throw new Error(`Unsupported ASR input type ${input.type}`)
       }

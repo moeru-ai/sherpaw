@@ -10,7 +10,7 @@ an external VAD. Other experimental model integrations have been removed.
 | --- | ---: | --- |
 | Paraformer zh-en | Existing pinned model pack | CPU/WASM; experimental WebGPU |
 | X-ASR zh-en, punctuation, 480 ms, INT8 | 169 MB | CPU/WASM Worker |
-| X-ASR zh-en, punctuation, 480 ms, FP32 | 615 MB | CPU/WASM Worker |
+| X-ASR zh-en, punctuation, 480 ms, FP32 | 615 MB | CPU/WASM Worker; experimental WebGPU encoder |
 | Zipformer Chinese, 2025-06-30, INT8 | 167 MB | CPU/WASM Worker; Chinese only |
 
 The source of truth for the new model variants is
@@ -31,10 +31,16 @@ is the microphone. The old custom model setup remains available under
 Paraformer's backend selector.
 
 X-ASR and Zipformer execute in dedicated Workers with one CPU inference thread.
+X-ASR FP32 also offers **WebGPU — FP32 encoder, CPU decoder/joiner**.
+This backend retains Sherpa feature extraction, endpoint detection, token decoding,
+and streaming state updates while ONNX Runtime Web executes the encoder.
+It requires hardware WebGPU; failures are reported instead of silently succeeding
+on the native CPU encoder. GPU dispatch counts are included in live metrics.
 A small native C API bridge owns model configuration, endpoint detection, and
 stream flushing. The existing Paraformer experiment preserves Sherpa's audio
 frontend and decoding while optionally running its encoder/decoder through
-ONNX Runtime Web. That WebGPU bridge does not support X-ASR or Zipformer.
+ONNX Runtime Web. The shared tensor bridge also supports the X-ASR encoder, including its INT64
+processed-length state. No custom GPU operators or model graph changes are used.
 
 Paraformer's FP32 WebGPU option is experimental: it requires additional weights, and
 performance depends on the GPU and browser. INT8 WebGPU can be slower than CPU
@@ -136,4 +142,63 @@ The FP32 60-second microphone test also passed, including continued text after
 45 seconds, matching capture/processing duration, final flush, and resource
 cleanup. It processed 60.12 seconds of audio with 6.72 seconds of total processing
 time on this Mac; this single functional run is not a comparative benchmark.
-X-ASR FP32 still executes through CPU/WASM; it does not enable WebGPU.
+This initial validation used CPU/WASM. See the WebGPU experiment below for the
+subsequent encoder integration.
+
+
+## X-ASR FP32 WebGPU experiment
+
+Choose X-ASR FP32, then its WebGPU encoder backend in `/asr`. Other catalog
+variants keep CPU/WASM. The GPU option uses the same original FP32 weights.
+The decoder and joiner remain on CPU. A separate `catalog-asr-webgpu` runtime
+contains the asynchronous bridge; `catalog-asr` keeps its synchronous CPU build.
+A target-local Zipformer2 encoder hook
+preserves the pinned upstream source; it shares tensor transport with Paraformer.
+
+Run the GPU checks with:
+
+```sh
+SHERPAW_ASR_MODELS=x-asr-fp32 SHERPAW_ASR_BACKEND=webgpu-encoder \
+  SHERPAW_ASR_REPORT_SUBDIR=asr-models-webgpu/ node scripts/check-asr-models.mjs
+pnpm --filter @sherpaw/sandbox build
+SHERPAW_ASR_MODELS=x-asr-fp32 SHERPAW_ASR_BACKEND=webgpu-encoder \
+  pnpm --filter @sherpaw/sandbox exec vitest run \
+  --config vitest.asr-realtime.config.ts tests/asr/models.audio.test.ts
+```
+
+The short Chinese and English fixtures passed with nonzero GPU dispatches.
+The prototype copies encoder inputs and all outputs, including streaming caches,
+across the WASM/browser boundary on each chunk. It also retains the native CPU
+session for Sherpa metadata and error recovery, so memory includes both runtimes.
+This implementation establishes compatibility; it does not imply a speedup or
+suitable peak memory use on Android.
+
+### Real-time comparison on 2026-09-26
+
+After native builds completed, Chrome 153 on the development Mac ran CPU and
+WebGPU sequentially against the same 60-second bilingual fakemic fixture.
+Both passed late-speech, continuity, final-text, microphone-stop, and Worker
+cleanup checks. Their final transcripts were identical.
+
+| Metric | CPU/WASM FP32 | WebGPU encoder + CPU decoder/joiner |
+| --- | ---: | ---: |
+| Captured and processed audio | 60.056 s | 60.120 s |
+| Cumulative audio processing time | 6.813 s | 11.157 s |
+| Inference batch P95 | 66.2 ms | 116.3 ms |
+| First partial text from capture start | 3.088 s | 3.193 s |
+| Maximum outstanding audio | 0.176 s | 0.336 s |
+| Stop drain | 106.4 ms | 236.6 ms |
+| GPU dispatches | 0 | 439,039 |
+
+Processing time sums audio accept calls; it excludes model loading, waiting for
+microphone input, and the separately reported Stop drain. Batch latency is not
+word-level recognition latency. These are single functional runs, with shaders
+potentially cached from the earlier smoke tests, not a warmed multi-run benchmark.
+The current GPU path spent about 64% more time processing than CPU on this Mac,
+while both kept up with live input. Cache transfers, dispatch overhead, and async
+bridging are optimization candidates; this run does not isolate their costs.
+CPU remains the default.
+
+The shared bridge also passed the existing Paraformer FP32 WebGPU 60-second
+regression test. Other Paraformer backends were not rerun. Production build,
+type checking, changed-source lint, and changed-file spell checks passed.

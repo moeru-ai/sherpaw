@@ -1,4 +1,4 @@
-// Experiment-only model boundary. The generated Paraformer source calls this
+// Experiment-only model boundary. Generated Paraformer/Zipformer sources call this
 // hook; the pinned upstream checkout and all ordinary targets stay unchanged.
 #pragma once
 #include "onnxruntime_cxx_api.h"

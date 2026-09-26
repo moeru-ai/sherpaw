@@ -25,7 +25,8 @@ const { describe, it } = createAudioTestAPI<AudioTestCase, AudioTestTask, { audi
   },
 })
 
-const reportDirectory = new URL('../../../../docs/research/asr-models-realtime/', import.meta.url)
+const backend = process.env.SHERPAW_ASR_BACKEND === 'webgpu-encoder' ? 'webgpu-encoder' : 'cpu'
+const reportDirectory = new URL(`../../../../docs/research/asr-models-realtime${backend === 'cpu' ? '' : '-webgpu'}/`, import.meta.url)
 
 describe('Model selector and continuous microphone input', () => {
   for (const model of asrModels.filter(model => !process.env.SHERPAW_ASR_MODELS || process.env.SHERPAW_ASR_MODELS.split(',').includes(model.id))) {
@@ -37,6 +38,7 @@ describe('Model selector and continuous microphone input', () => {
       try {
         // Exercise preloading via the visible selector, with no microphone opened.
         await audio.page.getByLabel('ASR model', { exact: true }).selectOption(model.id)
+        await audio.page.getByLabel('Inference backend').selectOption(backend)
         await audio.page.getByRole('button', { name: 'Load model', exact: true }).click()
         await audio.page.waitForFunction(() => document.querySelector('[role=alert]') || document.querySelector('[role=status]')?.textContent?.includes('Ready ·'), undefined, { timeout: 180000 })
         expect((await audio.snapshot()).error).toBe('')
@@ -55,12 +57,16 @@ describe('Model selector and continuous microphone input', () => {
         expect(audio.errors).toEqual([])
         expect(final.kind).toBe('stopped')
         expect(final.model).toBe(model.id)
+        expect(final.backend).toBe(backend)
         expect(final.snapshot.receivedAudioSeconds).toBeGreaterThanOrEqual(60)
         expect(final.snapshot.receivedAudioSeconds).toBeLessThan(60.5)
         expect(final.snapshot.processedAudioSeconds).toBeCloseTo(final.snapshot.receivedAudioSeconds, 5)
         expect(final.snapshot.elapsedMs).toBeGreaterThan(59000)
         expect(final.snapshot.captureGapMs - final.snapshot.startupCaptureGapMs).toBeLessThan(1)
-        expect(final.snapshot.gpuDispatches).toBe(0)
+        if (backend === 'cpu')
+          expect(final.snapshot.gpuDispatches).toBe(0)
+        else
+          expect(final.snapshot.gpuDispatches).toBeGreaterThan(0)
         expect(final.text).toContain('语音识别测试')
         if (chineseOnly)
           expect(final.text.match(/语音识别测试/g)!.length).toBeGreaterThanOrEqual(2)

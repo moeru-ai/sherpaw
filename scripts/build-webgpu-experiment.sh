@@ -25,4 +25,4 @@ cmake -S "$repo/sherpa-onnx" -B "$repo/sherpa-onnx/build-webgpu-experiment" \
   -DSHERPA_ONNX_ENABLE_GPU=OFF -DSHERPA_ONNX_ENABLE_WASM=ON \
   -DSHERPA_ONNX_ENABLE_BINARY=OFF -DSHERPA_ONNX_LINK_LIBSTDCPP_STATICALLY=OFF \
   -DSHERPAW_WEBGPU_EXPERIMENT=ON "${cache_args[@]}"
-cmake --build "$repo/sherpa-onnx/build-webgpu-experiment" --target asr-probe catalog-asr --parallel 8
+cmake --build "$repo/sherpa-onnx/build-webgpu-experiment" --target asr-probe catalog-asr catalog-asr-webgpu --parallel 8

@@ -1,10 +1,10 @@
 import type { LiveRecognizer } from '../webgpu-experiment/live-asr'
-import type { ModelReply, ModelRequest, ModelSnapshot } from './catalog'
+import type { ModelBackend, ModelReply, ModelRequest, ModelSnapshot } from './catalog'
 
 import ModelWorker from './model.worker?worker'
 
 /** Triggering workflow: ASR Load/Start -> selected model -> dedicated worker -> LiveRecognizer PCM interface. */
-export async function createModelRecognizer(modelId: string, report: (status: string) => void): Promise<LiveRecognizer> {
+export async function createModelRecognizer(modelId: string, report: (status: string) => void, backend: ModelBackend = 'cpu'): Promise<LiveRecognizer> {
   const worker = new ModelWorker()
   let nextId = 0
   let closed = false
@@ -61,7 +61,7 @@ export async function createModelRecognizer(modelId: string, report: (status: st
   }
 
   try {
-    await send({ id: nextId++, kind: 'load', modelId, baseUrl: new URL(import.meta.env.BASE_URL, location.href).href })
+    await send({ id: nextId++, kind: 'load', modelId, backend, baseUrl: new URL(import.meta.env.BASE_URL, location.href).href })
     return {
       /** Triggering workflow: microphone pump -> transferred PCM -> CatalogAccept -> partial/final text. */
       async accept(samples) {
@@ -72,7 +72,7 @@ export async function createModelRecognizer(modelId: string, report: (status: st
       /** Triggering workflow: Stop -> CatalogFinish -> drain trailing streaming context -> final text. */
       async finish() { return (await send({ id: nextId++, kind: 'finish' })).text },
       async dispose() { close() },
-      stats: () => ({ decodedChunks: snapshot.decodedChunks, gpuDispatches: 0 }),
+      stats: () => ({ decodedChunks: snapshot.decodedChunks, gpuDispatches: snapshot.gpuDispatches ?? 0 }),
     }
   }
   catch (error) {

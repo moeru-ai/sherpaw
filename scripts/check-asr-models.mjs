@@ -7,6 +7,8 @@ import { chromium } from 'playwright'
 const baseURL = process.argv[2] || 'http://127.0.0.1:5187'
 const catalog = JSON.parse(await readFile(new URL('../models/asr-catalog.json', import.meta.url), 'utf8'))
 const selected = process.env.SHERPAW_ASR_MODELS?.split(',')
+const backend = process.env.SHERPAW_ASR_BACKEND || 'cpu'
+assert.ok(['cpu', 'webgpu-encoder'].includes(backend))
 const models = catalog.models.filter(model => !selected || selected.includes(model.id))
 const fixtures = (process.env.SHERPAW_ASR_FIXTURES || 'chinese,english').split(',')
 const directory = new URL(process.env.SHERPAW_ASR_REPORT_SUBDIR || 'asr-models/', new URL('../docs/research/', import.meta.url))
@@ -30,7 +32,7 @@ try {
         await page.getByRole('button', { name: 'Start', exact: true }).waitFor()
         await page.waitForLoadState('networkidle')
         const fixturePath = fileURLToPath(new URL(fixture === 'realtime' ? '../packages/sandbox/tests/asr/fixtures/generated/realtime.wav' : `../packages/testing-audio/cases/${fixture}/input.test.wav`, import.meta.url))
-        const result = await page.evaluate(async ({ id, fixturePath }) => {
+        const result = await page.evaluate(async ({ id, fixturePath, backend }) => {
           const { createModelRecognizer } = await import('/src/features/asr-models/recognizer.ts')
           const wav = await (await fetch(`/@fs${fixturePath}`)).arrayBuffer()
           const audio = new AudioContext({ sampleRate: 16000 })
@@ -38,7 +40,7 @@ try {
           const samples = decoded.getChannelData(0).slice()
           await audio.close()
           const start = performance.now()
-          const engine = await createModelRecognizer(id, message => window.modelProgress(message))
+          const engine = await createModelRecognizer(id, message => window.modelProgress(message), backend)
           const loadMs = performance.now() - start
           let text = ''
           let firstTextMs = null
@@ -54,9 +56,9 @@ try {
             return { text, loadMs, inferenceMs, firstTextMs, audioSeconds: samples.length / 16000, rtf: inferenceMs / (samples.length / 16), stats: engine.stats() }
           }
           finally { await engine.dispose() }
-        }, { id: model.id, fixturePath })
+        }, { id: model.id, fixturePath, backend })
         // Smoke check only: save actual output; this is not a full accuracy benchmark.
-        const passed = errors.length === 0 && (fixture === 'chinese'
+        const passed = errors.length === 0 && (backend === 'cpu' ? result.stats.gpuDispatches === 0 : result.stats.gpuDispatches > 0) && (fixture === 'chinese'
           ? result.text.includes('语音识别测试')
           : fixture === 'realtime'
             ? (result.text.match(/please say hello/gi)?.length ?? 0) === 2
@@ -71,7 +73,7 @@ try {
         console.error(`[${model.id}/${fixture}] ${error}`)
       }
       finally {
-        await writeFile(new URL(`${model.id}.json`, directory), `${JSON.stringify({ date: new Date().toISOString(), browser: browser.version(), model, feeding: '100 ms chunks, unpaced; includes final flush, excludes initialization', results }, null, 2)}\n`)
+        await writeFile(new URL(`${model.id}.json`, directory), `${JSON.stringify({ date: new Date().toISOString(), browser: browser.version(), model, backend, feeding: '100 ms chunks, unpaced; includes final flush, excludes initialization', results }, null, 2)}\n`)
         await context.close()
       }
     }

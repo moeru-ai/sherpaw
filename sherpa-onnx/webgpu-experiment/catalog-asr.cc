@@ -1,3 +1,6 @@
+#ifdef SHERPAW_ASR_WEBGPU
+#include "asr-bridge.h"
+#endif
 #include <string>
 #include <vector>
 #include "nlohmann/json.hpp"
@@ -36,6 +39,9 @@ void CatalogDestroy() {
   completed.clear();
   text.clear();
   chunks = 0;
+#ifdef SHERPAW_ASR_WEBGPU
+  asr_web_enabled = false;
+#endif
 }
 
 // Triggering workflow: model worker load -> JSON file roles -> native Sherpa
@@ -64,6 +70,9 @@ int CatalogCreate(const char *description) {
   c.rule3_min_utterance_length = 20;
   online = SherpaOnnxCreateOnlineRecognizer(&c);
   if (!online) return 0;
+#ifdef SHERPAW_ASR_WEBGPU
+  asr_web_enabled = config.value("webgpuEncoder", false);
+#endif
   stream = SherpaOnnxCreateOnlineStream(online);
   return stream != nullptr;
 }

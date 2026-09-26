@@ -8,13 +8,16 @@ export interface ModelManifest extends AsrModel {
   files: { path: string, bytes: number, sha256: string }[]
 }
 
+export type ModelBackend = 'cpu' | 'webgpu-encoder'
+
 export interface ModelSnapshot {
   text: string
   decodedChunks: number
+  gpuDispatches?: number
 }
 
 export type ModelRequest
-  = | { id: number, kind: 'load', modelId: string, baseUrl: string }
+  = | { id: number, kind: 'load', modelId: string, baseUrl: string, backend: ModelBackend }
     | { id: number, kind: 'accept', samples: Float32Array }
     | { id: number, kind: 'finish' }
 
