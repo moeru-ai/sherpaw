@@ -29,11 +29,16 @@ export const keywordPresets: KeywordPreset[] = [
   {
     id: 'chinese',
     name: '肥鱼 · 中文',
-    note: '按普通话「nǐ hǎo féi yú / dà féi yú / féi yú féi yú」编码。',
+    note: '保留普通话拼音，并兼容录音中「肥」被模型编码为一声的情况。',
     entries: [
-      { label: '你好肥鱼', tokens: ['n', 'ǐ', 'h', 'ǎo', 'f', 'éi', 'y', 'ú'] },
-      { label: '大肥鱼', tokens: ['d', 'à', 'f', 'éi', 'y', 'ú'] },
-      { label: '肥鱼肥鱼', tokens: ['f', 'éi', 'y', 'ú', 'f', 'éi', 'y', 'ú'] },
+      // Keep the standard second tone and the model's observed first-tone path.
+      // Both alternatives require the complete phrase, never a single 肥鱼.
+      { label: '你好肥鱼', tokens: ['n', 'ǐ', 'h', 'ǎo', 'f', 'éi', 'y', 'ú'], threshold: 0.1 },
+      { label: '你好肥鱼', tokens: ['n', 'ǐ', 'h', 'ǎo', 'f', 'ēi', 'y', 'ú'], threshold: 0.1 },
+      { label: '大肥鱼', tokens: ['d', 'à', 'f', 'éi', 'y', 'ú'], threshold: 0.1 },
+      { label: '大肥鱼', tokens: ['d', 'à', 'f', 'ēi', 'y', 'ú'], threshold: 0.1 },
+      { label: '肥鱼肥鱼', tokens: ['f', 'éi', 'y', 'ú', 'f', 'éi', 'y', 'ú'], threshold: 0.1 },
+      { label: '肥鱼肥鱼', tokens: ['f', 'ēi', 'y', 'ú', 'f', 'ēi', 'y', 'ú'], threshold: 0.1 },
     ],
   },
 ]

@@ -70,8 +70,10 @@ it('activates selected presets immediately with the real model and keeps manual 
     expect(await labels()).toEqual(chinese)
     await expect.poll(() => page.locator('.active-words .word').allTextContents()).toEqual(chinese)
     expect(await page.getByRole('alert').count()).toBe(0)
-    await file(page)
-    expect(await page.locator('.hit').count()).toBe(0)
+    for (const filename of ['en_0.wav', 'en_1.wav', 'zh_0.wav', 'zh_1.wav', 'zh_2.wav', 'zh_3.wav', 'zh_4.wav', 'zh_5.wav', 'zh_6.wav']) {
+      await file(page, filename)
+      expect(await page.locator('.hit').count()).toBe(0)
+    }
 
     // Editing a preset must not modify its definition when selected again.
     await page.getByLabel('关键词 1 名称').fill('edited')
@@ -173,6 +175,49 @@ it.skipIf(!repeatedRecording)('detects mixed-language Hello Iru pronunciations i
       await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain(`${name} 检测完成`)
       expect(await page.locator('.hit strong').allTextContents()).toEqual(['Hello Iru'])
     }
+  }
+  finally {
+    await browser.close()
+  }
+})
+
+const chineseRecording = process.env.SHERPAW_KWS_TEST_CHINESE_RECORDING
+it.skipIf(!chineseRecording)('recovers Chinese preset phrases in a local recording and rejects the standalone name', async () => {
+  const browser = await chromium.launch({ headless: true, args: createChromiumFileMicrophoneArguments(chineseRecording!) })
+  try {
+    const page = await browser.newPage({ permissions: ['microphone'] })
+    await page.goto(`${url}kws`)
+    await page.getByRole('button', { name: '肥鱼 · 中文' }).click()
+    await load(page, false)
+    await file(page, chineseRecording!)
+    // Five of eight full phrases are recovered; three repeated-name phrases
+    // remain missed. The accidental standalone 肥鱼 is not a positive example.
+    const expected = ['大肥鱼', '你好肥鱼', '大肥鱼', '大肥鱼', '肥鱼肥鱼']
+    expect(await page.locator('.hit strong').allTextContents()).toEqual(expected)
+
+    await page.getByRole('button', { name: '清空记录' }).click()
+    const { samples, sampleRate } = decodeWavPcm16(Uint8Array.from(await readFile(chineseRecording!)).buffer)
+    const buffer = Buffer.from(encodeWavPcm16(samples.slice(Math.round(16.6 * sampleRate), Math.round(17.8 * sampleRate)), sampleRate))
+    await page.getByLabel('测试音频文件').setInputFiles({ name: 'single-name.wav', mimeType: 'audio/wav', buffer })
+    await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain('single-name.wav 检测完成')
+    expect(await page.locator('.hit').count()).toBe(0)
+
+    await page.getByRole('button', { name: '开始监听' }).click()
+    // Live capture changes frame alignment. The recording currently yields
+    // three to five hits across start positions, so do not require file parity.
+    await expect.poll(async () => Number.parseFloat((await page.locator('.time').textContent()) ?? '0'), { timeout: 35000 }).toBeGreaterThanOrEqual(26)
+    await page.getByRole('button', { name: '停止监听' }).click()
+    const hits = await page.locator('.hit strong').allTextContents()
+    expect(hits.length).toBeGreaterThanOrEqual(3)
+    expect(hits.length).toBeLessThanOrEqual(5)
+    // Every returned label must remain in the expected order, with no extras.
+    let position = 0
+    for (const hit of hits) {
+      position = expected.indexOf(hit, position)
+      expect(position).toBeGreaterThanOrEqual(0)
+      position++
+    }
+    expect(await page.getByRole('alert').count()).toBe(0)
   }
   finally {
     await browser.close()
