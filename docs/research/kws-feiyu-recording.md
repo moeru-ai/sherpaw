@@ -110,4 +110,51 @@ Run the unresolved target explicitly with the fourth local mono PCM16 WAV:
 SHERPAW_KWS_TEST_NATURAL_RECORDING=/absolute/path/natural.wav pnpm -F @sherpaw/sandbox test:kws -t 'seven natural'
 ```
 
-Current result: **FAIL**, expected seven 肥鱼肥鱼 detections, received three. This fixture is optional and stays outside Git; without the environment variable the test is skipped. The earlier passing tests establish specific supported behavior, not general wake-word reliability. No production detector or preset change is made from this fourth-recording investigation.
+Before the candidate-retention change below: **FAIL**, expected seven 肥鱼肥鱼 detections, received three. This fixture is optional and stays outside Git; without the environment variable the test is skipped. The earlier passing tests establish specific supported behavior, not general wake-word reliability. No production detector or preset change is made from this fourth-recording investigation.
+
+## Selected candidate-retention change
+
+The Chinese playground preset now uses **32 active paths** instead of 16, with
+boost **1.5 for 肥鱼肥鱼**. Its other boosts remain 1 and thresholds remain 0.1.
+The Iru preset stays at 16 paths with its existing pronunciation and score
+settings. The public API already supports `maxActivePaths`, so this change does
+not add a public option or replace the upstream decoder.
+
+| Unmodified file replay | Previous preset | Selected preset |
+| --- | ---: | ---: |
+| Third recording | 5/8 | 6/8 |
+| Fourth recording | 3/7 | 4/7 |
+
+Native and browser replay agree on these results. The third recording gains the
+first repeated-name phrase, delivered around 6.9 seconds, while retaining the
+previous five detections. The fourth gains the traced second attempt around
+9.2 seconds and keeps its previous detections around 6.0, 13.0 and 21.0 seconds.
+The remaining repeated-name misses are unresolved.
+
+Increasing only the beam to 32 leaves the third recording at five hits;
+combining it with the repeated-name boost yields six. Larger beams are not
+monotonically better: 64 paths with boost 1.5 loses a fourth-recording hit, and
+128 paths introduces wrong-label detections. A temporary decoder adaptation
+that merged equivalent prefixes before pruning reached higher Chinese file
+counts, but caused an English microphone regression. Replaying captured PCM
+through the original native decoder still detected all three English phrases.
+That decoder adaptation is rejected; the original native sources and packaged
+WASM remain unchanged.
+
+Preset changes now carry their candidate count to the Worker. When it changes,
+the Worker creates a replacement detector using the already loaded model files
+and switches only after successful creation. Failed reconstruction preserves
+the old detector; model files are not downloaded again. Pause/resume and stream
+reset retain the current candidate count. This keeps the larger Chinese search
+from changing the English preset's behavior.
+
+The new private regression replays the first 9.5 seconds of the fourth recording,
+preserving its leading audio and full Chinese vocabulary, and requires both
+initial attempts. The separate seven-hit target still fails with four hits;
+it is not reduced to four. Browser checks also retain the existing English
+file/microphone regressions, reject nine unrelated upstream recordings under
+each preset, and reject the standalone Chinese name and three partial English
+phrases. These same-speaker calibration cases do not establish general recall
+or a continuous-listening false-alarm rate.
+
+A simulated-microphone run of the fourth recording with the selected preset yields three hits at 44.1 kHz, versus two in the earlier captured run. File replay yields four; this difference still depends on capture alignment and is not a measurement of the user’s actual microphone session.

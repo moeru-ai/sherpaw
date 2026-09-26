@@ -1,4 +1,4 @@
-import type { KeywordEntry, KeywordSpotter, KWSModel } from '@sherpaw/kws'
+import type { KeywordEntry, KeywordSpotter, KWSModel, KWSModule } from '@sherpaw/kws'
 
 import { createKeywordSpotter, initKWSModule } from '@sherpaw/kws'
 import { loadVirtualData } from '@sherpaw/preloader'
@@ -6,6 +6,7 @@ import { loadVirtualData } from '@sherpaw/preloader'
 import type { Reply, Request } from './protocol'
 
 let spotter: KeywordSpotter | undefined
+let loaded: { module: KWSModule, model: KWSModel, maxActivePaths: number } | undefined
 let keywords: KeywordEntry[] = []
 let queue = Promise.resolve()
 
@@ -24,10 +25,10 @@ async function handleRequest(request: Request, progress: (message: string) => vo
         loadVirtualData({ module, virtualData: { [paths[key]]: await response.arrayBuffer() } })
       }
       progress('正在初始化关键词检测…')
-      // Four paths pruned the Iru pronunciation in the recorded regression case.
-      const next = createKeywordSpotter(module, { model: paths, keywords: request.keywords, maxActivePaths: 16 })
+      const next = createKeywordSpotter(module, { model: paths, keywords: request.keywords, maxActivePaths: request.maxActivePaths })
       spotter?.dispose()
       spotter = next
+      loaded = { module, model: paths, maxActivePaths: request.maxActivePaths }
       keywords = request.keywords
     }
     catch (error) {
@@ -39,12 +40,22 @@ async function handleRequest(request: Request, progress: (message: string) => vo
     }
     return []
   }
-  if (!spotter)
+  if (!spotter || !loaded)
     throw new Error('请先加载模型。')
   if (request.type === 'audio')
     return spotter.processAudio(request.samples, request.sampleRate)
   const next = request.type === 'keywords' ? request.keywords : keywords
-  await spotter.setKeywords(next)
+  if (request.type === 'keywords' && next.length && request.maxActivePaths !== loaded.maxActivePaths) {
+    // Candidate count is fixed at construction. Reuse the loaded model files,
+    // and commit the replacement only after the new detector is ready.
+    const replacement = createKeywordSpotter(loaded.module, { model: loaded.model, keywords: next, maxActivePaths: request.maxActivePaths })
+    spotter.dispose()
+    spotter = replacement
+    loaded.maxActivePaths = request.maxActivePaths
+  }
+  else {
+    await spotter.setKeywords(next)
+  }
   keywords = next
   return []
 }

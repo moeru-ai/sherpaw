@@ -92,7 +92,7 @@ export function useKWSPlayground() {
     error.value = ''
     try {
       const keywords = entries()
-      await client.request({ type: 'load', urls: modelURLs, keywords })
+      await client.request({ type: 'load', urls: modelURLs, keywords, maxActivePaths: preset.value.maxActivePaths })
       ready.value = true
       activeLabels.value = [...new Set(keywords.map(entry => entry.label))]
       message.value = '模型已就绪，可以开始监听。'
@@ -110,7 +110,7 @@ export function useKWSPlayground() {
     busy.value = 'update'
     error.value = ''
     try {
-      await client.request({ type: 'keywords', keywords })
+      await client.request({ type: 'keywords', keywords, maxActivePaths: preset.value.maxActivePaths })
       activeLabels.value = [...new Set(keywords.map(entry => entry.label))]
       seconds.value = 0
       message.value = keywords.length ? '词表已更新，音频状态已重置。' : '检测已暂停；应用词表后恢复。'

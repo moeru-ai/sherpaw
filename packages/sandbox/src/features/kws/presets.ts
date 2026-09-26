@@ -4,6 +4,7 @@ export interface KeywordPreset {
   id: 'english' | 'chinese'
   name: string
   note: string
+  maxActivePaths: number
   entries: KeywordEntry[]
 }
 
@@ -13,6 +14,7 @@ export interface KeywordPreset {
 export const keywordPresets: KeywordPreset[] = [
   {
     id: 'english',
+    maxActivePaths: 16,
     name: 'Iru · English',
     note: 'Iru 按「伊噜」发音，使用贴近「噜」的发音编码；可编辑 token 调整。',
     entries: [
@@ -47,6 +49,7 @@ export const keywordPresets: KeywordPreset[] = [
   },
   {
     id: 'chinese',
+    maxActivePaths: 32,
     name: '肥鱼 · 中文',
     note: '保留普通话拼音，并兼容录音中「肥」被模型编码为一声的情况。',
     entries: [
@@ -72,6 +75,7 @@ export const keywordPresets: KeywordPreset[] = [
           { tokens: ['f', 'éi', 'y', 'ú', 'f', 'éi', 'y', 'ú'] },
           { tokens: ['f', 'ēi', 'y', 'ú', 'f', 'ēi', 'y', 'ú'] },
         ],
+        score: 1.5,
         threshold: 0.1,
       },
     ],

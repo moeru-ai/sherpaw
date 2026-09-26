@@ -93,6 +93,45 @@ it('activates selected presets immediately with the real model and keeps manual 
   }
 })
 
+it('keeps the active detector when a preset changes search settings but its tokens are invalid', async () => {
+  const browser = await chromium.launch({ headless: true })
+  try {
+    const page = await browser.newPage()
+    let modelRequests = 0
+    page.on('request', (request) => {
+      if (request.url().includes('.onnx'))
+        modelRequests++
+    })
+    await page.goto(`${url}kws`)
+    await load(page)
+    // Corrupt the next preset message to exercise failed reconstruction at a
+    // different candidate count, rather than only setKeywords validation.
+    await page.evaluate(() => {
+      const post = Worker.prototype.postMessage
+      Worker.prototype.postMessage = function (message, transfer) {
+        if (message.request?.type === 'keywords') {
+          Worker.prototype.postMessage = post
+          message.request.keywords[0].matches[0].tokens = ['NOT_A_MODEL_TOKEN']
+        }
+        return post.call(this, message, transfer as StructuredSerializeOptions)
+      }
+    })
+    await page.getByRole('button', { name: '肥鱼 · 中文' }).click()
+    await expect.poll(() => page.getByRole('alert').textContent()).toContain('token')
+    await file(page)
+    expect(await page.locator('.hit strong').allTextContents()).toEqual(['落实', '周望军'])
+    await page.getByRole('button', { name: '应用词表' }).click()
+    await expect.poll(() => page.locator('.active-words .word').allTextContents()).toEqual(['你好肥鱼', '大肥鱼', '肥鱼肥鱼'])
+    await page.getByRole('button', { name: '清空记录' }).click()
+    await file(page)
+    expect(await page.locator('.hit').count()).toBe(0)
+    expect(modelRequests).toBe(3)
+  }
+  finally {
+    await browser.close()
+  }
+})
+
 async function file(page: Page, filename = 'zh_5.wav') {
   await page.getByLabel('测试音频文件').setInputFiles(resolve(fixtures, filename))
   await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain('检测完成')
@@ -120,7 +159,18 @@ it.skipIf(!recording)('detects all Iru phrases in a local recording through file
       await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain(`${name} 检测完成`)
       expect(await page.locator('.hit strong').allTextContents()).toEqual(expected)
     }
-    await page.getByRole('button', { name: '清空记录' }).click()
+    // A complete phrase is required: neither one name, the greeting alone,
+    // nor a final syllable may become a hit after candidate expansion.
+    for (const [name, start, end] of [['single-iru', 8.45, 9.04], ['hello-only', 5.10, 5.95], ['final-syllable', 3.70, 4.35]] as const) {
+      if (await page.locator('.hit').count())
+        await page.getByRole('button', { name: '清空记录' }).click()
+      const crop = samples.slice(Math.round(start * sampleRate), Math.round(end * sampleRate))
+      const padded = new Float32Array(sampleRate + crop.length)
+      padded.set(crop, sampleRate)
+      await page.getByLabel('测试音频文件').setInputFiles({ name: `${name}.wav`, mimeType: 'audio/wav', buffer: Buffer.from(encodeWavPcm16(padded, sampleRate)) })
+      await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain(`${name}.wav 检测完成`)
+      expect(await page.locator('.hit').count()).toBe(0)
+    }
     await page.getByRole('button', { name: '开始监听' }).click()
     await expect.poll(() => page.locator('.hit strong').allTextContents(), { timeout: 20000 }).toEqual(expected)
     await page.getByRole('button', { name: '停止监听' }).click()
@@ -149,8 +199,7 @@ it.skipIf(!repeatedRecording)('detects mixed-language Hello Iru pronunciations i
       'Hey Iru',
     ])
     const { samples, sampleRate } = decodeWavPcm16(Uint8Array.from(await readFile(repeatedRecording!)).buffer)
-    // A 160 ms shift recovers all five Hellos in continuous replay. Keep both
-    // results visible instead of treating one successful alignment as reliable.
+    // Retain the previously passing shifted alignment as a separate check.
     await page.getByRole('button', { name: '清空记录' }).click()
     const padded = new Float32Array(samples.length + Math.round(sampleRate * 0.16))
     padded.set(samples, padded.length - samples.length)
@@ -165,8 +214,7 @@ it.skipIf(!repeatedRecording)('detects mixed-language Hello Iru pronunciations i
       'Hello Iru',
       'Hey Iru',
     ])
-    // Each complete Hello phrase is detectable with fresh stream state and its
-    // own frame alignment, including the two continuous-replay misses.
+    // Fresh stream state must also detect each complete Hello phrase.
     for (const [start, end] of [[5.5, 8.3], [12, 14.5], [14.7, 16.8], [17, 19.5], [19.7, 22]] as const) {
       await page.getByRole('button', { name: '清空记录' }).click()
       const name = `hello-${start}.wav`
@@ -190,9 +238,9 @@ it.skipIf(!chineseRecording)('recovers Chinese preset phrases in a local recordi
     await page.getByRole('button', { name: '肥鱼 · 中文' }).click()
     await load(page, false)
     await file(page, chineseRecording!)
-    // Five of eight full phrases are recovered; three repeated-name phrases
+    // Six of eight phrases are recovered; the last two repeated-name phrases
     // remain missed. The accidental standalone 肥鱼 is not a positive example.
-    const expected = ['大肥鱼', '你好肥鱼', '大肥鱼', '大肥鱼', '肥鱼肥鱼']
+    const expected = ['大肥鱼', '你好肥鱼', '大肥鱼', '大肥鱼', '肥鱼肥鱼', '肥鱼肥鱼']
     expect(await page.locator('.hit strong').allTextContents()).toEqual(expected)
 
     await page.getByRole('button', { name: '清空记录' }).click()
@@ -203,17 +251,18 @@ it.skipIf(!chineseRecording)('recovers Chinese preset phrases in a local recordi
     expect(await page.locator('.hit').count()).toBe(0)
 
     await page.getByRole('button', { name: '开始监听' }).click()
-    // Live capture changes frame alignment. The recording currently yields
-    // three to five hits across start positions, so do not require file parity.
+    // Live capture changes frame alignment. Require at least the previous
+    // three-hit floor and only correctly ordered labels from the full recording.
     await expect.poll(async () => Number.parseFloat((await page.locator('.time').textContent()) ?? '0'), { timeout: 35000 }).toBeGreaterThanOrEqual(26)
     await page.getByRole('button', { name: '停止监听' }).click()
     const hits = await page.locator('.hit strong').allTextContents()
     expect(hits.length).toBeGreaterThanOrEqual(3)
-    expect(hits.length).toBeLessThanOrEqual(5)
+    const fullSequence = ['肥鱼肥鱼', '大肥鱼', '肥鱼肥鱼', '你好肥鱼', '大肥鱼', '大肥鱼', '肥鱼肥鱼', '肥鱼肥鱼']
+    expect(hits.length).toBeLessThanOrEqual(fullSequence.length)
     // Every returned label must remain in the expected order, with no extras.
     let position = 0
     for (const hit of hits) {
-      position = expected.indexOf(hit, position)
+      position = fullSequence.indexOf(hit, position)
       expect(position).toBeGreaterThanOrEqual(0)
       position++
     }
@@ -224,9 +273,28 @@ it.skipIf(!chineseRecording)('recovers Chinese preset phrases in a local recordi
   }
 })
 
-// Intentionally red when the fourth private fixture is supplied: this captures
-// the user's seven-utterance target rather than accepting the current three hits.
 const naturalRecording = process.env.SHERPAW_KWS_TEST_NATURAL_RECORDING
+it.skipIf(!naturalRecording)('retains the repeated-name prefix while competing keywords are active', async () => {
+  const browser = await chromium.launch({ headless: true })
+  try {
+    const page = await browser.newPage()
+    await page.goto(`${url}kws`)
+    await page.getByRole('button', { name: '肥鱼 · 中文' }).click()
+    await load(page, false)
+    // Keep the original leading audio and frame alignment. The 16-path preset
+    // detected the first attempt, then discarded the second attempt's prefix.
+    const { samples, sampleRate } = decodeWavPcm16(Uint8Array.from(await readFile(naturalRecording!)).buffer)
+    const buffer = Buffer.from(encodeWavPcm16(samples.slice(0, Math.round(9.5 * sampleRate)), sampleRate))
+    await page.getByLabel('测试音频文件').setInputFiles({ name: 'repeated-prefix.wav', mimeType: 'audio/wav', buffer })
+    await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain('repeated-prefix.wav 检测完成')
+    expect(await page.locator('.hit strong').allTextContents()).toEqual(['肥鱼肥鱼', '肥鱼肥鱼'])
+  }
+  finally {
+    await browser.close()
+  }
+})
+
+// Intentionally red: keep the seven-utterance target despite the partial fix.
 it.skipIf(!naturalRecording)('detects all seven natural repeated-name utterances (known failure)', async () => {
   const browser = await chromium.launch({ headless: true })
   try {
