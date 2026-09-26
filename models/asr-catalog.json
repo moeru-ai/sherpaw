@@ -11,7 +11,13 @@
         "bytes": 132634597,
         "sha256": "5a2832047ea1f97dd0dc595b816c230c4bafad65cfc0341fa57517cadc50afd0"
       },
-      "modelBytes": 167360920
+      "modelBytes": 167360920,
+      "weights": {
+        "encoder": "encoder.int8.onnx",
+        "decoder": "decoder.onnx",
+        "joiner": "joiner.int8.onnx",
+        "tokens": "tokens.txt"
+      }
     },
     {
       "id": "x-asr",
@@ -24,7 +30,32 @@
         "bytes": 133895136,
         "sha256": "fa5f63d618e5a01526e275a358bb7772e403f84808a4769fba52cffd8160bf74"
       },
-      "modelBytes": 169227953
+      "modelBytes": 169227953,
+      "weights": {
+        "encoder": "encoder.int8.onnx",
+        "decoder": "decoder.onnx",
+        "joiner": "joiner.int8.onnx",
+        "tokens": "tokens.txt"
+      }
+    },
+    {
+      "id": "x-asr-fp32",
+      "label": "X-ASR zh-en \u00b7 480 ms \u00b7 FP32",
+      "family": "transducer",
+      "featureDim": 80,
+      "directory": "sherpa-onnx-x-asr-480ms-streaming-zipformer-transducer-zh-en-punct-2026-06-05",
+      "archive": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-x-asr-480ms-streaming-zipformer-transducer-zh-en-punct-2026-06-05.tar.bz2",
+        "bytes": 584120230,
+        "sha256": "7e82f0a26f2bf8630141ebec658760b0fa585575fea2fee3d8edc4d3cb637b88"
+      },
+      "modelBytes": 614981400,
+      "weights": {
+        "encoder": "encoder.onnx",
+        "decoder": "decoder.onnx",
+        "joiner": "joiner.onnx",
+        "tokens": "tokens.txt"
+      }
     }
   ]
 }

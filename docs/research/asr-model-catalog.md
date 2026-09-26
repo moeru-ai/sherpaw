@@ -1,6 +1,6 @@
 # Streaming ASR model selector
 
-The sandbox retains three choices: Paraformer zh-en, X-ASR zh-en, and the
+The sandbox retains three model families: Paraformer zh-en, X-ASR zh-en, and the
 2025 Chinese Zipformer. All three accept continuous microphone input without
 an external VAD. Other experimental model integrations have been removed.
 
@@ -10,14 +10,19 @@ an external VAD. Other experimental model integrations have been removed.
 | --- | ---: | --- |
 | Paraformer zh-en | Existing pinned model pack | CPU/WASM; experimental WebGPU |
 | X-ASR zh-en, punctuation, 480 ms, INT8 | 169 MB | CPU/WASM Worker |
+| X-ASR zh-en, punctuation, 480 ms, FP32 | 615 MB | CPU/WASM Worker |
 | Zipformer Chinese, 2025-06-30, INT8 | 167 MB | CPU/WASM Worker; Chinese only |
 
-The source of truth for the two new models is
+The source of truth for the new model variants is
 [`models/asr-catalog.json`](../../models/asr-catalog.json). Download scripts
 pin archive sizes and SHA-256 digests from the official
 [ASR release](https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models).
 The Transducer decoder stays in its upstream precision; encoder and joiner
-are INT8. These sizes describe model files, not peak runtime memory.
+are INT8 in the quantized variants. The optional X-ASR FP32 variant uses the
+upstream floating-point encoder, decoder, and joiner, rather than converting
+quantized weights back to float. The catalog explicitly names every weight
+file so that an FP32 selection cannot silently prefer an INT8 file.
+These sizes describe model files, not peak runtime memory.
 
 The **Load model** button initializes the selected recognizer without opening
 the microphone. **Start** reuses that recognizer. **Stop**, changing models,
@@ -31,7 +36,7 @@ stream flushing. The existing Paraformer experiment preserves Sherpa's audio
 frontend and decoding while optionally running its encoder/decoder through
 ONNX Runtime Web. That WebGPU bridge does not support X-ASR or Zipformer.
 
-The FP32 WebGPU option is experimental: it requires additional weights, and
+Paraformer's FP32 WebGPU option is experimental: it requires additional weights, and
 performance depends on the GPU and browser. INT8 WebGPU can be slower than CPU
 because unsupported quantized operators fall back to CPU. Default inference
 remains CPU/WASM. This work does not validate Android or Electron native builds.
@@ -53,7 +58,7 @@ pnpm --filter @sherpaw/sandbox... build
 pnpm --filter @sherpaw/sandbox dev --host 127.0.0.1 --port 5187
 ```
 
-The preparer supports selected IDs: `x-asr` and `zipformer-zh`. Each also has
+The preparer supports selected IDs: `x-asr`, `x-asr-fp32`, and `zipformer-zh`. Each also has
 its own `models/<upstream-name>/download.sh`. Weights are stored under
 `models/<upstream-name>/model/`; generated public symlinks serve them to Vite.
 Neither weights nor generated WASM binaries are committed. An optional
@@ -79,7 +84,7 @@ Short fixtures run in Chrome against the dev server:
 node scripts/check-asr-models.mjs
 ```
 
-The driver checks the Chinese fixture for both models and English for X-ASR.
+The driver checks the Chinese fixture for every variant and English for X-ASR.
 It records actual text and timings; phrase matches are smoke checks, not a
 CER/WER benchmark. `SHERPAW_ASR_MODELS` selects comma-separated model IDs.
 
@@ -114,3 +119,21 @@ On 2026-09-26, Chrome on the development Mac passed:
 
 These checks verify the local sandbox and audio lifecycle. They do not establish
 recognition accuracy on arbitrary speech or performance on Android devices.
+
+## X-ASR FP32 validation
+
+The FP32 option uses the matching upstream 2026-06-05 bilingual, punctuation,
+480 ms model. Its archive size and SHA-256 were verified before extraction.
+ONNX inspection confirmed FLOAT weights and no quantization operators in all
+three networks. Their input/output signatures and frontend metadata match the
+INT8 variant; the decoder and token file are byte-identical between variants.
+
+On 2026-09-26, Chrome on the development Mac passed Chinese and English short
+fixtures for both X-ASR precisions. The visible selector has four choices:
+`paraformer`, `zipformer-zh`, `x-asr`, and `x-asr-fp32`. Sandbox production build,
+type checking, changed-source lint, and changed-file spell checking passed.
+The FP32 60-second microphone test also passed, including continued text after
+45 seconds, matching capture/processing duration, final flush, and resource
+cleanup. It processed 60.12 seconds of audio with 6.72 seconds of total processing
+time on this Mac; this single functional run is not a comparative benchmark.
+X-ASR FP32 still executes through CPU/WASM; it does not enable WebGPU.

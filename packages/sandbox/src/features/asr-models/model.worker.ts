@@ -64,10 +64,11 @@ async function load(request: Extract<ModelRequest, { kind: 'load' }>) {
     paths.push(path)
     downloaded += file.bytes
   }
-  function file(prefix: string) {
-    const matches = manifest.files.filter(f => f.path.startsWith(prefix) && f.path.endsWith('.onnx'))
-    const chosen = matches.find(f => f.path.includes('int8')) ?? matches[0]
-    return chosen ? `/model/${chosen.path}` : ''
+  function file(role: keyof ModelManifest['weights']) {
+    const path = manifest.weights[role]
+    if (!manifest.files.some(file => file.path === path))
+      throw new Error(`Missing ${role} weights in model manifest`)
+    return `/model/${path}`
   }
   const config = {
     family: manifest.family,
@@ -75,7 +76,7 @@ async function load(request: Extract<ModelRequest, { kind: 'load' }>) {
     encoder: file('encoder'),
     decoder: file('decoder'),
     joiner: file('joiner'),
-    tokens: manifest.files.some(f => f.path === 'tokens.txt') ? '/model/tokens.txt' : '',
+    tokens: file('tokens'),
   }
   status(`Initializing ${manifest.label} · CPU / WASM…`)
   const success = runtime!.ccall('CatalogCreate', 'number', ['string'], [JSON.stringify(config)])

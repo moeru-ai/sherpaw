@@ -43,8 +43,8 @@ Speaker tests cover UI interactions, route cleanup, sample management, recording
 
 ## Streaming ASR models
 
-The `/asr` selector offers Paraformer zh-en, X-ASR zh-en, and Chinese Zipformer
-2025. Use **Load model** to preload, then **Start** to open the microphone.
+The `/asr` selector offers Paraformer zh-en, X-ASR zh-en (INT8 or FP32), and
+Chinese Zipformer 2025. Use **Load model** to preload, then **Start** to open the microphone.
 X-ASR and Zipformer use dedicated CPU/WASM Workers. Paraformer also offers
 experimental WebGPU backends. These sandbox experiments require additional
 model assets and locally built WASM bridges; follow the

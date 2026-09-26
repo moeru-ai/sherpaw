@@ -53,10 +53,13 @@ def prepare(model):
                     shutil.copyfileobj(source, dest)
         marker.write_text(model['archive']['sha256'])
     files = []
-    for path in sorted(target.rglob('*')):
-        relative = path.relative_to(target).as_posix()
-        if path.is_file() and (path.suffix == '.onnx' or relative == 'tokens.txt' or relative.startswith('tokenizer/')):
-            files.append(dict(path=relative, bytes=path.stat().st_size, sha256=digest(path)))
+    for relative in sorted(set(model['weights'].values())):
+        if Path(relative).is_absolute() or '..' in Path(relative).parts:
+            raise ValueError(f'Unsafe runtime file path: {relative}')
+        path = target / relative
+        if not path.is_file():
+            raise ValueError(f'Missing runtime file: {path}')
+        files.append(dict(path=relative, bytes=path.stat().st_size, sha256=digest(path)))
     if not files:
         raise ValueError(f'No runtime files: {target}')
     model_bytes = sum(f['bytes'] for f in files)
