@@ -83,10 +83,19 @@ The [sandbox playground](../sandbox/README.md#keyword-spotting-playground) at `/
 
 ## Models and verification
 
-The browser suite uses the fp32 chunk-16 variants and test recordings from these [official upstream releases](https://k2-fsa.github.io/sherpa/onnx/kws/pretrained_models/index.html):
+The browser suite loads the published preload packs of the fp32 chunk-16 variants, with test recordings from these [official upstream releases](https://k2-fsa.github.io/sherpa/onnx/kws/pretrained_models/index.html):
 
 - `sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01`: Chinese.
 - `sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20`: Chinese and English.
+
+Both models have reproducible `download.sh`, `pack.sh` and `build.sh` scripts under `models/<model-name>/`. The scripts verify source hashes and generate the standard `install/bin/wasm/preload.{data,js,js.metadata}` assets using Emscripten 4.0.23. The KWS runtime is built separately; no keyword vocabulary is baked into a model.
+
+Published packs:
+
+- [Chinese/English Zipformer 3M](https://huggingface.co/moeru-ai/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20)
+- [Chinese Wenetspeech Zipformer 3.3M](https://huggingface.co/moeru-ai/sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01)
+
+The revisions are pinned as submodules under `models/huggingface/`. `test:prepare` fetches the packs and upstream test recordings. To load a pack, use `loadData({ module, data, metadata })` with `preload.data` and parsed `preload.js.metadata`, then create the detector using `encoder.onnx`, `decoder.onnx`, `joiner.onnx` and `tokens.txt`.
 
 Japanese is **not verified**. A caller may supply a compatible KWS transducer model and its already encoded tokens; an ordinary Japanese ASR model is not sufficient. This package has no raw keyword-string API or pinyin, phoneme or BPE encoder.
 

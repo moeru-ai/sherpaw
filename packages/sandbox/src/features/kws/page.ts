@@ -2,8 +2,8 @@ import type { Detection, KeywordEntry } from '@sherpaw/kws'
 
 import { computed, onBeforeUnmount, ref } from 'vue'
 
+import { startMicrophone } from '../audio/microphone'
 import { createKWSClient } from './client'
-import { startMicrophone } from './microphone'
 import { modelURLs } from './models'
 import { keywordPresets } from './presets'
 
@@ -184,7 +184,21 @@ export function useKWSPlayground() {
     try {
       await client.request({ type: 'reset' })
       controller.signal.throwIfAborted()
-      await startMicrophone(controller.signal, processMicrophone)
+      let batch: Float32Array | undefined
+      let offset = 0
+      // Keep 100 ms requests without making the shared recorder clip speaker audio.
+      await startMicrophone(controller.signal, (samples, sampleRate) => {
+        batch ??= new Float32Array(Math.round(sampleRate / 10))
+        for (const value of samples) {
+          batch[offset++] = Math.max(-1, Math.min(1, value))
+          if (offset === batch.length) {
+            const completed = batch
+            batch = new Float32Array(batch.length)
+            processMicrophone(completed, sampleRate)
+            offset = 0
+          }
+        }
+      })
       message.value = '正在监听，命中后会自动继续检测。'
     }
     catch (cause) {

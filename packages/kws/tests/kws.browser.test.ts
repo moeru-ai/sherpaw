@@ -1,4 +1,4 @@
-import { loadVirtualData } from '@sherpaw/preloader'
+import { loadData } from '@sherpaw/preloader'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import type { Detection, KeywordEntry, KeywordSpotter, KWSModel, KWSModule } from '../src/types'
@@ -7,7 +7,8 @@ import type { Detection, KeywordEntry, KeywordSpotter, KWSModel, KWSModule } fro
 // eslint-disable-next-line antfu/no-import-dist
 import { createKeywordSpotter, initKWSModule } from '../dist/index.js'
 
-const files = import.meta.glob<string>('./models/**/*.{onnx,txt,wav}', { eager: true, query: '?url', import: 'default' })
+const files = import.meta.glob<string>('./models/**/*.wav', { eager: true, query: '?url', import: 'default' })
+const packs = import.meta.glob<string>('../../../models/huggingface/sherpa-onnx-kws-*/install/bin/wasm/preload.{data,js.metadata}', { eager: true, query: '?url', import: 'default' })
 const first: KeywordEntry = { matches: [{ tokens: ['zh', 'ōu', 'w', 'àng', 'j', 'ūn'] }], label: '周望军' }
 const second: KeywordEntry = { matches: [{ tokens: ['l', 'uò', 'sh', 'í'] }], label: '落实' }
 const english: KeywordEntry = { matches: [{ tokens: ['L', 'AY1', 'T', 'AH1', 'P'] }], label: 'LIGHT UP' }
@@ -47,26 +48,19 @@ function feed(spotter: KeywordSpotter, samples: Float32Array, sampleRate = 16000
 }
 
 describe.each([
-  { directory: 'sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01', epoch: 12, wav: '5.wav', miss: '4.wav', bilingual: false },
-  { directory: 'sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20', epoch: 13, wav: 'zh_5.wav', miss: 'zh_4.wav', bilingual: true },
-])('$directory', ({ directory, epoch, wav, miss, bilingual }) => {
+  { directory: 'sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01', wav: '5.wav', miss: '4.wav', bilingual: false },
+  { directory: 'sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20', wav: 'zh_5.wav', miss: 'zh_4.wav', bilingual: true },
+])('$directory', ({ directory, wav, miss, bilingual }) => {
   let module: KWSModule
   let model: KWSModel
   let samples: Float32Array
   let unrelated: Float32Array
   beforeAll(async () => {
     module = await initKWSModule()
-    const names = ['encoder', 'decoder', 'joiner'] as const
-    const models = await Promise.all(names.map(name => bytes(directory, `${name}-epoch-${epoch}-avg-2-chunk-16-left-64.onnx`)))
-    loadVirtualData({
-      module,
-      virtualData: {
-        'encoder.onnx': models[0],
-        'decoder.onnx': models[1],
-        'joiner.onnx': models[2],
-        'tokens.txt': await bytes(directory, 'tokens.txt'),
-      },
-    })
+    const prefix = `../../../models/huggingface/${directory}/install/bin/wasm/preload`
+    const [data, metadata] = await Promise.all([fetch(packs[`${prefix}.data`]), fetch(packs[`${prefix}.js.metadata`])])
+    expect(data.ok && metadata.ok).toBe(true)
+    loadData({ module, data: await data.arrayBuffer(), metadata: await metadata.json() })
     model = { encoder: 'encoder.onnx', decoder: 'decoder.onnx', joiner: 'joiner.onnx', tokens: 'tokens.txt' }
     samples = await audio(directory, wav)
     unrelated = await audio(directory, miss)

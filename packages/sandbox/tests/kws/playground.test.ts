@@ -29,7 +29,14 @@ afterAll(async () => {
   await server?.close()
 })
 
+async function openKeywords(page: Page) {
+  const settings = page.locator('details').filter({ has: page.locator('summary', { hasText: '关键词设置' }) })
+  if (await settings.getAttribute('open') === null)
+    await settings.locator('summary').click()
+}
+
 async function load(page: Page, useFixtureKeywords = true) {
+  await openKeywords(page)
   // Upstream audio regression cases have their own vocabulary; they must not
   // dictate the presets shown to people using the playground.
   if (useFixtureKeywords) {
@@ -45,15 +52,18 @@ async function load(page: Page, useFixtureKeywords = true) {
       await page.getByLabel(`关键词 ${index + 1} 阈值`).fill('0.25')
     }
   }
+  await page.getByRole('button', { name: 'Model setup' }).click()
   await page.getByRole('button', { name: '加载模型', exact: true }).click()
   await expect.poll(() => page.getByRole('button', { name: '开始监听', exact: true }).isEnabled(), { timeout: 30000 }).toBe(true)
+  await page.keyboard.press('Escape')
 }
 
 it('activates selected presets immediately with the real model and keeps manual edits explicit', async () => {
   const browser = await chromium.launch({ headless: true })
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } })
-    await page.goto(`${url}kws`)
+    await page.goto(`${url}kws`, { waitUntil: 'domcontentloaded' })
+    await openKeywords(page)
     const labels = () => page.locator('.keyword-row > label:first-child input').evaluateAll(inputs => inputs.map(input => (input as HTMLInputElement).value))
     const english = ['Hey Iru', 'Hello Iru', 'Iru Iru']
     const chinese = ['你好肥鱼', '大肥鱼', '肥鱼肥鱼']
@@ -99,10 +109,11 @@ it('keeps the active detector when a preset changes search settings but its toke
     const page = await browser.newPage()
     let modelRequests = 0
     page.on('request', (request) => {
-      if (request.url().includes('.onnx'))
+      if (request.url().includes('preload.data'))
         modelRequests++
     })
-    await page.goto(`${url}kws`)
+    await page.goto(`${url}kws`, { waitUntil: 'domcontentloaded' })
+    await openKeywords(page)
     await load(page)
     // Corrupt the next preset message to exercise failed reconstruction at a
     // different candidate count, rather than only setKeywords validation.
@@ -125,7 +136,7 @@ it('keeps the active detector when a preset changes search settings but its toke
     await page.getByRole('button', { name: '清空记录' }).click()
     await file(page)
     expect(await page.locator('.hit').count()).toBe(0)
-    expect(modelRequests).toBe(3)
+    expect(modelRequests).toBe(1)
   }
   finally {
     await browser.close()
@@ -143,7 +154,8 @@ it.skipIf(!recording)('detects all Iru phrases in a local recording through file
   const browser = await chromium.launch({ headless: true, args: createChromiumFileMicrophoneArguments(recording!) })
   try {
     const page = await browser.newPage({ permissions: ['microphone'] })
-    await page.goto(`${url}kws`)
+    await page.goto(`${url}kws`, { waitUntil: 'domcontentloaded' })
+    await openKeywords(page)
     await load(page, false)
     await file(page, recording!)
     const expected = ['Iru Iru', 'Hello Iru', 'Hey Iru']
@@ -186,7 +198,8 @@ it.skipIf(!repeatedRecording)('detects mixed-language Hello Iru pronunciations i
   const browser = await chromium.launch({ headless: true })
   try {
     const page = await browser.newPage()
-    await page.goto(`${url}kws`)
+    await page.goto(`${url}kws`, { waitUntil: 'domcontentloaded' })
+    await openKeywords(page)
     await load(page, false)
     await file(page, repeatedRecording!)
     // This 27-second recording has five Hello Iru attempts. Three are recovered
@@ -234,7 +247,8 @@ it.skipIf(!chineseRecording)('recovers Chinese preset phrases in a local recordi
   const browser = await chromium.launch({ headless: true, args: createChromiumFileMicrophoneArguments(chineseRecording!) })
   try {
     const page = await browser.newPage({ permissions: ['microphone'] })
-    await page.goto(`${url}kws`)
+    await page.goto(`${url}kws`, { waitUntil: 'domcontentloaded' })
+    await openKeywords(page)
     await page.getByRole('button', { name: '肥鱼 · 中文' }).click()
     await load(page, false)
     await file(page, chineseRecording!)
@@ -278,7 +292,8 @@ it.skipIf(!naturalRecording)('retains the repeated-name prefix while competing k
   const browser = await chromium.launch({ headless: true })
   try {
     const page = await browser.newPage()
-    await page.goto(`${url}kws`)
+    await page.goto(`${url}kws`, { waitUntil: 'domcontentloaded' })
+    await openKeywords(page)
     await page.getByRole('button', { name: '肥鱼 · 中文' }).click()
     await load(page, false)
     // Keep the original leading audio and frame alignment. The 16-path preset
@@ -299,7 +314,8 @@ it.skipIf(!naturalRecording)('detects all seven natural repeated-name utterances
   const browser = await chromium.launch({ headless: true })
   try {
     const page = await browser.newPage()
-    await page.goto(`${url}kws`)
+    await page.goto(`${url}kws`, { waitUntil: 'domcontentloaded' })
+    await openKeywords(page)
     await page.getByRole('button', { name: '肥鱼 · 中文' }).click()
     await load(page, false)
     await file(page, naturalRecording!)
@@ -317,7 +333,7 @@ it('uses the real Worker for files, replaces keywords atomically, pauses and res
     const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } })
     const exceptions: string[] = []
     page.on('pageerror', error => exceptions.push(error.message))
-    await page.goto(url)
+    await page.goto(url, { waitUntil: 'domcontentloaded' })
     await page.getByRole('link', { name: 'Keyword spotting' }).click()
     await load(page)
     await file(page)
@@ -382,7 +398,8 @@ it('streams fake microphone audio and releases capture and Worker when leaving t
         return stream
       }
     })
-    await page.goto(`${url}kws`)
+    await page.goto(`${url}kws`, { waitUntil: 'domcontentloaded' })
+    await openKeywords(page)
     await load(page)
     await page.getByRole('button', { name: '开始监听' }).click()
     await expect.poll(() => page.locator('.hit strong').allTextContents(), { timeout: 30000 }).toContain('周望军')
@@ -392,6 +409,7 @@ it('streams fake microphone audio and releases capture and Worker when leaving t
     await page.getByRole('button', { name: '应用词表' }).click()
     await expect.poll(() => page.locator('.active-words .word').count()).toBe(3)
     await page.getByRole('link', { name: '← Sandbox' }).click()
+    await page.waitForURL(url)
     await expect.poll(() => closedWorkers).toBe(1)
     expect(await page.evaluate(() => (window as unknown as { kwsTestTracks: MediaStreamTrack[] }).kwsTestTracks.map(track => track.readyState))).toEqual(['ended'])
     await page.getByRole('link', { name: 'Keyword spotting' }).click()
@@ -407,12 +425,15 @@ it('recovers from failed model loading and microphone permission denial', async 
   const browser = await chromium.launch({ headless: true })
   try {
     const page = await browser.newPage()
-    await page.route('**/*encoder*.onnx*', route => route.abort())
-    await page.goto(`${url}kws`)
+    await page.route('**/*preload*.data*', route => route.abort())
+    await page.goto(`${url}kws`, { waitUntil: 'domcontentloaded' })
+    await openKeywords(page)
+    await page.getByRole('button', { name: 'Model setup' }).click()
     await page.getByRole('button', { name: '加载模型', exact: true }).click()
     await expect.poll(() => page.getByRole('alert').count(), { timeout: 30000 }).toBe(1)
     expect(await page.getByRole('button', { name: '开始监听' }).isDisabled()).toBe(true)
-    await page.unroute('**/*encoder*.onnx*')
+    await page.keyboard.press('Escape')
+    await page.unroute('**/*preload*.data*')
     await load(page)
     await page.evaluate(() => {
       navigator.mediaDevices.getUserMedia = async () => {
@@ -439,7 +460,7 @@ it('loads the production Worker, WASM, models and microphone worklet', async () 
   const browser = await chromium.launch({ headless: true, args: createChromiumFileMicrophoneArguments(resolve(fixtures, 'zh_5.wav')) })
   try {
     const page = await browser.newPage({ permissions: ['microphone'] })
-    await page.goto(`${built.resolvedUrls!.local[0]}kws`)
+    await page.goto(`${built.resolvedUrls!.local[0]}kws`, { waitUntil: 'domcontentloaded' })
     await load(page)
     await file(page, 'en_0.wav')
     expect(await page.locator('.hit strong').allTextContents()).toEqual(['LIGHT UP'])

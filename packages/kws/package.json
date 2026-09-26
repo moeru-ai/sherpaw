@@ -24,7 +24,7 @@
   ],
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.tests.json",
+    "typecheck": "tsc --noEmit -p tsconfig.config.json && tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.tests.json",
     "test:run": "vitest run --config vitest.node.config.ts",
     "test:prepare": "bash tests/scripts/prepare.sh",
     "test:run:browser": "vitest run --config vitest.config.ts"

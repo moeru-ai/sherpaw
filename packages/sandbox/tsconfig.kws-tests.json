@@ -1,4 +1,4 @@
 {
-  "extends": "./tsconfig.speaker-tests.json",
+  "extends": "./tsconfig.tests.json",
   "include": ["src/features/kws", "tests/kws", "vitest.kws.config.ts"]
 }

@@ -3,7 +3,6 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "types": ["vite/client"],
     "allowImportingTsExtensions": true,
     "strict": false,
     "noEmit": true,
@@ -11,5 +10,5 @@
     "isolatedModules": true,
     "skipLibCheck": true
   },
-  "include": ["tests"]
+  "include": ["tsdown.config.ts", "vitest*.config.ts"]
 }
