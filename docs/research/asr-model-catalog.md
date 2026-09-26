@@ -145,7 +145,6 @@ time on this Mac; this single functional run is not a comparative benchmark.
 This initial validation used CPU/WASM. See the WebGPU experiment below for the
 subsequent encoder integration.
 
-
 ## X-ASR FP32 WebGPU experiment
 
 Choose X-ASR FP32, then its WebGPU encoder backend in `/asr`. Other catalog
