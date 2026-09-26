@@ -14,6 +14,19 @@ git submodule update
 
 The published Hugging Face models are pinned as submodules under `models/huggingface/`. Each model includes `preload.data`, `preload.js`, and `preload.js.metadata` in `install/bin/wasm/`.
 
+X-ASR streaming model packs are available in the same preload layout:
+
+| Model | Hugging Face repository | Model data size |
+| --- | --- | --- |
+| X-ASR zh-en, 480 ms, INT8 | [sherpaw-x-asr-zh-en-480ms-int8](https://huggingface.co/moeru-ai/sherpaw-x-asr-zh-en-480ms-int8) | 169.23 MB |
+| X-ASR zh-en, 480 ms, FP32 | [sherpaw-x-asr-zh-en-480ms-fp32](https://huggingface.co/moeru-ai/sherpaw-x-asr-zh-en-480ms-fp32) | 614.98 MB |
+
+Both expose `/decoder.onnx`, `/encoder.onnx`, `/joiner.onnx`, and `/tokens.txt`.
+The INT8 encoder/joiner are renamed for compatibility without changing their
+bytes. See [packaging and verification](docs/research/x-asr-model-packaging.md)
+for reproduction commands, and use the pinned Hugging Face submodules below
+`models/huggingface/` for reproducible deployment.
+
 Speaker embedding model packs are also available:
 
 | Model | Hugging Face repository | Model data size |

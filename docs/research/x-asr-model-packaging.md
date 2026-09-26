@@ -52,7 +52,8 @@ submodules under `models/huggingface/`, consistent with existing model packs.
 
 Both generated ES module loaders were executed locally. Each restored all four
 virtual files with hashes matching the original ONNX/token files and released
-all run dependencies. Virtual paths and metadata fields match the existing
+all run dependencies. Both generated `preload.js` files are byte-identical to
+the existing Zipformer loader. Virtual paths and metadata fields match the existing
 `sherpaw-zipformer-zh-en-2023-02-20` pack. INT8 data is 169,227,953 bytes; FP32 data
 is 614,981,400 bytes. These are asset sizes, not runtime memory requirements.
 
