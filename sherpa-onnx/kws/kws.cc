@@ -5,7 +5,7 @@
 // Keep the evolving upstream config layout in C++, not hard-coded WASM offsets.
 extern "C" const SherpaOnnxKeywordSpotter *SherpawCreateKeywordSpotter(
     const char *encoder, const char *decoder, const char *joiner,
-    const char *tokens, const char *keywords) {
+    const char *tokens, const char *keywords, int32_t max_active_paths) {
   SherpaOnnxKeywordSpotterConfig config{};
   config.feat_config.sample_rate = 16000;
   config.feat_config.feature_dim = 80;
@@ -15,7 +15,7 @@ extern "C" const SherpaOnnxKeywordSpotter *SherpawCreateKeywordSpotter(
   config.model_config.tokens = tokens;
   config.model_config.num_threads = 1;
   config.model_config.provider = "cpu";
-  config.max_active_paths = 4;
+  config.max_active_paths = max_active_paths;
   config.num_trailing_blanks = 1;
   config.keywords_score = 1.0f;
   config.keywords_threshold = 0.25f;

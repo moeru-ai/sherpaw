@@ -8,17 +8,20 @@ export interface KeywordPreset {
 }
 
 // Encoded for the bundled phone+partial-pinyin model, not a text converter.
-// HEY/HELLO follow its en.phone lexicon. Iru uses the custom pronunciation
-// "ee-roo"; users can adjust the tokens for their pronunciation.
+// HEY/HELLO follow its en.phone lexicon. The recorded 伊噜 pronunciation matches
+// the model's L better than its English R; keep this mapping editable.
 export const keywordPresets: KeywordPreset[] = [
   {
     id: 'english',
     name: 'Iru · English',
-    note: 'Iru 按「伊噜 / ee-roo」发音，可编辑 token 调整。',
+    note: 'Iru 按「伊噜」发音，使用贴近「噜」的发音编码；可编辑 token 调整。',
     entries: [
-      { label: 'Hey Iru', tokens: ['HH', 'EY1', 'IY1', 'R', 'UW0'] },
-      { label: 'Hello Iru', tokens: ['HH', 'AH0', 'L', 'OW1', 'IY1', 'R', 'UW0'] },
-      { label: 'Iru Iru', tokens: ['IY1', 'R', 'UW0', 'IY1', 'R', 'UW0'] },
+      { label: 'Hey Iru', tokens: ['HH', 'EY1', 'IY1', 'L', 'UW0'], score: 2, threshold: 0.15 },
+      // The bilingual model can encode the same accented phrase as pinyin.
+      { label: 'Hey Iru', tokens: ['h', 'ēi', 'y', 'ī', 'l', 'ù'], score: 2, threshold: 0.15 },
+      { label: 'Hello Iru', tokens: ['HH', 'AH0', 'L', 'OW1', 'IY1', 'L', 'UW0'], score: 2, threshold: 0.15 },
+      { label: 'Iru Iru', tokens: ['IY1', 'L', 'UW0', 'IY1', 'L', 'UW0'], score: 2, threshold: 0.15 },
+      { label: 'Iru Iru', tokens: ['y', 'ī', 'l', 'ù', 'y', 'ī', 'l', 'ù'], score: 2, threshold: 0.15 },
     ],
   },
   {

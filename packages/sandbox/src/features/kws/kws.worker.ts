@@ -24,7 +24,8 @@ async function handleRequest(request: Request, progress: (message: string) => vo
         loadVirtualData({ module, virtualData: { [paths[key]]: await response.arrayBuffer() } })
       }
       progress('正在初始化关键词检测…')
-      const next = createKeywordSpotter(module, { model: paths, keywords: request.keywords })
+      // Four paths pruned the Iru pronunciation in the recorded regression case.
+      const next = createKeywordSpotter(module, { model: paths, keywords: request.keywords, maxActivePaths: 16 })
       spotter?.dispose()
       spotter = next
       keywords = request.keywords

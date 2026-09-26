@@ -48,7 +48,7 @@ spotter.dispose()
 
 ## Contract
 
-- `createKeywordSpotter(module, { model, keywords })` is synchronous and requires loaded, compatible KWS transducer model files and at least one keyword. The runtime uses 16 kHz, 80-dimensional features, one CPU inference thread, four active paths and one trailing blank.
+- `createKeywordSpotter(module, { model, keywords, maxActivePaths? })` is synchronous and requires loaded, compatible KWS transducer model files and at least one keyword. The runtime uses 16 kHz, 80-dimensional features, one CPU inference thread, one trailing blank and `maxActivePaths` search candidates (default `4`, a positive int32 integer). Larger values preserve more pronunciation candidates at a higher CPU cost. This setting is retained across vocabulary replacement and pause/resume.
 - Each entry has `{ tokens: string[], label: string, score?: number, threshold?: number }`. Tokens must exactly match the model's `tokens.txt`. Labels are returned unchanged and may include spaces. Empty labels, empty token sequences, unknown tokens and duplicate token sequences are rejected. Multiple pronunciations may share a label.
 - `score` defaults to `1` and must be positive. `threshold` defaults to `0.25` and must be in `(0, 1]`. Both must fit a finite, normal float32 value. Zero is excluded because upstream interprets it as “use the default.”
 - `setKeywords()` snapshots entries at call time and rebuilds the detector and stream in call order. Only a successful rebuild replaces the active vocabulary. Invalid updates reject without losing the current detector, and later updates still run. The old and new detectors briefly coexist in memory. Reloads can pause processing and reset all audio history and the timestamp origin.

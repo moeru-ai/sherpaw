@@ -37,6 +37,8 @@ async function load(page: Page, useFixtureKeywords = true) {
     for (const [index, keyword] of keywords.entries()) {
       await page.getByLabel(`关键词 ${index + 1} 名称`).fill(keyword.label)
       await page.getByLabel(`关键词 ${index + 1} tokens`).fill(keyword.tokens)
+      await page.getByLabel(`关键词 ${index + 1} 分数`).fill('1')
+      await page.getByLabel(`关键词 ${index + 1} 阈值`).fill('0.25')
     }
   }
   await page.getByRole('button', { name: '加载模型', exact: true }).click()
@@ -54,6 +56,11 @@ it('activates selected presets immediately with the real model and keeps manual 
     await expect.poll(labels).toEqual(english)
     await load(page, false)
     expect(await page.locator('.active-words .word').allTextContents()).toEqual(english)
+    // Check the more sensitive English preset against unrelated speech.
+    for (const filename of ['en_0.wav', 'en_1.wav', 'zh_0.wav', 'zh_1.wav', 'zh_2.wav', 'zh_3.wav', 'zh_4.wav', 'zh_5.wav']) {
+      await file(page, filename)
+      expect(await page.locator('.hit').count()).toBe(0)
+    }
 
     await page.getByRole('button', { name: '肥鱼 · 中文' }).click()
     expect(await labels()).toEqual(chinese)
@@ -84,6 +91,28 @@ async function file(page: Page, filename = 'zh_5.wav') {
   await page.getByLabel('测试音频文件').setInputFiles(resolve(fixtures, filename))
   await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain('检测完成')
 }
+
+// Private recordings stay outside the repository and are supplied explicitly.
+const recording = process.env.SHERPAW_KWS_TEST_RECORDING
+it.skipIf(!recording)('detects all Iru phrases in a local recording through file and microphone input', async () => {
+  const browser = await chromium.launch({ headless: true, args: createChromiumFileMicrophoneArguments(recording!) })
+  try {
+    const page = await browser.newPage({ permissions: ['microphone'] })
+    await page.goto(`${url}kws`)
+    await load(page, false)
+    await file(page, recording!)
+    const expected = ['Iru Iru', 'Hello Iru', 'Hey Iru']
+    expect(await page.locator('.hit strong').allTextContents()).toEqual(expected)
+    await page.getByRole('button', { name: '清空记录' }).click()
+    await page.getByRole('button', { name: '开始监听' }).click()
+    await expect.poll(() => page.locator('.hit strong').allTextContents(), { timeout: 20000 }).toEqual(expected)
+    await page.getByRole('button', { name: '停止监听' }).click()
+    expect(await page.getByRole('alert').count()).toBe(0)
+  }
+  finally {
+    await browser.close()
+  }
+})
 
 it('uses the real Worker for files, replaces keywords atomically, pauses and resumes', async () => {
   const browser = await chromium.launch({ headless: true })

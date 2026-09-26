@@ -34,7 +34,7 @@ function runtime() {
     lengthBytesUTF8: (text: string) => new TextEncoder().encode(text).length,
     stringToUTF8: (text: string, ptr: number) => strings.set(ptr, text),
     UTF8ToString: (ptr: number) => strings.get(ptr),
-    _SherpawCreateKeywordSpotter: vi.fn((_e, _d, _j, _t, k) => {
+    _SherpawCreateKeywordSpotter: vi.fn((_e, _d, _j, _t, k, _maxActivePaths) => {
       configs.push(strings.get(k)!)
       const ptr = next++
       detectors.add(ptr)
@@ -106,6 +106,29 @@ describe('keyword validation', () => {
 })
 
 describe('native ownership and updates', () => {
+  it('preserves the configured search beam through vocabulary replacement and pause/resume', async () => {
+    const r = runtime()
+    const config = { model, keywords: [keyword], maxActivePaths: 16 }
+    const spotter = createKeywordSpotter(r.typed, config)
+    config.maxActivePaths = 4
+    await spotter.setKeywords([{ tokens: ['b'], label: 'second' }])
+    await spotter.setKeywords([])
+    await spotter.setKeywords([keyword])
+    expect(r.module._SherpawCreateKeywordSpotter.mock.calls.map(call => call[5])).toEqual([16, 16, 16])
+    spotter.dispose()
+    const defaults = createKeywordSpotter(r.typed, { model, keywords: [keyword] })
+    expect(r.module._SherpawCreateKeywordSpotter.mock.lastCall?.[5]).toBe(4)
+    defaults.dispose()
+  })
+
+  it('rejects invalid search beams before entering the native runtime', () => {
+    const r = runtime()
+    for (const maxActivePaths of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 2147483648])
+      expect(() => createKeywordSpotter(r.typed, { model, keywords: [keyword], maxActivePaths })).toThrow(/maxActivePaths/)
+    expect(r.module._SherpawCreateKeywordSpotter).not.toHaveBeenCalled()
+    expect(r.allocated.size).toBe(0)
+  })
+
   it('rolls back failed allocation, detector and stream creation', async () => {
     const r = runtime()
     const spotter = createKeywordSpotter(r.typed, { model, keywords: [keyword] })

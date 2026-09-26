@@ -11,6 +11,9 @@ interface NativeState {
 
 /** Owns the native detector, stream and temporary allocations, but not model files. */
 export function createKeywordSpotter(module: KWSModule, config: KeywordSpotterConfig): KeywordSpotter {
+  const maxActivePaths = config.maxActivePaths ?? 4
+  if (!Number.isInteger(maxActivePaths) || maxActivePaths < 1 || maxActivePaths > 2147483647)
+    throw new RangeError('maxActivePaths must be a positive int32 integer')
   // Snapshot paths so caller mutation cannot alter a queued replacement.
   const paths = [config.model.encoder, config.model.decoder, config.model.joiner, config.model.tokens]
   for (const path of paths) {
@@ -43,7 +46,7 @@ export function createKeywordSpotter(module: KWSModule, config: KeywordSpotterCo
         pointers.push(ptr)
         module.stringToUTF8(text, ptr, size)
       }
-      spotter = module._SherpawCreateKeywordSpotter(pointers[0], pointers[1], pointers[2], pointers[3], pointers[4])
+      spotter = module._SherpawCreateKeywordSpotter(pointers[0], pointers[1], pointers[2], pointers[3], pointers[4], maxActivePaths)
       if (!spotter)
         throw new Error('Unable to create keyword spotter; check the KWS transducer model')
       const stream = module._SherpaOnnxCreateKeywordStream(spotter)

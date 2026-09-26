@@ -3,7 +3,7 @@ import type { WebAssemblyModule } from '@sherpaw/shared'
 /** Exports of the standalone KWS runtime. Compatible with @sherpaw/preloader. */
 export interface KWSModule extends WebAssemblyModule {
   FS: typeof FS
-  _SherpawCreateKeywordSpotter: (encoder: number, decoder: number, joiner: number, tokens: number, keywords: number) => number
+  _SherpawCreateKeywordSpotter: (encoder: number, decoder: number, joiner: number, tokens: number, keywords: number, maxActivePaths: number) => number
   _SherpaOnnxCreateKeywordStream: (spotter: number) => number
   _SherpaOnnxIsKeywordStreamReady: (spotter: number, stream: number) => number
   _SherpaOnnxDecodeKeywordStream: (spotter: number, stream: number) => void
@@ -37,6 +37,8 @@ export interface KWSModel {
 
 export interface KeywordSpotterConfig {
   model: KWSModel
+  /** Positive int32 search beam size. Default: 4. Larger values cost more CPU. */
+  maxActivePaths?: number
   /** Must contain at least one entry at creation. */
   keywords: readonly KeywordEntry[]
 }

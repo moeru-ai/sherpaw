@@ -41,13 +41,24 @@ export function useKWSPlayground() {
   const client = createKWSClient(showProgress)
 
   function createDrafts(keywords: KeywordEntry[]): Draft[] {
-    return keywords.map(entry => ({
-      id: ++rowId,
-      label: entry.label,
-      tokens: entry.tokens.join(' '),
-      score: String(entry.score ?? 1),
-      threshold: String(entry.threshold ?? 0.25),
-    }))
+    // Preset pronunciations share a label and settings in one editable row.
+    const rows = new Map<string, Draft>()
+    for (const entry of keywords) {
+      const row = rows.get(entry.label)
+      if (row) {
+        row.tokens += `\n${entry.tokens.join(' ')}`
+      }
+      else {
+        rows.set(entry.label, {
+          id: ++rowId,
+          label: entry.label,
+          tokens: entry.tokens.join(' '),
+          score: String(entry.score ?? 1),
+          threshold: String(entry.threshold ?? 0.25),
+        })
+      }
+    }
+    return [...rows.values()]
   }
 
   /** Triggering workflow: kws.vue preset button `click` -> {@link selectPreset} -> draft replacement and {@link applyKeywords} when loaded. */
@@ -65,12 +76,16 @@ export function useKWSPlayground() {
   }
 
   function entries(): KeywordEntry[] {
-    return drafts.value.map(row => ({
-      label: row.label,
-      tokens: row.tokens.trim() ? row.tokens.trim().split(/\s+/u) : [],
-      score: String(row.score).trim() ? Number(row.score) : undefined,
-      threshold: String(row.threshold).trim() ? Number(row.threshold) : undefined,
-    }))
+    return drafts.value.flatMap((row) => {
+      const lines = row.tokens.split(/\r?\n/u).map(line => line.trim()).filter(Boolean)
+      // Preserve an empty row so validation rejects it rather than dropping it.
+      return (lines.length ? lines : ['']).map(line => ({
+        label: row.label,
+        tokens: line ? line.split(/\s+/u) : [],
+        score: String(row.score).trim() ? Number(row.score) : undefined,
+        threshold: String(row.threshold).trim() ? Number(row.threshold) : undefined,
+      }))
+    })
   }
 
   function reportError(cause: unknown) {
@@ -91,7 +106,7 @@ export function useKWSPlayground() {
       const keywords = entries()
       await client.request({ type: 'load', urls: modelURLs, keywords })
       ready.value = true
-      activeLabels.value = keywords.map(entry => entry.label)
+      activeLabels.value = [...new Set(keywords.map(entry => entry.label))]
       message.value = '模型已就绪，可以开始监听。'
     }
     catch (cause) {
@@ -108,7 +123,7 @@ export function useKWSPlayground() {
     error.value = ''
     try {
       await client.request({ type: 'keywords', keywords })
-      activeLabels.value = keywords.map(entry => entry.label)
+      activeLabels.value = [...new Set(keywords.map(entry => entry.label))]
       seconds.value = 0
       message.value = keywords.length ? '词表已更新，音频状态已重置。' : '检测已暂停；应用词表后恢复。'
     }
