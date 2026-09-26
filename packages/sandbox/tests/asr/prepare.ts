@@ -1,6 +1,5 @@
 import type { FakemicWebPrepareContext } from '@sherpaw/vitest-plugin-fakemic'
 
-import type { LiveBackend } from '../../src/features/webgpu-experiment/live-asr'
 import type { RealtimeEvent } from '../../src/features/webgpu-experiment/realtime-metrics'
 
 declare global {
@@ -33,15 +32,6 @@ export default async function prepare(context: FakemicWebPrepareContext) {
     page,
     browser: context.browser.version(),
     errors,
-    async start(backend: LiveBackend, model = 'paraformer') {
-      await page.getByLabel('ASR model', { exact: true }).selectOption(model)
-      await page.getByLabel('Inference backend').selectOption(backend)
-      await page.getByRole('button', { name: 'Start', exact: true }).click()
-      await page.waitForFunction(() => document.querySelector('[role=alert]') || [...document.querySelectorAll('button')].some(button => button.textContent.includes('Stop transcription')), undefined, { timeout: 180000 })
-      const error = await page.getByRole('alert').allTextContents()
-      if (error.length)
-        throw new Error(error.join(' '))
-    },
     async stop() {
       await page.getByRole('button', { name: 'Stop transcription' }).click()
       await page.getByRole('button', { name: 'Start', exact: true }).waitFor({ timeout: 180000 })
