@@ -16,12 +16,12 @@ export const keywordPresets: KeywordPreset[] = [
     name: 'Iru · English',
     note: 'Iru 按「伊噜」发音，使用贴近「噜」的发音编码；可编辑 token 调整。',
     entries: [
-      { label: 'Hey Iru', tokens: ['HH', 'EY1', 'IY1', 'L', 'UW0'], score: 2, threshold: 0.15 },
+      { label: 'Hey Iru', tokens: ['HH', 'EY1', 'IY1', 'L', 'UW0'], score: 1.5, threshold: 0.1 },
       // The bilingual model can encode the same accented phrase as pinyin.
-      { label: 'Hey Iru', tokens: ['h', 'ēi', 'y', 'ī', 'l', 'ù'], score: 2, threshold: 0.15 },
-      { label: 'Hello Iru', tokens: ['HH', 'AH0', 'L', 'OW1', 'IY1', 'L', 'UW0'], score: 2, threshold: 0.15 },
-      { label: 'Iru Iru', tokens: ['IY1', 'L', 'UW0', 'IY1', 'L', 'UW0'], score: 2, threshold: 0.15 },
-      { label: 'Iru Iru', tokens: ['y', 'ī', 'l', 'ù', 'y', 'ī', 'l', 'ù'], score: 2, threshold: 0.15 },
+      { label: 'Hey Iru', tokens: ['h', 'ēi', 'y', 'ī', 'l', 'ù'], score: 1.5, threshold: 0.1 },
+      { label: 'Hello Iru', tokens: ['HH', 'AH0', 'L', 'OW1', 'IY1', 'L', 'UW0'], score: 1.5, threshold: 0.1 },
+      { label: 'Iru Iru', tokens: ['IY1', 'L', 'UW0', 'IY1', 'L', 'UW0'], score: 1.5, threshold: 0.1 },
+      { label: 'Iru Iru', tokens: ['y', 'ī', 'l', 'ù', 'y', 'ī', 'l', 'ù'], score: 1.5, threshold: 0.1 },
     ],
   },
   {

@@ -2,10 +2,14 @@ import type { Page } from 'playwright'
 import type { ViteDevServer } from 'vite'
 
 import { createChromiumFileMicrophoneArguments } from '@sherpaw/vitest-plugin-fakemic'
+import { Buffer } from 'node:buffer'
+import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { chromium } from 'playwright'
 import { createServer, preview } from 'vite'
 import { afterAll, beforeAll, expect, it } from 'vitest'
+
+import { decodeWavPcm16, encodeWavPcm16 } from '../../../asr/tests/helpers/wav'
 
 const fixtures = resolve(import.meta.dirname, '../../../kws/tests/models/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20/test_wavs')
 let server: ViteDevServer
@@ -57,7 +61,7 @@ it('activates selected presets immediately with the real model and keeps manual 
     await load(page, false)
     expect(await page.locator('.active-words .word').allTextContents()).toEqual(english)
     // Check the more sensitive English preset against unrelated speech.
-    for (const filename of ['en_0.wav', 'en_1.wav', 'zh_0.wav', 'zh_1.wav', 'zh_2.wav', 'zh_3.wav', 'zh_4.wav', 'zh_5.wav']) {
+    for (const filename of ['en_0.wav', 'en_1.wav', 'zh_0.wav', 'zh_1.wav', 'zh_2.wav', 'zh_3.wav', 'zh_4.wav', 'zh_5.wav', 'zh_6.wav']) {
       await file(page, filename)
       expect(await page.locator('.hit').count()).toBe(0)
     }
@@ -103,6 +107,17 @@ it.skipIf(!recording)('detects all Iru phrases in a local recording through file
     await file(page, recording!)
     const expected = ['Iru Iru', 'Hello Iru', 'Hey Iru']
     expect(await page.locator('.hit strong').allTextContents()).toEqual(expected)
+    const { samples, sampleRate } = decodeWavPcm16(Uint8Array.from(await readFile(recording!)).buffer)
+    // These frame offsets exposed misses despite the unmodified file passing.
+    for (const paddingMs of [160, 480]) {
+      await page.getByRole('button', { name: '清空记录' }).click()
+      const padded = new Float32Array(samples.length + Math.round(sampleRate * paddingMs / 1000))
+      padded.set(samples, padded.length - samples.length)
+      const name = `offset-${paddingMs}.wav`
+      await page.getByLabel('测试音频文件').setInputFiles({ name, mimeType: 'audio/wav', buffer: Buffer.from(encodeWavPcm16(padded, sampleRate)) })
+      await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain(`${name} 检测完成`)
+      expect(await page.locator('.hit strong').allTextContents()).toEqual(expected)
+    }
     await page.getByRole('button', { name: '清空记录' }).click()
     await page.getByRole('button', { name: '开始监听' }).click()
     await expect.poll(() => page.locator('.hit strong').allTextContents(), { timeout: 20000 }).toEqual(expected)
