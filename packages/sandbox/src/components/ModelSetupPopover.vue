@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { PopoverArrow, PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
 
-defineProps<{ ready?: boolean }>()
+defineProps<{ ready?: boolean, disabled?: boolean }>()
+
+const open = defineModel<boolean>('open', { default: false })
 </script>
 
 <template>
-  <PopoverRoot>
+  <PopoverRoot v-model:open="open">
     <PopoverTrigger
+      :disabled="disabled"
       flex="~ row items-center gap-2"
       bg="transparent hover:neutral/10"
       rounded-2xl p-2 md:p-4

@@ -64,3 +64,15 @@ pnpm -F @sherpaw/sandbox preview
 ```
 
 Speaker tests cover UI interactions, route cleanup, sample management, recording peaks, and long recordings. Diarization tests upload the four-speaker recording, rerun it with a different clustering, cancel a run, and check that leaving the route terminates the Worker. Fixed audio cases use the same Worker/recorder with external browser requests blocked. Tests never generate TTS audio.
+
+## Streaming ASR models
+
+The existing Transcription page's **Model setup** popover offers Paraformer zh-en, X-ASR zh-en (INT8 or FP32), and
+Chinese Zipformer 2025. Use **Load model** to preload, then **Start** to open the microphone.
+X-ASR and Zipformer use dedicated Workers. X-ASR FP32 offers an experimental
+WebGPU encoder with CPU decoder/joiner; other catalog variants use CPU/WASM.
+Paraformer also offers experimental WebGPU backends. ASR shares KWS's local-models Vite plugin and
+model-pack loader: dev uses prepared local weights when available, and builds download pinned HF weights.
+The microphone capture is shared with KWS and speaker identification. ASR still requires
+locally built WASM bridges; follow the
+[ASR preparation and validation guide](../../docs/research/asr-model-catalog.md).

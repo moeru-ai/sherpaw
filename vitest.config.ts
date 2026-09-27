@@ -4,7 +4,8 @@ export default defineConfig(() => {
   return {
     test: {
       projects: [
-        'packages/asr',
+        'packages/asr/vitest.config.ts',
+        'packages/asr/vitest.node.config.ts',
         'packages/kws/vitest.config.ts',
         'packages/kws/vitest.node.config.ts',
         'packages/preloader',

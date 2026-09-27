@@ -1,11 +1,11 @@
 import { useDevicesList, useUserMedia } from '@vueuse/core'
 import { computed, effectScope, ref } from 'vue'
 
-/** Capture raw mono PCM at the device rate. The caller owns any batching or normalization. */
-export async function startMicrophone(signal: AbortSignal, onAudio: (samples: Float32Array, sampleRate: number) => void) {
+/** Capture mono PCM. Web Audio resamples when a rate is requested; callers own batching. */
+export async function startMicrophone(signal: AbortSignal, onAudio: (samples: Float32Array, sampleRate: number) => void, options: { sampleRate?: number, onError?: () => void } = {}) {
   signal.throwIfAborted()
 
-  const context = new AudioContext()
+  const context = new AudioContext({ sampleRate: options.sampleRate })
   // Recording starts in event handlers, outside Vue setup. Own the VueUse
   // watchers/devicechange listener for exactly this capture's lifetime.
   const scope = effectScope(true)
@@ -31,7 +31,7 @@ export async function startMicrophone(signal: AbortSignal, onAudio: (samples: Fl
   let capture: AudioWorkletNode | undefined
   let closed: Promise<void> | undefined
 
-  /** Triggering workflow: KWS stopMicrophone / recorder.stop / AbortSignal `abort` -> release -> VueUse stop, scope disposal and AudioContext.close. */
+  /** Triggering workflow: ASR stopRecording / KWS stopMicrophone / recorder.stop / AbortSignal `abort` -> release -> VueUse stop, scope disposal and AudioContext.close. */
   function release() {
     // Also stop a stream whose permission request completed after scope disposal.
     media.stop()
@@ -95,13 +95,17 @@ export async function startMicrophone(signal: AbortSignal, onAudio: (samples: Fl
     source = context.createMediaStreamSource(stream)
     capture = new AudioWorkletNode(context, 'microphone-capture')
     capture.port.onmessage = collect
+    capture.onprocessorerror = options.onError ?? null
 
     const mute = context.createGain()
 
     mute.gain.value = 0
     source.connect(capture).connect(mute).connect(context.destination)
 
-    return { sampleRate: context.sampleRate, stop: release }
+    return {
+      sampleRate: context.sampleRate,
+      stop: release,
+    }
   }
   catch (error) {
     await release().catch(() => {})

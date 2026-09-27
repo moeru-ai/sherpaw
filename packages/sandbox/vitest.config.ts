@@ -9,7 +9,7 @@ export default defineConfig({
           name: 'sandbox',
           environment: 'node',
           include: ['tests/**/*.test.ts'],
-          exclude: ['tests/**/*.browser.test.ts'],
+          exclude: ['tests/**/*.browser.test.ts', 'tests/asr/realtime.audio.test.ts'],
           testTimeout: 120000,
           hookTimeout: 120000,
           fileParallelism: false,
