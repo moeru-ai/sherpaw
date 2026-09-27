@@ -1,7 +1,15 @@
 {
-  "references": [
-    { "path": "./tsconfig.config.json" },
-    { "path": "./tsconfig.lib.json" }
-  ],
-  "files": []
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ESNext", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "skipLibCheck": true
+  },
+  "include": ["src", "tests", "tsdown.config.ts", "vitest*.config.ts"]
 }

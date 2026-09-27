@@ -12,7 +12,6 @@ ignorePaths:
   - packages/vad/src/vad.js
   - packages/vad-asr/src/asr.js
   - packages/vad-asr/src/vad.js
-  - packages/speaker-diarization/src/sherpa-onnx-wasm-main-speaker-diarization.js
   - pnpm-lock.yaml
   - sherpa-onnx/upstream/**/*
   - upstream/**/*
@@ -63,6 +62,7 @@ words:
   - denoiser
   - Diacritization
   - diacritization
+  - diarizer
   - DPDF
   - DSHERPA
   - Eeuo

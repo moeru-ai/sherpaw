@@ -24,5 +24,8 @@
     <RouterLink to="/kws" text-3xl underline>
       Keyword spotting
     </RouterLink>
+    <RouterLink to="/speaker-diarization" text-3xl underline>
+      Speaker diarization
+    </RouterLink>
   </div>
 </template>

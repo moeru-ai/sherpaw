@@ -44,6 +44,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/speaker-diarization': RouteRecordInfo<
+      '/speaker-diarization',
+      '/speaker-diarization',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/speaker-identification': RouteRecordInfo<
       '/speaker-identification',
       '/speaker-identification',
@@ -79,6 +86,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/kws.vue': {
       routes:
         | '/kws'
+      views:
+        | never
+    }
+    'src/pages/speaker-diarization.vue': {
+      routes:
+        | '/speaker-diarization'
       views:
         | never
     }

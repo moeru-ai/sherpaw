@@ -25,11 +25,13 @@ Speaker embedding and keyword spotting model packs are also available:
 
 The speaker packs expose `/speaker-embedding.onnx`; the KWS packs expose `/encoder.onnx`, `/decoder.onnx`, `/joiner.onnx`, and `/tokens.txt`. Each requires its separate WASM runtime. Their model cards and manifests record source attribution, packaging details, and SHA-256 hashes. The data files contain the unchanged upstream ONNX bytes. Use the pinned submodule revisions for reproducible downloads.
 
-The [sandbox](packages/sandbox) includes speaker identification at `/speaker-identification`. Run `pnpm dev` and select it from the home page.
+The [sandbox](packages/sandbox) includes speaker identification at `/speaker-identification` and speaker diarization at `/speaker-diarization`. Run `pnpm dev` and select one from the home page.
 
 Speaker identification is available in [`@sherpaw/speaker-identification`](packages/speaker-identification/README.md), with WASM embedding extraction, enrollment, scored identification, and verification. Download and preload-pack scripts are available for CAM++ Chinese/English advanced and ERes2NetV2 Chinese. See the [model research](docs/research/speaker-identification.md) and [browser / fake-microphone experiments](docs/research/speaker-identification-experiments.md).
 
 Streaming keyword spotting is available in [`@sherpaw/kws`](packages/kws/README.md). It runs in a Worker, accepts PCM audio and encoded keyword tokens, and supports replacing keywords while listening. Try the [sandbox playground](packages/sandbox/README.md#keyword-spotting-playground) at `/kws` with a microphone or an audio file.
+
+Offline speaker diarization is available in [`@sherpaw/speaker-diarization`](packages/speaker-diarization/README.md). It combines pyannote-segmentation-3.0 with any supported speaker embedding model, such as the CAM++ pack above, and returns speaker turns for a complete recording.
 
 ## Development at the WASM/C level
 

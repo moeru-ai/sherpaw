@@ -1,17 +1,29 @@
 import { defineConfig } from 'tsdown'
 
 export default defineConfig({
-  entry: 'src/index.ts',
-  copy: [
-    'src/sherpa-onnx-speaker-diarization.d.ts',
-    'src/sherpa-onnx-wasm-main-speaker-diarization.wasm',
-  ],
-  dts: true,
-  exports: {
-    customExports(exports) {
-      exports['./module.wasm'] = './dist/sherpa-onnx-wasm-main-speaker-diarization.wasm'
-      return exports
-    },
+  entry: {
+    'index': 'src/index.ts',
+    'core': 'src/core.ts',
+    'worker-entry': 'src/web/entry.ts',
+    'node': 'src/node/index.ts',
+    'node-worker': 'src/node/entry.ts',
   },
-  tsconfig: 'tsconfig.lib.json',
+  copy: [{ from: 'src/prebuilt/sherpa-onnx-wasm-main-speaker-diarization.wasm', to: 'dist/prebuilt/sherpa-onnx-wasm-main-speaker-diarization.wasm' }],
+  dts: true,
+  plugins: [{
+    name: 'speaker-diarization-runtime-assets',
+    // Emscripten emits a Node-only import and a fallback URL relative to the
+    // original glue file. Adapt the published chunk without editing generated source.
+    renderChunk(code, chunk) {
+      if (!chunk.moduleIds.some(id => id.endsWith('/prebuilt/sherpa-onnx-wasm-main-speaker-diarization.js')))
+        return
+
+      return {
+        code: code
+          .replace(/import\(["']module["']\)/gu, 'import(/* webpackIgnore: true */ /* @vite-ignore */ "node:module")')
+          .replace(/new URL\(["']sherpa-onnx-wasm-main-speaker-diarization\.wasm["'],\s*import\.meta\.url\)/gu, 'new URL("./prebuilt/sherpa-onnx-wasm-main-speaker-diarization.wasm", import.meta.url)'),
+        map: null,
+      }
+    },
+  }],
 })

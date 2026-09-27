@@ -72,6 +72,7 @@ jobs:
           bash packages/kws/tests/scripts/prepare.sh
           packages/vad-asr/tests/scripts/prepare-models.sh
           packages/speaker-identification/tests/scripts/prepare.sh
+          packages/speaker-diarization/tests/scripts/prepare.sh
 
       - name: Build
         run: pnpm run build
