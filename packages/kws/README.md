@@ -1,6 +1,6 @@
 # @sherpaw/kws
 
-Streaming keyword spotting in browsers with a standalone Sherpa-ONNX WASM runtime. Supply mono PCM and keywords already encoded as model tokens. Models are loaded separately with `@sherpaw/preloader`; no model is bundled in the npm package.
+Streaming keyword spotting in browsers with a standalone Sherpa-ONNX WASM runtime. Supply mono PCM and keywords already encoded as model tokens. Models are loaded separately with `@sherpaw/preloader`; no model is bundled in the npm package. Callers fetch their chosen model files in JS/TS and pass the bytes to the preloader. Model URLs and download/fallback policies belong to the application.
 
 ```ts
 import { createKeywordSpotter, initKWSModule } from '@sherpaw/kws'

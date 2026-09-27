@@ -11,6 +11,9 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 
 import { decodeWavPcm16, encodeWavPcm16 } from '../../../asr/tests/helpers/wav'
 
+const modelPack = resolve(import.meta.dirname, '../../../../models/huggingface/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20/install/bin/wasm')
+const remoteModel = 'https://huggingface.co/moeru-ai/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20/resolve/1770a4b22db32184c110ac43c601db17cc9c93f8/install/bin/wasm/'
+
 const fixtures = resolve(import.meta.dirname, '../../../kws/tests/models/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20/test_wavs')
 let server: ViteDevServer
 let url: string
@@ -28,6 +31,22 @@ beforeAll(async () => {
 afterAll(async () => {
   await server?.close()
 })
+
+// Route only the two pinned HF URLs; inference still uses the real model bytes.
+async function serveRemoteModel(page: Page) {
+  const requests: string[] = []
+  for (const name of ['preload.data', 'preload.js.metadata']) {
+    await page.context().route(`${remoteModel}${name}`, async (route) => {
+      requests.push(name)
+      await route.fulfill({
+        path: resolve(modelPack, name),
+        contentType: name.endsWith('.metadata') ? 'application/json' : 'application/octet-stream',
+        headers: { 'access-control-allow-origin': '*' },
+      })
+    })
+  }
+  return requests
+}
 
 async function openKeywords(page: Page) {
   const settings = page.locator('details').filter({ has: page.locator('summary', { hasText: '关键词设置' }) })
@@ -108,6 +127,7 @@ it('keeps the active detector when a preset changes search settings but its toke
   try {
     const page = await browser.newPage()
     let modelRequests = 0
+    const remoteRequests = await serveRemoteModel(page)
     page.on('request', (request) => {
       if (request.url().includes('preload.data'))
         modelRequests++
@@ -137,6 +157,7 @@ it('keeps the active detector when a preset changes search settings but its toke
     await file(page)
     expect(await page.locator('.hit').count()).toBe(0)
     expect(modelRequests).toBe(1)
+    expect(remoteRequests).toEqual([])
   }
   finally {
     await browser.close()
@@ -421,11 +442,28 @@ it('streams fake microphone audio and releases capture and Worker when leaving t
   }
 })
 
+it('falls back to the pinned HF pack when a local model is missing', async () => {
+  const browser = await chromium.launch({ headless: true })
+  try {
+    const page = await browser.newPage()
+    await page.context().route('**/__local-models/**', route => route.fulfill({ status: 404, body: 'Missing' }))
+    const remoteRequests = await serveRemoteModel(page)
+    await page.goto(`${url}kws`, { waitUntil: 'domcontentloaded' })
+    await load(page)
+    expect(remoteRequests.sort()).toEqual(['preload.data', 'preload.js.metadata'])
+    await file(page, 'en_0.wav')
+    expect(await page.locator('.hit strong').allTextContents()).toEqual(['LIGHT UP'])
+  }
+  finally {
+    await browser.close()
+  }
+})
+
 it('recovers from failed model loading and microphone permission denial', async () => {
   const browser = await chromium.launch({ headless: true })
   try {
     const page = await browser.newPage()
-    await page.route('**/*preload*.data*', route => route.abort())
+    await page.context().route('**/*preload*.data*', route => route.abort())
     await page.goto(`${url}kws`, { waitUntil: 'domcontentloaded' })
     await openKeywords(page)
     await page.getByRole('button', { name: 'Model setup' }).click()
@@ -433,7 +471,7 @@ it('recovers from failed model loading and microphone permission denial', async 
     await expect.poll(() => page.getByRole('alert').count(), { timeout: 30000 }).toBe(1)
     expect(await page.getByRole('button', { name: '开始监听' }).isDisabled()).toBe(true)
     await page.keyboard.press('Escape')
-    await page.unroute('**/*preload*.data*')
+    await page.context().unroute('**/*preload*.data*')
     await load(page)
     await page.evaluate(() => {
       navigator.mediaDevices.getUserMedia = async () => {
@@ -460,8 +498,16 @@ it('loads the production Worker, WASM, models and microphone worklet', async () 
   const browser = await chromium.launch({ headless: true, args: createChromiumFileMicrophoneArguments(resolve(fixtures, 'zh_5.wav')) })
   try {
     const page = await browser.newPage({ permissions: ['microphone'] })
+    const remoteRequests = await serveRemoteModel(page)
+    const localRequests: string[] = []
+    page.on('request', (request) => {
+      if (request.url().includes('/__local-models/'))
+        localRequests.push(request.url())
+    })
     await page.goto(`${built.resolvedUrls!.local[0]}kws`, { waitUntil: 'domcontentloaded' })
     await load(page)
+    expect(remoteRequests.sort()).toEqual(['preload.data', 'preload.js.metadata'])
+    expect(localRequests).toEqual([])
     await file(page, 'en_0.wav')
     expect(await page.locator('.hit strong').allTextContents()).toEqual(['LIGHT UP'])
     await page.getByRole('button', { name: '开始监听' }).click()

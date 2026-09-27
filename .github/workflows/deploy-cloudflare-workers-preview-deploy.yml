@@ -155,7 +155,6 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - run: pnpm -F @sherpaw/speaker-identification run test:prepare
-      - run: bash scripts/prepare-kws-models.sh
 
       - name: Build packages
         run: pnpm --filter '@sherpaw/sandbox^...' run build

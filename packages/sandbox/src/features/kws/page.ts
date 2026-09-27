@@ -4,7 +4,6 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 
 import { startMicrophone } from '../audio/microphone'
 import { createKWSClient } from './client'
-import { modelURLs } from './models'
 import { keywordPresets } from './presets'
 
 interface Draft {
@@ -92,7 +91,7 @@ export function useKWSPlayground() {
     error.value = ''
     try {
       const keywords = entries()
-      await client.request({ type: 'load', urls: modelURLs, keywords, maxActivePaths: preset.value.maxActivePaths })
+      await client.request({ type: 'load', keywords, maxActivePaths: preset.value.maxActivePaths })
       ready.value = true
       activeLabels.value = [...new Set(keywords.map(entry => entry.label))]
       message.value = '模型已就绪，可以开始监听。'

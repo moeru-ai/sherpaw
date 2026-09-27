@@ -1,8 +1,0 @@
-{
-  "extends": "./tsconfig.tests.json",
-  "include": [
-    "src/features/speaker-identification",
-    "tests/speaker-identification",
-    "vitest.speaker.config.ts"
-  ]
-}

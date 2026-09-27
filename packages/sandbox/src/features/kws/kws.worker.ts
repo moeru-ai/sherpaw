@@ -1,10 +1,11 @@
 import type { KeywordEntry, KeywordSpotter, KWSModel, KWSModule } from '@sherpaw/kws'
-import type { DataMetadata } from '@sherpaw/preloader'
 
 import { createKeywordSpotter, initKWSModule } from '@sherpaw/kws'
 import { loadData } from '@sherpaw/preloader'
 
 import type { Reply, Request } from './protocol'
+
+import { loadKWSModel } from './models'
 
 let spotter: KeywordSpotter | undefined
 let loaded: { module: KWSModule, model: KWSModel, maxActivePaths: number } | undefined
@@ -19,10 +20,8 @@ async function handleRequest(request: Request, progress: (message: string) => vo
     const paths: KWSModel = { encoder: 'encoder.onnx', decoder: 'decoder.onnx', joiner: 'joiner.onnx', tokens: 'tokens.txt' }
     try {
       progress('正在加载模型…')
-      const [data, metadata] = await Promise.all([fetch(request.urls.data), fetch(request.urls.metadata)])
-      if (!data.ok || !metadata.ok)
-        throw new Error(`无法加载模型 (${data.status} / ${metadata.status})，请重试。`)
-      loadData({ module, data: await data.arrayBuffer(), metadata: await metadata.json() as DataMetadata })
+      const { data, metadata } = await loadKWSModel()
+      loadData({ module, data, metadata })
       progress('正在初始化关键词检测…')
       const next = createKeywordSpotter(module, { model: paths, keywords: request.keywords, maxActivePaths: request.maxActivePaths })
       spotter?.dispose()

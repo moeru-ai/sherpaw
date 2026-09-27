@@ -17,5 +17,10 @@
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
     "skipLibCheck": true
-  }
+  },
+  "include": [
+    "src/**/*.d.ts",
+    "tests",
+    "vitest.config.ts"
+  ]
 }
