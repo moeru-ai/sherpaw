@@ -71,11 +71,11 @@ it('recovers after a cloning failure without leaving the audio queue occupied', 
 
   const spotter = await createWorkerSpotter(context, config, terminate)
   const postMessage = vi.spyOn(port, 'postMessage').mockImplementationOnce(() => {
-    throw new DOMException('Uncloneable request', 'DataCloneError')
+    throw new DOMException('Could not clone request', 'DataCloneError')
   })
 
   try {
-    await expect(spotter.processAudio(new Float32Array(4), 16000)).rejects.toThrow('Uncloneable request')
+    await expect(spotter.processAudio(new Float32Array(4), 16000)).rejects.toThrow('Could not clone request')
 
     await expect(spotter.processAudio(new Float32Array(4), 16000)).resolves.toEqual([])
     expect(terminate).not.toHaveBeenCalled()

@@ -34,7 +34,7 @@ it('serves model bytes under the configured base and rejects missing or escaped 
     expect((await fetch(`${url}missing.data`)).status).toBe(404)
 
     expect((await fetch(`${url}escape.data`)).status).toBe(403)
-    expect((await fetch(`${url}..%2Fprivate.txt`)).status).toBe(403)
+    expect((await fetch(`${url}${encodeURIComponent('../private.txt')}`)).status).toBe(403)
   }
   finally {
     await server.close()
