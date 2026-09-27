@@ -2,11 +2,13 @@
 import type { AudioProcessorMessage } from '../audio-processor.protocol'
 import type { RealtimeEvent, RealtimeSnapshot } from '../features/asr/realtime-metrics'
 import type { AsrBackend, Recognizer } from '../features/asr/types'
-import { PopoverArrow, PopoverClose, PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
+import { PopoverClose } from 'reka-ui'
 import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue'
 import audioProcessor from '../audio-processor.worklet?worker&url'
 import Button from '../components/Button.vue'
 import ModelSetup from '../components/ModelSetup.vue'
+import ModelSetupPopover from '../components/ModelSetupPopover.vue'
+import SandboxLayout from '../components/SandboxLayout.vue'
 import { asrModels } from '../features/asr/catalog'
 import { RealtimeMetrics } from '../features/asr/realtime-metrics'
 import { provideASRStore } from '../store'
@@ -270,105 +272,80 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div h-dvh w-full font-sans flex="~ col items-center justify-start">
-    <header p-6 w-full flex="~ col md:row items-center justify-between gap-4 shrink-0">
-      <div flex="~ col items-center md:items-start">
-        <RouterLink to="/" text-xl md:text-3xl font-black>
-          Sherpa-ONNX WASM
-        </RouterLink>
-        <div font-semibold>
-          ASR Sandbox
+  <SandboxLayout title="ASR" h-dvh>
+    <template #setup>
+      <ModelSetupPopover v-model:open="setupOpen" :ready="modelLoaded" :disabled="phase === 'recording' || phase === 'stopping'">
+        <div p-4 flex="~ col gap-3" class="max-h-[80dvh] overflow-auto">
+          <div flex="~ row items-center justify-between">
+            <h2 font-semibold>
+              Model setup
+            </h2>
+            <PopoverClose aria-label="Close model setup" rounded p-2 bg="hover:neutral/10">
+              <span i-ri:close-line block />
+            </PopoverClose>
+          </div>
+          <label for="asr-model" font-semibold>ASR model</label>
+          <select id="asr-model" v-model="model" :disabled="phase !== 'idle'" b rounded-lg p-2 bg-white>
+            <option value="paraformer">
+              Paraformer zh-en
+            </option>
+            <option v-for="entry in asrModels" :key="entry.id" :value="entry.id">
+              {{ entry.label }}
+            </option>
+          </select>
+          <p v-if="selectedModel" text-sm>
+            Model weights: {{ Math.round(selectedModel.modelBytes / 1e6) }} MB. Streaming recognition.
+          </p>
+          <label for="asr-backend" font-semibold>Inference backend</label>
+          <select id="asr-backend" v-model="backend" :disabled="phase !== 'idle'" b rounded-lg p-2 bg-white>
+            <option value="cpu">
+              CPU / WASM
+            </option>
+            <option v-if="model === 'x-asr-fp32'" value="webgpu-encoder">
+              WebGPU — FP32 encoder, CPU decoder/joiner (experimental)
+            </option>
+            <option v-if="model === 'paraformer'" value="webgpu-fp32">
+              WebGPU — FP32 encoder + decoder (experimental)
+            </option>
+            <option v-if="model === 'paraformer'" value="webgpu">
+              WebGPU — encoder + decoder (experimental)
+            </option>
+            <option v-if="model === 'paraformer'" value="webgpu-decoder">
+              WebGPU — decoder only (experimental)
+            </option>
+            <option v-if="model === 'paraformer'" value="custom">
+              CPU / WASM — custom model
+            </option>
+          </select>
+          <template v-if="backend !== 'custom'">
+            <p text-sm>
+              Load the model here, or press Start to load it and open the microphone.
+            </p>
+            <Button v-if="!modelLoaded" :disabled="phase !== 'idle'" @click="loadModel">
+              {{ phase === 'loading' ? 'Loading model…' : 'Load model' }}
+            </Button>
+          </template>
+          <ModelSetup v-else />
+          <p text-sm>
+            {{ status }}
+          </p>
+          <details v-if="measurement" text-sm>
+            <summary cursor-pointer>
+              Recognition diagnostics
+            </summary>
+            <dl mt-3 grid="~ cols-2 gap-2" aria-label="Realtime metrics">
+              <dt>Audio processed</dt><dd>{{ measurement.processedAudioSeconds.toFixed(1) }} s</dd>
+              <dt>First text</dt><dd>{{ measurement.firstTextMs === null ? 'Waiting…' : `${Math.round(measurement.firstTextMs)} ms` }}</dd>
+              <dt>Processing delay p95</dt><dd>{{ Math.round(measurement.audioEndToCompletionP95Ms) }} ms</dd>
+              <dt>Peak unprocessed audio</dt><dd>{{ measurement.maxOutstandingSeconds.toFixed(2) }} s</dd>
+            </dl>
+            <p mt-2 text-xs>
+              First text includes leading silence. Processing delay measures audio batches, not individual words.
+            </p>
+          </details>
         </div>
-      </div>
-
-      <PopoverRoot v-model:open="setupOpen">
-        <PopoverTrigger
-          :disabled="phase === 'recording' || phase === 'stopping'"
-          flex="~ row items-center gap-2" bg="transparent hover:neutral/10"
-          rounded-2xl p-2 md:p-4 transition="background-color 300" text-sm lg:text-base
-        >
-          <span uppercase>Model setup</span>
-          <span i-ri:ai-generate-3d-line text-xl :class="{ 'op-50': !modelLoaded }" />
-        </PopoverTrigger>
-        <PopoverPortal>
-          <PopoverContent
-            side="bottom" :side-offset="0" rounded-lg bg-white shadow-sm b m-4
-            class="w-[460px] max-w-[calc(100dvw-2rem)] max-h-[80dvh] overflow-auto"
-          >
-            <div p-4 flex="~ col gap-3">
-              <div flex="~ row items-center justify-between">
-                <h2 font-semibold>
-                  Model setup
-                </h2>
-                <PopoverClose aria-label="Close model setup" rounded p-2 bg="hover:neutral/10">
-                  <span i-ri:close-line block />
-                </PopoverClose>
-              </div>
-              <label for="asr-model" font-semibold>ASR model</label>
-              <select id="asr-model" v-model="model" :disabled="phase !== 'idle'" b rounded-lg p-2 bg-white>
-                <option value="paraformer">
-                  Paraformer zh-en
-                </option>
-                <option v-for="entry in asrModels" :key="entry.id" :value="entry.id">
-                  {{ entry.label }}
-                </option>
-              </select>
-              <p v-if="selectedModel" text-sm>
-                Model weights: {{ Math.round(selectedModel.modelBytes / 1e6) }} MB. Streaming recognition.
-              </p>
-              <label for="asr-backend" font-semibold>Inference backend</label>
-              <select id="asr-backend" v-model="backend" :disabled="phase !== 'idle'" b rounded-lg p-2 bg-white>
-                <option value="cpu">
-                  CPU / WASM
-                </option>
-                <option v-if="model === 'x-asr-fp32'" value="webgpu-encoder">
-                  WebGPU — FP32 encoder, CPU decoder/joiner (experimental)
-                </option>
-                <option v-if="model === 'paraformer'" value="webgpu-fp32">
-                  WebGPU — FP32 encoder + decoder (experimental)
-                </option>
-                <option v-if="model === 'paraformer'" value="webgpu">
-                  WebGPU — encoder + decoder (experimental)
-                </option>
-                <option v-if="model === 'paraformer'" value="webgpu-decoder">
-                  WebGPU — decoder only (experimental)
-                </option>
-                <option v-if="model === 'paraformer'" value="custom">
-                  CPU / WASM — custom model
-                </option>
-              </select>
-              <template v-if="backend !== 'custom'">
-                <p text-sm>
-                  Load the model here, or press Start to load it and open the microphone.
-                </p>
-                <Button v-if="!modelLoaded" :disabled="phase !== 'idle'" @click="loadModel">
-                  {{ phase === 'loading' ? 'Loading model…' : 'Load model' }}
-                </Button>
-              </template>
-              <ModelSetup v-else />
-              <p text-sm>
-                {{ status }}
-              </p>
-              <details v-if="measurement" text-sm>
-                <summary cursor-pointer>
-                  Recognition diagnostics
-                </summary>
-                <dl mt-3 grid="~ cols-2 gap-2" aria-label="Realtime metrics">
-                  <dt>Audio processed</dt><dd>{{ measurement.processedAudioSeconds.toFixed(1) }} s</dd>
-                  <dt>First text</dt><dd>{{ measurement.firstTextMs === null ? 'Waiting…' : `${Math.round(measurement.firstTextMs)} ms` }}</dd>
-                  <dt>Processing delay p95</dt><dd>{{ Math.round(measurement.audioEndToCompletionP95Ms) }} ms</dd>
-                  <dt>Peak unprocessed audio</dt><dd>{{ measurement.maxOutstandingSeconds.toFixed(2) }} s</dd>
-                </dl>
-                <p mt-2 text-xs>
-                  First text includes leading silence. Processing delay measures audio batches, not individual words.
-                </p>
-              </details>
-            </div>
-            <PopoverArrow class="fill-white stroke-gray-200" />
-          </PopoverContent>
-        </PopoverPortal>
-      </PopoverRoot>
-    </header>
+      </ModelSetupPopover>
+    </template>
 
     <main p-4 w-full min-h-0 flex="~ col items-center justify-center gap-6 grow-1">
       <h1 v-if="phase !== 'recording' && phase !== 'stopping'" text-4xl md:text-6xl lg:text-8xl font-semibold>
@@ -396,5 +373,5 @@ onBeforeUnmount(() => {
         Stop transcription
       </Button>
     </main>
-  </div>
+  </SandboxLayout>
 </template>

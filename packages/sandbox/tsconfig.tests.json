@@ -20,7 +20,9 @@
     "skipLibCheck": true
   },
   "include": [
-    "tests/asr",
+    "src/**/*.d.ts",
+    "tests",
+    "vitest.config.ts",
     "src/features/asr",
     "vitest.asr-realtime.config.ts"
   ]

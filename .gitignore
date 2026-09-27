@@ -186,3 +186,7 @@ packages/sandbox/public/asr-runtime/
 
 # Generated X-ASR preload package manifests (published inside HF model repos)
 models/sherpa-onnx-x-asr-*/package-manifest.json
+
+# Private keyword recording notes
+docs/research/kws-iru-recording.md
+docs/research/kws-feiyu-recording.md
