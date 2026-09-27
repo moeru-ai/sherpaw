@@ -33,3 +33,15 @@ defineProps<{ ready?: boolean }>()
     </PopoverPortal>
   </PopoverRoot>
 </template>
+
+<style>
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+</style>

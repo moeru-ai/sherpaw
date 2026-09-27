@@ -9,14 +9,14 @@ export interface KeywordPreset {
 }
 
 // Encoded for the bundled phone+partial-pinyin model, not a text converter.
-// HEY/HELLO follow its en.phone lexicon. The recorded 伊噜 pronunciation matches
+// HEY/HELLO follow its en.phone lexicon. The recorded ee-roo pronunciation matches
 // the model's L better than its English R; keep this mapping editable.
 export const keywordPresets: KeywordPreset[] = [
   {
     id: 'english',
     maxActivePaths: 16,
     name: 'Iru · English',
-    note: 'Iru 按「伊噜」发音，使用贴近「噜」的发音编码；可编辑 token 调整。',
+    note: 'Pronounce Iru as “ee-roo”. Edit the tokens to adjust pronunciation.',
     entries: [
       {
         label: 'Hey Iru',
@@ -50,8 +50,8 @@ export const keywordPresets: KeywordPreset[] = [
   {
     id: 'chinese',
     maxActivePaths: 32,
-    name: '肥鱼 · 中文',
-    note: '保留普通话拼音，并兼容录音中「肥」被模型编码为一声的情况。',
+    name: 'Feiyu · Chinese',
+    note: 'Mandarin pronunciations with alternate tones for Feiyu.',
     entries: [
       {
         label: '你好肥鱼',

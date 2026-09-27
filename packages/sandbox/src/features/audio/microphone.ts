@@ -78,7 +78,7 @@ export async function startMicrophone(signal: AbortSignal, onAudio: (samples: Fl
     }
     signal.throwIfAborted()
     if (!stream)
-      throw new Error('当前浏览器不支持麦克风采集。')
+      throw new Error('This browser does not support microphone capture.')
     source = context.createMediaStreamSource(stream)
     capture = new AudioWorkletNode(context, 'microphone-capture')
     capture.port.onmessage = collect

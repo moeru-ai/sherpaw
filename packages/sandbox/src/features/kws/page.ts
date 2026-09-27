@@ -19,7 +19,7 @@ export function useKWSPlayground() {
   const busy = ref('')
   const listening = ref(false)
   const error = ref('')
-  const message = ref('先加载模型，再开始监听或选择音频文件。')
+  const message = ref('Load a model to start listening or test an audio file.')
   const seconds = ref(0)
   const activeLabels = ref<string[]>([])
   const history = ref<(Detection & { id: number, source: string })[]>([])
@@ -60,7 +60,7 @@ export function useKWSPlayground() {
     if (ready.value)
       await applyKeywords()
     else
-      message.value = '已选择预设，加载模型后开始检测。'
+      message.value = 'Preset selected. Load the model to begin.'
   }
 
   function entries(): KeywordEntry[] {
@@ -94,11 +94,11 @@ export function useKWSPlayground() {
       await client.request({ type: 'load', keywords, maxActivePaths: preset.value.maxActivePaths })
       ready.value = true
       activeLabels.value = [...new Set(keywords.map(entry => entry.label))]
-      message.value = '模型已就绪，可以开始监听。'
+      message.value = 'Model ready.'
     }
     catch (cause) {
       reportError(cause)
-      message.value = '模型未加载，请检查词表或重试。'
+      message.value = 'Could not load the model. Check your keywords and try again.'
     }
     finally {
       busy.value = ''
@@ -112,11 +112,11 @@ export function useKWSPlayground() {
       await client.request({ type: 'keywords', keywords, maxActivePaths: preset.value.maxActivePaths })
       activeLabels.value = [...new Set(keywords.map(entry => entry.label))]
       seconds.value = 0
-      message.value = keywords.length ? '词表已更新，音频状态已重置。' : '检测已暂停；应用词表后恢复。'
+      message.value = keywords.length ? 'Keywords updated. Audio state reset.' : 'Detection paused. Apply keywords to resume.'
     }
     catch (cause) {
       reportError(cause)
-      message.value = '更新失败，继续使用原词表。'
+      message.value = 'Update failed. The previous keywords remain active.'
     }
     finally {
       busy.value = ''
@@ -149,7 +149,7 @@ export function useKWSPlayground() {
     microphone?.abort()
     microphone = undefined
     listening.value = false
-    message.value = '监听已停止，麦克风已释放。'
+    message.value = 'Listening stopped. Microphone released.'
   }
 
   /** Triggering workflow: kws.vue start button `click` -> {@link listen} -> client.request `reset` -> {@link startMicrophone}. */
@@ -171,7 +171,7 @@ export function useKWSPlayground() {
         return
       void client.request({ type: 'audio', samples, sampleRate }).then((hits) => {
         if (!disposed && generation === inputGeneration)
-          record(hits, '麦克风')
+          record(hits, 'Microphone')
       }).catch((cause: unknown) => {
         if (!disposed && generation === inputGeneration) {
           stopMicrophone()
@@ -198,7 +198,7 @@ export function useKWSPlayground() {
           }
         }
       })
-      message.value = '正在监听，命中后会自动继续检测。'
+      message.value = 'Listening for keywords.'
     }
     catch (cause) {
       if (!controller.signal.aborted && !disposed) {
@@ -225,7 +225,7 @@ export function useKWSPlayground() {
     const context = new AudioContext({ sampleRate: 16000 })
     fileContext = context
     try {
-      message.value = `正在读取 ${file.name}…`
+      message.value = `Reading ${file.name}…`
       const decoded = await context.decodeAudioData(await file.arrayBuffer())
       if (disposed)
         return
@@ -247,14 +247,14 @@ export function useKWSPlayground() {
           return
         record(hits, file.name)
         seconds.value = Math.min((offset + 1600) / decoded.sampleRate, decoded.duration)
-        message.value = `正在检测 ${file.name} · ${seconds.value.toFixed(1)} / ${decoded.duration.toFixed(1)} 秒`
+        message.value = `Processing ${file.name} · ${seconds.value.toFixed(1)} / ${decoded.duration.toFixed(1)} s`
       }
-      message.value = `${file.name} 检测完成。`
+      message.value = `${file.name} complete.`
     }
     catch (cause) {
       if (!disposed) {
         reportError(cause)
-        message.value = '文件检测未完成，请检查音频后重试。'
+        message.value = 'Could not process this audio file. Check the file and try again.'
       }
     }
     finally {

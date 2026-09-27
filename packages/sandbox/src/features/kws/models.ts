@@ -9,7 +9,7 @@ const remote = `https://huggingface.co/moeru-ai/${model}/resolve/${revision}/ins
 async function fetchPack(fetchFile: (filename: string) => Promise<Response>) {
   const [data, metadata] = await Promise.all([fetchFile('preload.data'), fetchFile('preload.js.metadata')])
   if (!data.ok || !metadata.ok)
-    throw new Error(`无法加载模型 (${data.status} / ${metadata.status})，请重试。`)
+    throw new Error(`Could not load the model (${data.status} / ${metadata.status}). Please try again.`)
   return { data: await data.arrayBuffer(), metadata: await metadata.json() as DataMetadata }
 }
 

@@ -15,14 +15,14 @@ let queue = Promise.resolve()
 /** Triggering workflow: client.request -> {@link enqueue} -> {@link handleRequest} -> KWS API and progress replies. */
 async function handleRequest(request: Request, progress: (message: string) => void) {
   if (request.type === 'load') {
-    progress('正在加载语音引擎…')
+    progress('Loading speech engine…')
     const module = await initKWSModule()
     const paths: KWSModel = { encoder: 'encoder.onnx', decoder: 'decoder.onnx', joiner: 'joiner.onnx', tokens: 'tokens.txt' }
     try {
-      progress('正在加载模型…')
+      progress('Loading model…')
       const { data, metadata } = await loadKWSModel()
       loadData({ module, data, metadata })
-      progress('正在初始化关键词检测…')
+      progress('Initializing keyword detection…')
       const next = createKeywordSpotter(module, { model: paths, keywords: request.keywords, maxActivePaths: request.maxActivePaths })
       spotter?.dispose()
       spotter = next
@@ -39,7 +39,7 @@ async function handleRequest(request: Request, progress: (message: string) => vo
     return []
   }
   if (!spotter || !loaded)
-    throw new Error('请先加载模型。')
+    throw new Error('Load a model first.')
   if (request.type === 'audio')
     return spotter.processAudio(request.samples, request.sampleRate)
   const next = request.type === 'keywords' ? request.keywords : keywords

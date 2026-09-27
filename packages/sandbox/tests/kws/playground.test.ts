@@ -48,8 +48,17 @@ async function serveRemoteModel(page: Page) {
   return requests
 }
 
+async function closeSetup(page: Page) {
+  if (await page.getByLabel('Model settings').isVisible()) {
+    await page.getByRole('button', { name: 'Model setup' }).click()
+    await page.getByLabel('Model settings').waitFor({ state: 'hidden' })
+  }
+}
+
 async function openKeywords(page: Page) {
-  const settings = page.locator('details').filter({ has: page.locator('summary', { hasText: '关键词设置' }) })
+  if (!await page.getByLabel('Model settings').isVisible())
+    await page.getByRole('button', { name: 'Model setup' }).click()
+  const settings = page.locator('details').filter({ has: page.locator('summary', { hasText: 'Keywords' }) })
   if (await settings.getAttribute('open') === null)
     await settings.locator('summary').click()
 }
@@ -65,16 +74,15 @@ async function load(page: Page, useFixtureKeywords = true) {
       { label: 'LIGHT UP', tokens: 'L AY1 T AH1 P' },
     ]
     for (const [index, keyword] of keywords.entries()) {
-      await page.getByLabel(`关键词 ${index + 1} 名称`).fill(keyword.label)
-      await page.getByLabel(`关键词 ${index + 1} tokens`).fill(keyword.tokens)
-      await page.getByLabel(`关键词 ${index + 1} 分数`).fill('1')
-      await page.getByLabel(`关键词 ${index + 1} 阈值`).fill('0.25')
+      await page.getByLabel(`Keyword ${index + 1} label`).fill(keyword.label)
+      await page.getByLabel(`Keyword ${index + 1} tokens`).fill(keyword.tokens)
+      await page.getByLabel(`Keyword ${index + 1} score`).fill('1')
+      await page.getByLabel(`Keyword ${index + 1} threshold`).fill('0.25')
     }
   }
-  await page.getByRole('button', { name: 'Model setup' }).click()
-  await page.getByRole('button', { name: '加载模型', exact: true }).click()
-  await expect.poll(() => page.getByRole('button', { name: '开始监听', exact: true }).isEnabled(), { timeout: 30000 }).toBe(true)
-  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Initialize', exact: true }).click()
+  await expect.poll(() => page.getByRole('button', { name: 'Start', exact: true }).isEnabled(), { timeout: 30000 }).toBe(true)
+  await closeSetup(page)
 }
 
 it('activates selected presets immediately with the real model and keeps manual edits explicit', async () => {
@@ -95,7 +103,8 @@ it('activates selected presets immediately with the real model and keeps manual 
       expect(await page.locator('.hit').count()).toBe(0)
     }
 
-    await page.getByRole('button', { name: '肥鱼 · 中文' }).click()
+    await openKeywords(page)
+    await page.getByLabel('Preset', { exact: true }).selectOption('chinese')
     expect(await labels()).toEqual(chinese)
     await expect.poll(() => page.locator('.active-words .word').allTextContents()).toEqual(chinese)
     expect(await page.getByRole('alert').count()).toBe(0)
@@ -105,15 +114,19 @@ it('activates selected presets immediately with the real model and keeps manual 
     }
 
     // Editing a preset must not modify its definition when selected again.
-    await page.getByLabel('关键词 1 名称').fill('edited')
+    await openKeywords(page)
+    await page.getByLabel('Keyword 1 label').fill('edited')
     expect(await page.locator('.active-words .word').allTextContents()).toEqual(chinese)
-    await page.getByRole('button', { name: 'Iru · English' }).click()
+    await openKeywords(page)
+    await page.getByLabel('Preset', { exact: true }).selectOption('english')
     await expect.poll(() => page.locator('.active-words .word').allTextContents()).toEqual(english)
     expect(await labels()).toEqual(english)
-    await page.getByRole('button', { name: '肥鱼 · 中文' }).click()
+    await openKeywords(page)
+    await page.getByLabel('Preset', { exact: true }).selectOption('chinese')
     await expect.poll(() => page.locator('.active-words .word').allTextContents()).toEqual(chinese)
     expect(await labels()).toEqual(chinese)
-    await page.getByRole('button', { name: 'Iru · English' }).click()
+    await openKeywords(page)
+    await page.getByLabel('Preset', { exact: true }).selectOption('english')
     await expect.poll(() => page.locator('.active-words .word').allTextContents()).toEqual(english)
     await page.screenshot({ path: '/tmp/sherpaw-kws-presets.png', fullPage: true })
   }
@@ -147,13 +160,16 @@ it('keeps the active detector when a preset changes search settings but its toke
         return post.call(this, message, transfer as StructuredSerializeOptions)
       }
     })
-    await page.getByRole('button', { name: '肥鱼 · 中文' }).click()
+    await openKeywords(page)
+    await page.getByLabel('Preset', { exact: true }).selectOption('chinese')
     await expect.poll(() => page.getByRole('alert').textContent()).toContain('token')
     await file(page)
     expect(await page.locator('.hit strong').allTextContents()).toEqual(['落实', '周望军'])
-    await page.getByRole('button', { name: '应用词表' }).click()
+    await openKeywords(page)
+    await page.getByRole('button', { name: 'Apply' }).click()
     await expect.poll(() => page.locator('.active-words .word').allTextContents()).toEqual(['你好肥鱼', '大肥鱼', '肥鱼肥鱼'])
-    await page.getByRole('button', { name: '清空记录' }).click()
+    await closeSetup(page)
+    await page.getByRole('button', { name: 'Clear detections' }).click()
     await file(page)
     expect(await page.locator('.hit').count()).toBe(0)
     expect(modelRequests).toBe(1)
@@ -165,8 +181,9 @@ it('keeps the active detector when a preset changes search settings but its toke
 })
 
 async function file(page: Page, filename = 'zh_5.wav') {
-  await page.getByLabel('测试音频文件').setInputFiles(resolve(fixtures, filename))
-  await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain('检测完成')
+  await closeSetup(page)
+  await page.getByLabel('Test audio file').setInputFiles(resolve(fixtures, filename))
+  await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain('complete')
 }
 
 // Private recordings stay outside the repository and are supplied explicitly.
@@ -184,29 +201,34 @@ it.skipIf(!recording)('detects all Iru phrases in a local recording through file
     const { samples, sampleRate } = decodeWavPcm16(Uint8Array.from(await readFile(recording!)).buffer)
     // These frame offsets exposed misses despite the unmodified file passing.
     for (const paddingMs of [160, 480]) {
-      await page.getByRole('button', { name: '清空记录' }).click()
+      await closeSetup(page)
+      await page.getByRole('button', { name: 'Clear detections' }).click()
       const padded = new Float32Array(samples.length + Math.round(sampleRate * paddingMs / 1000))
       padded.set(samples, padded.length - samples.length)
       const name = `offset-${paddingMs}.wav`
-      await page.getByLabel('测试音频文件').setInputFiles({ name, mimeType: 'audio/wav', buffer: Buffer.from(encodeWavPcm16(padded, sampleRate)) })
-      await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain(`${name} 检测完成`)
+      await page.getByLabel('Test audio file').setInputFiles({ name, mimeType: 'audio/wav', buffer: Buffer.from(encodeWavPcm16(padded, sampleRate)) })
+      await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain(`${name} complete`)
       expect(await page.locator('.hit strong').allTextContents()).toEqual(expected)
     }
     // A complete phrase is required: neither one name, the greeting alone,
     // nor a final syllable may become a hit after candidate expansion.
     for (const [name, start, end] of [['single-iru', 8.45, 9.04], ['hello-only', 5.10, 5.95], ['final-syllable', 3.70, 4.35]] as const) {
-      if (await page.locator('.hit').count())
-        await page.getByRole('button', { name: '清空记录' }).click()
+      if (await page.locator('.hit').count()) {
+        await closeSetup(page)
+        await page.getByRole('button', { name: 'Clear detections' }).click()
+      }
       const crop = samples.slice(Math.round(start * sampleRate), Math.round(end * sampleRate))
       const padded = new Float32Array(sampleRate + crop.length)
       padded.set(crop, sampleRate)
-      await page.getByLabel('测试音频文件').setInputFiles({ name: `${name}.wav`, mimeType: 'audio/wav', buffer: Buffer.from(encodeWavPcm16(padded, sampleRate)) })
-      await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain(`${name}.wav 检测完成`)
+      await page.getByLabel('Test audio file').setInputFiles({ name: `${name}.wav`, mimeType: 'audio/wav', buffer: Buffer.from(encodeWavPcm16(padded, sampleRate)) })
+      await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain(`${name}.wav complete`)
       expect(await page.locator('.hit').count()).toBe(0)
     }
-    await page.getByRole('button', { name: '开始监听' }).click()
+    await closeSetup(page)
+    await page.getByRole('button', { name: 'Start' }).click()
     await expect.poll(() => page.locator('.hit strong').allTextContents(), { timeout: 20000 }).toEqual(expected)
-    await page.getByRole('button', { name: '停止监听' }).click()
+    await closeSetup(page)
+    await page.getByRole('button', { name: 'Stop listening' }).click()
     expect(await page.getByRole('alert').count()).toBe(0)
   }
   finally {
@@ -234,11 +256,12 @@ it.skipIf(!repeatedRecording)('detects mixed-language Hello Iru pronunciations i
     ])
     const { samples, sampleRate } = decodeWavPcm16(Uint8Array.from(await readFile(repeatedRecording!)).buffer)
     // Retain the previously passing shifted alignment as a separate check.
-    await page.getByRole('button', { name: '清空记录' }).click()
+    await closeSetup(page)
+    await page.getByRole('button', { name: 'Clear detections' }).click()
     const padded = new Float32Array(samples.length + Math.round(sampleRate * 0.16))
     padded.set(samples, padded.length - samples.length)
-    await page.getByLabel('测试音频文件').setInputFiles({ name: 'repeated-offset.wav', mimeType: 'audio/wav', buffer: Buffer.from(encodeWavPcm16(padded, sampleRate)) })
-    await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain('repeated-offset.wav 检测完成')
+    await page.getByLabel('Test audio file').setInputFiles({ name: 'repeated-offset.wav', mimeType: 'audio/wav', buffer: Buffer.from(encodeWavPcm16(padded, sampleRate)) })
+    await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain('repeated-offset.wav complete')
     expect(await page.locator('.hit strong').allTextContents()).toEqual([
       'Hello Iru',
       'Hello Iru',
@@ -250,11 +273,12 @@ it.skipIf(!repeatedRecording)('detects mixed-language Hello Iru pronunciations i
     ])
     // Fresh stream state must also detect each complete Hello phrase.
     for (const [start, end] of [[5.5, 8.3], [12, 14.5], [14.7, 16.8], [17, 19.5], [19.7, 22]] as const) {
-      await page.getByRole('button', { name: '清空记录' }).click()
+      await closeSetup(page)
+      await page.getByRole('button', { name: 'Clear detections' }).click()
       const name = `hello-${start}.wav`
       const buffer = Buffer.from(encodeWavPcm16(samples.slice(Math.round(start * sampleRate), Math.round(end * sampleRate)), sampleRate))
-      await page.getByLabel('测试音频文件').setInputFiles({ name, mimeType: 'audio/wav', buffer })
-      await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain(`${name} 检测完成`)
+      await page.getByLabel('Test audio file').setInputFiles({ name, mimeType: 'audio/wav', buffer })
+      await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain(`${name} complete`)
       expect(await page.locator('.hit strong').allTextContents()).toEqual(['Hello Iru'])
     }
   }
@@ -270,7 +294,7 @@ it.skipIf(!chineseRecording)('recovers Chinese preset phrases in a local recordi
     const page = await browser.newPage({ permissions: ['microphone'] })
     await page.goto(`${url}kws`, { waitUntil: 'domcontentloaded' })
     await openKeywords(page)
-    await page.getByRole('button', { name: '肥鱼 · 中文' }).click()
+    await page.getByLabel('Preset', { exact: true }).selectOption('chinese')
     await load(page, false)
     await file(page, chineseRecording!)
     // Six of eight phrases are recovered; the last two repeated-name phrases
@@ -278,18 +302,21 @@ it.skipIf(!chineseRecording)('recovers Chinese preset phrases in a local recordi
     const expected = ['大肥鱼', '你好肥鱼', '大肥鱼', '大肥鱼', '肥鱼肥鱼', '肥鱼肥鱼']
     expect(await page.locator('.hit strong').allTextContents()).toEqual(expected)
 
-    await page.getByRole('button', { name: '清空记录' }).click()
+    await closeSetup(page)
+    await page.getByRole('button', { name: 'Clear detections' }).click()
     const { samples, sampleRate } = decodeWavPcm16(Uint8Array.from(await readFile(chineseRecording!)).buffer)
     const buffer = Buffer.from(encodeWavPcm16(samples.slice(Math.round(16.6 * sampleRate), Math.round(17.8 * sampleRate)), sampleRate))
-    await page.getByLabel('测试音频文件').setInputFiles({ name: 'single-name.wav', mimeType: 'audio/wav', buffer })
-    await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain('single-name.wav 检测完成')
+    await page.getByLabel('Test audio file').setInputFiles({ name: 'single-name.wav', mimeType: 'audio/wav', buffer })
+    await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain('single-name.wav complete')
     expect(await page.locator('.hit').count()).toBe(0)
 
-    await page.getByRole('button', { name: '开始监听' }).click()
+    await closeSetup(page)
+    await page.getByRole('button', { name: 'Start' }).click()
     // Live capture changes frame alignment. Require at least the previous
     // three-hit floor and only correctly ordered labels from the full recording.
     await expect.poll(async () => Number.parseFloat((await page.locator('.time').textContent()) ?? '0'), { timeout: 35000 }).toBeGreaterThanOrEqual(26)
-    await page.getByRole('button', { name: '停止监听' }).click()
+    await closeSetup(page)
+    await page.getByRole('button', { name: 'Stop listening' }).click()
     const hits = await page.locator('.hit strong').allTextContents()
     expect(hits.length).toBeGreaterThanOrEqual(3)
     const fullSequence = ['肥鱼肥鱼', '大肥鱼', '肥鱼肥鱼', '你好肥鱼', '大肥鱼', '大肥鱼', '肥鱼肥鱼', '肥鱼肥鱼']
@@ -315,14 +342,14 @@ it.skipIf(!naturalRecording)('retains the repeated-name prefix while competing k
     const page = await browser.newPage()
     await page.goto(`${url}kws`, { waitUntil: 'domcontentloaded' })
     await openKeywords(page)
-    await page.getByRole('button', { name: '肥鱼 · 中文' }).click()
+    await page.getByLabel('Preset', { exact: true }).selectOption('chinese')
     await load(page, false)
     // Keep the original leading audio and frame alignment. The 16-path preset
     // detected the first attempt, then discarded the second attempt's prefix.
     const { samples, sampleRate } = decodeWavPcm16(Uint8Array.from(await readFile(naturalRecording!)).buffer)
     const buffer = Buffer.from(encodeWavPcm16(samples.slice(0, Math.round(9.5 * sampleRate)), sampleRate))
-    await page.getByLabel('测试音频文件').setInputFiles({ name: 'repeated-prefix.wav', mimeType: 'audio/wav', buffer })
-    await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain('repeated-prefix.wav 检测完成')
+    await page.getByLabel('Test audio file').setInputFiles({ name: 'repeated-prefix.wav', mimeType: 'audio/wav', buffer })
+    await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain('repeated-prefix.wav complete')
     expect(await page.locator('.hit strong').allTextContents()).toEqual(['肥鱼肥鱼', '肥鱼肥鱼'])
   }
   finally {
@@ -337,7 +364,7 @@ it.skipIf(!naturalRecording)('detects all seven natural repeated-name utterances
     const page = await browser.newPage()
     await page.goto(`${url}kws`, { waitUntil: 'domcontentloaded' })
     await openKeywords(page)
-    await page.getByRole('button', { name: '肥鱼 · 中文' }).click()
+    await page.getByLabel('Preset', { exact: true }).selectOption('chinese')
     await load(page, false)
     await file(page, naturalRecording!)
     expect(await page.getByRole('alert').count()).toBe(0)
@@ -359,37 +386,49 @@ it('uses the real Worker for files, replaces keywords atomically, pauses and res
     await load(page)
     await file(page)
     expect(await page.locator('.hit strong').allTextContents()).toEqual(['落实', '周望军'])
-    await page.locator('.hit').first().getByText('Token 时间戳').click()
+    await page.locator('.hit').first().getByText('Token timestamps').click()
     expect(await page.locator('.token-times span').count()).toBeGreaterThan(0)
     await page.screenshot({ path: '/tmp/sherpaw-kws-playground.png', fullPage: true })
 
-    await page.getByRole('button', { name: '清空记录' }).click()
+    await closeSetup(page)
+    await page.getByRole('button', { name: 'Clear detections' }).click()
     await file(page, 'en_0.wav')
     expect(await page.locator('.hit strong').allTextContents()).toEqual(['LIGHT UP'])
 
-    await page.getByRole('button', { name: '删除关键词 3' }).click()
-    await page.getByRole('button', { name: '删除关键词 1' }).click()
-    await page.getByRole('button', { name: '应用词表' }).click()
+    await openKeywords(page)
+    await page.getByRole('button', { name: 'Remove keyword 3' }).click()
+    await openKeywords(page)
+    await page.getByRole('button', { name: 'Remove keyword 1' }).click()
+    await openKeywords(page)
+    await page.getByRole('button', { name: 'Apply' }).click()
     await expect.poll(() => page.locator('.active-words .word').allTextContents()).toEqual(['落实'])
-    await page.getByRole('button', { name: '清空记录' }).click()
+    await closeSetup(page)
+    await page.getByRole('button', { name: 'Clear detections' }).click()
     await file(page)
     expect(await page.locator('.hit strong').allTextContents()).toEqual(['落实'])
 
-    await page.getByLabel('关键词 1 tokens').fill('NOT_A_MODEL_TOKEN')
-    await page.getByRole('button', { name: '应用词表' }).click()
+    await openKeywords(page)
+    await page.getByLabel('Keyword 1 tokens').fill('NOT_A_MODEL_TOKEN')
+    await openKeywords(page)
+    await page.getByRole('button', { name: 'Apply' }).click()
     await expect.poll(() => page.getByRole('alert').textContent()).toContain('unknown keyword token')
     expect(await page.locator('.active-words .word').allTextContents()).toEqual(['落实'])
-    await page.getByRole('button', { name: '清空记录' }).click()
+    await closeSetup(page)
+    await page.getByRole('button', { name: 'Clear detections' }).click()
     await file(page)
     expect(await page.locator('.hit strong').allTextContents()).toEqual(['落实'])
 
-    await page.getByRole('button', { name: '暂停检测' }).click()
-    await expect.poll(() => page.getByLabel('测试音频文件').isDisabled()).toBe(true)
+    await openKeywords(page)
+    await page.getByRole('button', { name: 'Pause detection' }).click()
+    await expect.poll(() => page.getByLabel('Test audio file').isDisabled()).toBe(true)
     await expect.poll(() => page.locator('.active-words .word').count()).toBe(0)
-    await page.getByLabel('关键词 1 tokens').fill('l uò sh í')
-    await page.getByRole('button', { name: '应用词表' }).click()
-    await expect.poll(() => page.getByLabel('测试音频文件').isEnabled()).toBe(true)
-    await page.getByRole('button', { name: '清空记录' }).click()
+    await openKeywords(page)
+    await page.getByLabel('Keyword 1 tokens').fill('l uò sh í')
+    await openKeywords(page)
+    await page.getByRole('button', { name: 'Apply' }).click()
+    await expect.poll(() => page.getByLabel('Test audio file').isEnabled()).toBe(true)
+    await closeSetup(page)
+    await page.getByRole('button', { name: 'Clear detections' }).click()
     await file(page)
     expect(await page.locator('.hit strong').allTextContents()).toEqual(['落实'])
     expect(exceptions).toEqual([])
@@ -422,12 +461,16 @@ it('streams fake microphone audio and releases capture and Worker when leaving t
     await page.goto(`${url}kws`, { waitUntil: 'domcontentloaded' })
     await openKeywords(page)
     await load(page)
-    await page.getByRole('button', { name: '开始监听' }).click()
+    await closeSetup(page)
+    await page.getByRole('button', { name: 'Start' }).click()
     await expect.poll(() => page.locator('.hit strong').allTextContents(), { timeout: 30000 }).toContain('周望军')
-    await page.getByRole('button', { name: '暂停检测' }).click()
+    await openKeywords(page)
+    await page.getByRole('button', { name: 'Pause detection' }).click()
     await expect.poll(() => page.locator('.active-words .word').count()).toBe(0)
-    expect(await page.getByRole('button', { name: '停止监听' }).isVisible()).toBe(true)
-    await page.getByRole('button', { name: '应用词表' }).click()
+    await closeSetup(page)
+    expect(await page.getByRole('button', { name: 'Stop listening' }).isVisible()).toBe(true)
+    await openKeywords(page)
+    await page.getByRole('button', { name: 'Apply' }).click()
     await expect.poll(() => page.locator('.active-words .word').count()).toBe(3)
     await page.getByRole('link', { name: '← Sandbox' }).click()
     await page.waitForURL(url)
@@ -435,7 +478,8 @@ it('streams fake microphone audio and releases capture and Worker when leaving t
     expect(await page.evaluate(() => (window as unknown as { kwsTestTracks: MediaStreamTrack[] }).kwsTestTracks.map(track => track.readyState))).toEqual(['ended'])
     await page.getByRole('link', { name: 'Keyword spotting' }).click()
     expect(await page.locator('.hit').count()).toBe(0)
-    expect(await page.getByRole('button', { name: '开始监听' }).isDisabled()).toBe(true)
+    await closeSetup(page)
+    expect(await page.getByRole('button', { name: 'Start' }).isDisabled()).toBe(true)
   }
   finally {
     await browser.close()
@@ -466,11 +510,11 @@ it('recovers from failed model loading and microphone permission denial', async 
     await page.context().route('**/*preload*.data*', route => route.abort())
     await page.goto(`${url}kws`, { waitUntil: 'domcontentloaded' })
     await openKeywords(page)
-    await page.getByRole('button', { name: 'Model setup' }).click()
-    await page.getByRole('button', { name: '加载模型', exact: true }).click()
+    await page.getByRole('button', { name: 'Initialize', exact: true }).click()
     await expect.poll(() => page.getByRole('alert').count(), { timeout: 30000 }).toBe(1)
-    expect(await page.getByRole('button', { name: '开始监听' }).isDisabled()).toBe(true)
-    await page.keyboard.press('Escape')
+    await closeSetup(page)
+    expect(await page.getByRole('button', { name: 'Start' }).isDisabled()).toBe(true)
+    await page.getByRole('button', { name: 'Model setup' }).click()
     await page.context().unroute('**/*preload*.data*')
     await load(page)
     await page.evaluate(() => {
@@ -478,9 +522,11 @@ it('recovers from failed model loading and microphone permission denial', async 
         throw new DOMException('Permission denied', 'NotAllowedError')
       }
     })
-    await page.getByRole('button', { name: '开始监听' }).click()
+    await closeSetup(page)
+    await page.getByRole('button', { name: 'Start' }).click()
     await expect.poll(() => page.getByRole('alert').textContent()).toContain('Permission denied')
-    expect(await page.getByRole('button', { name: '开始监听' }).isEnabled()).toBe(true)
+    await closeSetup(page)
+    expect(await page.getByRole('button', { name: 'Start' }).isEnabled()).toBe(true)
     await file(page)
     expect(await page.locator('.hit strong').allTextContents()).toEqual(['落实', '周望军'])
   }
@@ -510,10 +556,13 @@ it('loads the production Worker, WASM, models and microphone worklet', async () 
     expect(localRequests).toEqual([])
     await file(page, 'en_0.wav')
     expect(await page.locator('.hit strong').allTextContents()).toEqual(['LIGHT UP'])
-    await page.getByRole('button', { name: '开始监听' }).click()
+    await closeSetup(page)
+    await page.getByRole('button', { name: 'Start' }).click()
     await expect.poll(() => page.locator('.hit strong').allTextContents(), { timeout: 30000 }).toContain('周望军')
-    await page.getByRole('button', { name: '停止监听' }).click()
-    expect(await page.getByRole('button', { name: '开始监听' }).isEnabled()).toBe(true)
+    await closeSetup(page)
+    await page.getByRole('button', { name: 'Stop listening' }).click()
+    await closeSetup(page)
+    expect(await page.getByRole('button', { name: 'Start' }).isEnabled()).toBe(true)
   }
   finally {
     await browser.close()

@@ -27,11 +27,11 @@ export function createKWSClient(onProgress: (message: string) => void) {
 
   /** Triggering workflow: {@link worker} `error` -> {@link fail} -> {@link dispose} rejects pending requests. */
   function fail(event: ErrorEvent) {
-    dispose(new Error(event.message || '关键词检测引擎意外停止，请刷新页面重试。'))
+    dispose(new Error(event.message || 'The keyword engine stopped unexpectedly. Reload the page to try again.'))
   }
 
   /** Triggering workflow: page unmount / {@link fail} -> {@link dispose} -> Worker.terminate and pending promise rejection. */
-  function dispose(error = new Error('关键词检测会话已关闭。')) {
+  function dispose(error = new Error('The keyword session has closed.')) {
     closed = true
     worker.terminate()
     for (const callback of pending.values())
@@ -44,11 +44,11 @@ export function createKWSClient(onProgress: (message: string) => void) {
 
   async function request(request: Request): Promise<Detection[]> {
     if (closed)
-      throw new Error('关键词检测会话已关闭，请刷新页面重试。')
+      throw new Error('The keyword session has closed. Reload the page to try again.')
     const audio = request.type === 'audio'
     // Bound live input to ~400 ms instead of accumulating stale microphone audio.
     if (audio && audioPending >= 4)
-      throw new Error('检测速度跟不上麦克风输入，已停止监听。请关闭其他繁忙任务后重试。')
+      throw new Error('Listening stopped because detection could not keep up. Close other busy tasks and try again.')
     if (audio)
       audioPending++
     try {
