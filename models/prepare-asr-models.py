@@ -8,8 +8,8 @@ import subprocess
 import sys
 import tarfile
 
-ROOT = Path(__file__).resolve().parents[1]
-CATALOG = json.loads((ROOT / 'models/asr-catalog.json').read_text())
+MODELS = Path(__file__).resolve().parent
+CATALOG = json.loads((MODELS / 'asr-catalog.json').read_text())
 
 
 def digest(path):
@@ -30,7 +30,7 @@ def download(asset, path):
 
 
 def prepare(model):
-    directory = ROOT / 'models' / model['directory']
+    directory = MODELS / model['directory']
     archive = directory / 'model.tar.bz2'
     download(model['archive'], archive)
     target = directory / 'model'

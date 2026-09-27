@@ -80,8 +80,8 @@ git submodule update --init models/huggingface/sherpaw-paraformer-zh-en \
   models/huggingface/sherpaw-x-asr-zh-en-480ms-int8 \
   models/huggingface/sherpaw-x-asr-zh-en-480ms-fp32
 # Run git lfs pull in those submodules if LFS smudging is disabled.
-python3 scripts/prepare-asr-models.py zipformer-zh
-uv run scripts/prepare-paraformer-fp32.py
+python3 models/prepare-asr-models.py zipformer-zh
+uv run models/prepare-paraformer-fp32.py
 ```
 
 The archive preparer still accepts `x-asr` and `x-asr-fp32` for model packaging;

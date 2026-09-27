@@ -156,6 +156,7 @@ models/
 !models/**/download.sh
 !models/**/pack.sh
 !/models/asr-catalog.json
+!/models/*.py
 *.onnx
 *.pb
 *.pt

@@ -27,7 +27,7 @@ The INT8 variant's decoder retains its original floating-point precision.
 Use Python 3.11+ and Docker, then run:
 
 ```sh
-python3 scripts/pack-x-asr-models.py
+python3 models/pack-x-asr-models.py
 ```
 
 Each model directory also has `download.sh` and `pack.sh`. The packer uses
@@ -40,7 +40,7 @@ source URLs, file hashes, virtual paths, and artifact hashes.
 An activated local Emscripten 4.0.23 installation can be used instead of Docker:
 
 ```sh
-python3 scripts/pack-x-asr-models.py --file-packager /path/to/emscripten/tools/file_packager
+python3 models/pack-x-asr-models.py --file-packager /path/to/emscripten/tools/file_packager
 ```
 
 The published `manifest.json` is this package manifest. Publish only the model

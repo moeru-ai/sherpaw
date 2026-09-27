@@ -8,7 +8,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+MODELS = Path(__file__).resolve().parent
 IDS = ('x-asr', 'x-asr-fp32')
 
 
@@ -18,7 +18,7 @@ def digest(path):
 
 
 def package(model, packager):
-    directory = ROOT / 'models' / model['directory']
+    directory = MODELS / model['directory']
     source = directory / 'model'
     manifest = json.loads((source / 'manifest.json').read_text())
     if any(manifest[key] != value for key, value in model.items()):
@@ -93,8 +93,8 @@ if __name__ == '__main__':
     packager = args.file_packager.resolve() if args.file_packager else None
     if packager and not packager.is_file():
         parser.error(f'Missing file packager: {packager}')
-    catalog = json.loads((ROOT / 'models/asr-catalog.json').read_text())
-    subprocess.run(['python3', str(ROOT / 'scripts/prepare-asr-models.py'), *selected], check=True)
+    catalog = json.loads((MODELS / 'asr-catalog.json').read_text())
+    subprocess.run(['python3', str(MODELS / 'prepare-asr-models.py'), *selected], check=True)
     for model in catalog['models']:
         if model['id'] in selected:
             package(model, packager)

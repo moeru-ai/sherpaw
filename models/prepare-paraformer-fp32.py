@@ -4,7 +4,7 @@
 # ///
 """Fetch verified upstream FP32 Paraformer weights for the browser bridge.
 
-Run: uv run scripts/prepare-paraformer-fp32.py
+Run: uv run models/prepare-paraformer-fp32.py
 Artifacts stay under models/sherpa-onnx-streaming-paraformer-bilingual-zh-en/fp32/.
 """
 import hashlib
@@ -15,8 +15,8 @@ from pathlib import Path
 import onnx
 from huggingface_hub import hf_hub_download
 
-ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "models/sherpa-onnx-streaming-paraformer-bilingual-zh-en/fp32"
+MODELS = Path(__file__).resolve().parent
+OUT = MODELS / "sherpa-onnx-streaming-paraformer-bilingual-zh-en/fp32"
 REPO = "csukuangfj/sherpa-onnx-streaming-paraformer-bilingual-zh-en"
 REVISION = "8e40c43232a1c5c66c82111efc5820d3accca11b"
 SHA256 = {
@@ -43,7 +43,7 @@ def model_info(model):
 
 
 def main():
-    pack_root = ROOT / "models/huggingface/sherpaw-paraformer-zh-en/install/bin/wasm"
+    pack_root = MODELS / "huggingface/sherpaw-paraformer-zh-en/install/bin/wasm"
     entries = json.loads((pack_root / "preload.js.metadata").read_text())["files"]
     native_info = {}
     with (pack_root / "preload.data").open("rb") as pack:
