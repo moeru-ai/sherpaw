@@ -13,12 +13,17 @@ export function createKWSClient(onProgress: (message: string) => void) {
   /** Triggering workflow: {@link worker} `message` -> {@link complete} -> pending request promise / {@link onProgress}. */
   function complete(event: MessageEvent<Reply>) {
     const reply = event.data
+
     if (reply.progress) {
       onProgress(reply.progress)
+
       return
     }
+
     const callback = pending.get(reply.id)
+
     pending.delete(reply.id)
+
     if (reply.error)
       callback?.reject(new Error(reply.error))
     else
@@ -34,8 +39,10 @@ export function createKWSClient(onProgress: (message: string) => void) {
   function dispose(error = new Error('The keyword session has closed.')) {
     closed = true
     worker.terminate()
+
     for (const callback of pending.values())
       callback.reject(error)
+
     pending.clear()
   }
 
@@ -45,16 +52,22 @@ export function createKWSClient(onProgress: (message: string) => void) {
   async function request(request: Request): Promise<Detection[]> {
     if (closed)
       throw new Error('The keyword session has closed. Reload the page to try again.')
+
     const audio = request.type === 'audio'
+
     // Bound live input to ~400 ms instead of accumulating stale microphone audio.
     if (audio && audioPending >= 4)
       throw new Error('Listening stopped because detection could not keep up. Close other busy tasks and try again.')
+
     if (audio)
       audioPending++
+
     try {
       return await new Promise<Detection[]>((resolve, reject) => {
         const id = ++sequence
+
         pending.set(id, { resolve, reject })
+
         try {
           worker.postMessage({ id, request }, request.type === 'audio' ? [request.samples.buffer] : [])
         }

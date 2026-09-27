@@ -20,23 +20,28 @@ export function useKWSPlayground() {
   const listening = ref(false)
   const error = ref('')
   const message = ref('Load a model to start listening or test an audio file.')
+
   const seconds = ref(0)
   const activeLabels = ref<string[]>([])
   const history = ref<(Detection & { id: number, source: string })[]>([])
+
   const preset = ref(keywordPresets[0]!)
   let rowId = 0
   const drafts = ref<Draft[]>(createDrafts(preset.value.entries))
+
   let hitId = 0
   let disposed = false
   let inputGeneration = 0
   let microphone: AbortController | undefined
   let fileContext: AudioContext | undefined
+
   const paused = computed(() => ready.value && activeLabels.value.length === 0)
 
   /** Triggering workflow: KWS Worker progress -> client.complete -> {@link showProgress} -> message status. */
   function showProgress(progress: string) {
     message.value = progress
   }
+
   const client = createKWSClient(showProgress)
 
   function createDrafts(keywords: KeywordEntry[]): Draft[] {
@@ -52,11 +57,14 @@ export function useKWSPlayground() {
   /** Triggering workflow: kws.vue preset button `click` -> {@link selectPreset} -> draft replacement and {@link applyKeywords} when loaded. */
   async function selectPreset(id: string) {
     const selected = keywordPresets.find(preset => preset.id === id)
+
     if (!selected)
       return
+
     preset.value = selected
     drafts.value = createDrafts(selected.entries)
     error.value = ''
+
     if (ready.value)
       await applyKeywords()
     else
@@ -66,6 +74,7 @@ export function useKWSPlayground() {
   function entries(): KeywordEntry[] {
     return drafts.value.map((row) => {
       const lines = row.tokens.split(/\r?\n/u).map(line => line.trim()).filter(Boolean)
+
       return {
         label: row.label,
         matches: lines.map(line => ({ tokens: line.split(/\s+/u) })),
@@ -82,6 +91,7 @@ export function useKWSPlayground() {
   function record(hits: Detection[], source: string) {
     for (const hit of hits)
       history.value.unshift({ ...hit, id: ++hitId, source })
+
     history.value = history.value.slice(0, 100)
   }
 
@@ -89,8 +99,10 @@ export function useKWSPlayground() {
   async function loadModel() {
     busy.value = 'load'
     error.value = ''
+
     try {
       const keywords = entries()
+
       await client.request({ type: 'load', keywords, maxActivePaths: preset.value.maxActivePaths })
       ready.value = true
       activeLabels.value = [...new Set(keywords.map(entry => entry.label))]
@@ -108,6 +120,7 @@ export function useKWSPlayground() {
   async function replace(keywords: KeywordEntry[]) {
     busy.value = 'update'
     error.value = ''
+
     try {
       await client.request({ type: 'keywords', keywords, maxActivePaths: preset.value.maxActivePaths })
       activeLabels.value = [...new Set(keywords.map(entry => entry.label))]
@@ -158,17 +171,23 @@ export function useKWSPlayground() {
     error.value = ''
     seconds.value = 0
     listening.value = true
+
     const controller = new AbortController()
+
     microphone = controller
+
     const generation = ++inputGeneration
 
     /** Triggering workflow: microphone.collect -> {@link processMicrophone} -> client.request `audio` -> {@link record}. */
     function processMicrophone(samples: Float32Array, sampleRate: number) {
       if (disposed || generation !== inputGeneration)
         return
+
       seconds.value += samples.length / sampleRate
+
       if (paused.value)
         return
+
       void client.request({ type: 'audio', samples, sampleRate }).then((hits) => {
         if (!disposed && generation === inputGeneration)
           record(hits, 'Microphone')
@@ -183,15 +202,20 @@ export function useKWSPlayground() {
     try {
       await client.request({ type: 'reset' })
       controller.signal.throwIfAborted()
+
       let batch: Float32Array | undefined
       let offset = 0
+
       // Keep 100 ms requests without making the shared recorder clip speaker audio.
       await startMicrophone(controller.signal, (samples, sampleRate) => {
         batch ??= new Float32Array(Math.round(sampleRate / 10))
+
         for (const value of samples) {
           batch[offset++] = Math.max(-1, Math.min(1, value))
+
           if (offset === batch.length) {
             const completed = batch
+
             batch = new Float32Array(batch.length)
             processMicrophone(completed, sampleRate)
             offset = 0
@@ -215,40 +239,58 @@ export function useKWSPlayground() {
   async function testFile(event: Event) {
     const input = event.target as HTMLInputElement
     const file = input.files?.[0]
+
     input.value = ''
+
     if (!file)
       return
+
     busy.value = 'file'
     error.value = ''
     seconds.value = 0
+
     const generation = ++inputGeneration
     const context = new AudioContext({ sampleRate: 16000 })
+
     fileContext = context
+
     try {
       message.value = `Reading ${file.name}…`
+
       const decoded = await context.decodeAudioData(await file.arrayBuffer())
+
       if (disposed)
         return
+
       await client.request({ type: 'reset' })
+
       // Downmix to mono and add one second of trailing silence for streaming KWS.
       const samples = new Float32Array(decoded.length + decoded.sampleRate)
+
       for (let channel = 0; channel < decoded.numberOfChannels; channel++) {
         const values = decoded.getChannelData(channel)
+
         for (let i = 0; i < values.length; i++)
           samples[i] = samples[i]! + values[i]! / decoded.numberOfChannels
       }
+
       for (let i = 0; i < samples.length; i++)
         samples[i] = Math.max(-1, Math.min(1, samples[i]!))
+
       for (let offset = 0; offset < samples.length; offset += 1600) {
         if (disposed || generation !== inputGeneration)
           return
+
         const hits = await client.request({ type: 'audio', samples: samples.slice(offset, offset + 1600), sampleRate: decoded.sampleRate })
+
         if (disposed)
           return
+
         record(hits, file.name)
         seconds.value = Math.min((offset + 1600) / decoded.sampleRate, decoded.duration)
         message.value = `Processing ${file.name} · ${seconds.value.toFixed(1)} / ${decoded.duration.toFixed(1)} s`
       }
+
       message.value = `${file.name} complete.`
     }
     catch (cause) {
@@ -260,6 +302,7 @@ export function useKWSPlayground() {
     finally {
       if (context.state !== 'closed')
         await context.close()
+
       fileContext = undefined
       busy.value = ''
     }
@@ -274,10 +317,13 @@ export function useKWSPlayground() {
   function dispose() {
     disposed = true
     stopMicrophone()
+
     if (fileContext && fileContext.state !== 'closed')
       void fileContext.close().catch(() => {})
+
     client.dispose()
   }
+
   onBeforeUnmount(dispose)
 
   return { ready, busy, listening, paused, error, message, seconds, activeLabels, drafts, history, preset, keywordPresets, selectPreset, loadModel, applyKeywords, pauseDetection, addKeyword, removeKeyword, listen, stopMicrophone, testFile, clearHistory }

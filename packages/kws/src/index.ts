@@ -7,5 +7,6 @@ export { createKeywordSpotter } from './spotter'
 export async function initKWSModule(): Promise<KWSModule> {
   const { default: init } = await import('./prebuilt/kws.js')
   const wasmUrl = new URL('./prebuilt/kws.wasm', import.meta.url).toString()
+
   return init({ locateFile: () => wasmUrl })
 }

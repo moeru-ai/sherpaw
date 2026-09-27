@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
 cd "$(dirname "$0")"
 
 # Unmodified fp32 chunk-16 weights from the official KWS release.
@@ -12,20 +13,26 @@ fcf43a2edf687e2e1bc8a2b2cf53129d3b0d693d90dcc4202e2d53b43db6c43c  joiner.onnx
 SHA256
   )
 }
+
 if [[ -d model/normalized ]] && verify model/normalized; then
   exit 0
 fi
+
 mkdir -p model
 staging="$(mktemp -d model/.download.XXXXXX)"
 trap 'rm -rf "$staging"' EXIT
+
 curl --fail --location --retry 3 --output "$staging/model.tar.bz2" \
   "https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01.tar.bz2"
 tar xjf "$staging/model.tar.bz2" -C "$staging"
+
 mkdir "$staging/normalized"
 cp "$staging/sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01/encoder-epoch-12-avg-2-chunk-16-left-64.onnx" "$staging/normalized/encoder.onnx"
 cp "$staging/sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01/decoder-epoch-12-avg-2-chunk-16-left-64.onnx" "$staging/normalized/decoder.onnx"
 cp "$staging/sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01/joiner-epoch-12-avg-2-chunk-16-left-64.onnx" "$staging/normalized/joiner.onnx"
 cp "$staging/sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01/tokens.txt" "$staging/normalized/tokens.txt"
+
 verify "$staging/normalized"
+
 mkdir -p model/normalized
 cp "$staging/normalized/"* model/normalized/

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
 cd "$(dirname "$0")"
 
 # Unmodified fp32 chunk-16 weights from the official KWS release.
@@ -12,20 +13,26 @@ verify() {
 SHA256
   )
 }
+
 if [[ -d model/normalized ]] && verify model/normalized; then
   exit 0
 fi
+
 mkdir -p model
 staging="$(mktemp -d model/.download.XXXXXX)"
 trap 'rm -rf "$staging"' EXIT
+
 curl --fail --location --retry 3 --output "$staging/model.tar.bz2" \
   "https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20.tar.bz2"
 tar xjf "$staging/model.tar.bz2" -C "$staging"
+
 mkdir "$staging/normalized"
 cp "$staging/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20/encoder-epoch-13-avg-2-chunk-16-left-64.onnx" "$staging/normalized/encoder.onnx"
 cp "$staging/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20/decoder-epoch-13-avg-2-chunk-16-left-64.onnx" "$staging/normalized/decoder.onnx"
 cp "$staging/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20/joiner-epoch-13-avg-2-chunk-16-left-64.onnx" "$staging/normalized/joiner.onnx"
 cp "$staging/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20/tokens.txt" "$staging/normalized/tokens.txt"
+
 verify "$staging/normalized"
+
 mkdir -p model/normalized
 cp "$staging/normalized/"* model/normalized/

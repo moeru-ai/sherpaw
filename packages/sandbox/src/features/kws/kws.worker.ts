@@ -16,14 +16,20 @@ let queue = Promise.resolve()
 async function handleRequest(request: Request, progress: (message: string) => void) {
   if (request.type === 'load') {
     progress('Loading speech engine…')
+
     const module = await initKWSModule()
     const paths: KWSModel = { encoder: 'encoder.onnx', decoder: 'decoder.onnx', joiner: 'joiner.onnx', tokens: 'tokens.txt' }
+
     try {
       progress('Loading model…')
+
       const { data, metadata } = await loadKWSModel()
+
       loadData({ module, data, metadata })
       progress('Initializing keyword detection…')
+
       const next = createKeywordSpotter(module, { model: paths, keywords: request.keywords, maxActivePaths: request.maxActivePaths })
+
       spotter?.dispose()
       spotter = next
       loaded = { module, model: paths, maxActivePaths: request.maxActivePaths }
@@ -34,19 +40,26 @@ async function handleRequest(request: Request, progress: (message: string) => vo
         if (module.FS.analyzePath(path).exists)
           module.FS.unlink(path)
       }
+
       throw error
     }
+
     return []
   }
+
   if (!spotter || !loaded)
     throw new Error('Load a model first.')
+
   if (request.type === 'audio')
     return spotter.processAudio(request.samples, request.sampleRate)
+
   const next = request.type === 'keywords' ? request.keywords : keywords
+
   if (request.type === 'keywords' && next.length && request.maxActivePaths !== loaded.maxActivePaths) {
     // Candidate count is fixed at construction. Reuse the loaded model files,
     // and commit the replacement only after the new detector is ready.
     const replacement = createKeywordSpotter(loaded.module, { model: loaded.model, keywords: next, maxActivePaths: request.maxActivePaths })
+
     spotter.dispose()
     spotter = replacement
     loaded.maxActivePaths = request.maxActivePaths
@@ -54,7 +67,9 @@ async function handleRequest(request: Request, progress: (message: string) => vo
   else {
     await spotter.setKeywords(next)
   }
+
   keywords = next
+
   return []
 }
 
@@ -62,6 +77,7 @@ async function handleRequest(request: Request, progress: (message: string) => vo
 function enqueue(event: MessageEvent<{ id: number, request: Request }>) {
   const { id, request } = event.data
   const reply = (message: Omit<Reply, 'id'>) => globalThis.postMessage({ id, ...message })
+
   queue = queue.then(async () => {
     try {
       reply({ detections: await handleRequest(request, progress => reply({ progress })) })

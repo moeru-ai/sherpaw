@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
 cd "$(dirname "$0")"
 
 if [[ ! -s model/normalized/encoder.onnx || ! -s model/normalized/decoder.onnx || ! -s model/normalized/joiner.onnx || ! -s model/normalized/tokens.txt ]]; then
@@ -18,6 +19,7 @@ docker run --rm --platform linux/amd64 \
   emscripten/emsdk:4.0.23 \
   -lc '
     set -euo pipefail
+
     "$(dirname "$(command -v emcc)")/tools/file_packager" \
       preload.data \
       --preload /assets@/ \
