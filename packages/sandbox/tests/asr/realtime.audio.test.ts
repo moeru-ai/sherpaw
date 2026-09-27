@@ -48,7 +48,7 @@ describe('Model selector and continuous microphone input', () => {
       let failure: unknown
       try {
         // Reuse the original Transcription page and its Model setup popover.
-        expect(await audio.page.getByRole('heading', { name: 'Transcription', exact: true }).count()).toBe(1)
+        await audio.page.getByRole('heading', { name: 'Transcription', exact: true }).waitFor()
         expect(await audio.page.getByLabel('ASR model', { exact: true }).count()).toBe(0)
         await audio.page.getByRole('button', { name: 'Model setup', exact: true }).click()
         // Exercise preloading via the visible selector, with no microphone opened.
