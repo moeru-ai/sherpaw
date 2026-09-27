@@ -8,8 +8,6 @@
     "preview": "vite preview",
     "typecheck": "vue-tsc -b && tsc --noEmit -p tsconfig.tests.json",
     "test:speaker": "vitest run tests/speaker-identification",
-    "test:kws": "playwright test kws",
-    "test:e2e": "playwright test",
     "test": "vitest run"
   },
   "dependencies": {

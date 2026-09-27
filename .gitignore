@@ -181,7 +181,3 @@ typed-router.d.ts
 # Private keyword recording notes
 docs/research/kws-iru-recording.md
 docs/research/kws-feiyu-recording.md
-
-# Playwright test artifacts
-**/test-results/
-**/playwright-report/

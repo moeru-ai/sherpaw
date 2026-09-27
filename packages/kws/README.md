@@ -166,4 +166,4 @@ Browser tests load the built npm JS, bundled WASM, external model files and upst
 
 To rebuild the runtime, activate Emscripten 4.0.23 and run `cd sherpa-onnx && ./build.sh` from the repository root. The `kws` CMake target installs `kws.js` and `kws.wasm` into this package's `src/prebuilt/` directory, using the pinned upstream submodule and no model preload.
 
-Node integration tests exercise the built `/node` entry with the real WASM and audio fixtures, including ownership, queue ordering, rollback, reset, queue limits, abort and disposal. The sandbox KWS E2E suite uses Playwright Test with the package root in Vite dev and production builds.
+Node integration tests exercise the built `/node` entry with the real WASM and audio fixtures, including ownership, queue ordering, rollback, reset, queue limits, abort and disposal.

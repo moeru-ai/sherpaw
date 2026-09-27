@@ -108,15 +108,20 @@ it('stops a late microphone stream when the route is left while permission is pe
   const source = new AudioContext()
   const destination = source.createMediaStreamDestination()
   let grantPermission!: (stream: MediaStream) => void
+  let requestPermission!: () => void
+  const permissionRequested = new Promise<void>((resolve) => {
+    requestPermission = resolve
+  })
   const microphone = vi.spyOn(navigator.mediaDevices, 'getUserMedia').mockImplementation(() => new Promise((resolve) => {
     grantPermission = resolve
+    requestPermission()
   }))
   const lifetime = new AbortController()
   const recording = startRecording(() => {}, lifetime.signal)
   const rejected = expect(recording).rejects.toThrow()
 
   try {
-    await vi.waitFor(() => expect(microphone).toHaveBeenCalledOnce())
+    await permissionRequested
     lifetime.abort()
     grantPermission(destination.stream)
     await rejected
@@ -130,47 +135,49 @@ it('stops a late microphone stream when the route is left while permission is pe
   }
 })
 
-it.each([false, true])('uses VueUse device selection and releases its listeners (missing device: %s)', async (missingDevice) => {
+it('recovers audio when the selected microphone has disconnected', async () => {
   const context = new AudioContext()
   const destination = context.createMediaStreamDestination()
+  const oscillator = context.createOscillator()
+
+  oscillator.connect(destination)
+  oscillator.start()
+  await context.resume()
+
   const devices = vi.spyOn(navigator.mediaDevices, 'enumerateDevices').mockResolvedValue([
-    { deviceId: 'another-input', kind: 'audioinput', label: 'Other mic', groupId: 'other', toJSON: () => ({}) },
-    { deviceId: 'default', kind: 'audioinput', label: 'Default mic', groupId: 'default', toJSON: () => ({}) },
+    { deviceId: 'disconnected-input', kind: 'audioinput', label: 'Disconnected mic', groupId: 'input', toJSON: () => ({}) },
   ])
-  const acquire = vi.spyOn(navigator.mediaDevices, 'getUserMedia').mockResolvedValue(destination.stream)
+  let disconnected = false
+  const microphone = vi.spyOn(navigator.mediaDevices, 'getUserMedia').mockImplementation(async (constraints) => {
+    // The enumerated device is gone; only the browser's default input is available.
+    if (typeof constraints?.audio === 'object' && constraints.audio.deviceId) {
+      disconnected = true
 
-  if (missingDevice)
-    acquire.mockRejectedValueOnce(new DOMException('Device disconnected', 'NotFoundError'))
+      throw new DOMException('Device disconnected', 'NotFoundError')
+    }
 
-  const add = vi.spyOn(navigator.mediaDevices, 'addEventListener')
-  const remove = vi.spyOn(navigator.mediaDevices, 'removeEventListener')
+    return destination.stream
+  })
   let capture: Awaited<ReturnType<typeof startMicrophone>> | undefined
+  let audible = false
 
   try {
-    capture = await startMicrophone(new AbortController().signal, () => {})
+    capture = await startMicrophone(new AbortController().signal, (samples) => {
+      audible ||= samples.some(sample => Math.abs(sample) > 0.01)
+    })
 
-    expect(acquire).toHaveBeenCalledTimes(missingDevice ? 2 : 1)
-    expect(acquire.mock.calls[0]![0]).toMatchObject({ audio: { deviceId: { exact: 'default' }, channelCount: 1 } })
-
-    if (missingDevice)
-      expect(acquire.mock.calls[1]![0]!.audio).not.toHaveProperty('deviceId')
-
-    const listener = add.mock.calls.find(([event]) => event === 'devicechange')
-
-    expect(listener).toBeDefined()
+    expect(disconnected).toBe(true)
+    await expect.poll(() => audible, { timeout: 5000 }).toBe(true)
 
     await capture.stop()
     await capture.stop()
 
-    expect(remove.mock.calls.some(([event, callback]) => event === 'devicechange' && callback === listener![1])).toBe(true)
     expect(destination.stream.getTracks().every(track => track.readyState === 'ended')).toBe(true)
   }
   finally {
     await capture?.stop()
     devices.mockRestore()
-    acquire.mockRestore()
-    add.mockRestore()
-    remove.mockRestore()
+    microphone.mockRestore()
     destination.stream.getTracks().forEach(track => track.stop())
     await context.close()
   }

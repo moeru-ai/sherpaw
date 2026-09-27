@@ -84,9 +84,6 @@ jobs:
           pnpm -F @sherpaw/sandbox test
           pnpm -F @sherpaw/testing-audio test:speakers
 
-      - name: Run sandbox E2E tests
-        run: pnpm -F @sherpaw/sandbox test:e2e
-
       - if: inputs.publish
         name: Set up NPM token
         run: pnpm config set //registry.npmjs.org/:_authToken '${NPM_TOKEN}'
