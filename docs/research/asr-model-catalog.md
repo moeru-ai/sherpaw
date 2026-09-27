@@ -109,6 +109,11 @@ SHERPAW_ASR_MODELS=x-asr-fp32 SHERPAW_ASR_BACKEND=cpu,webgpu-encoder \
 ```
 
 Both filters accept comma-separated values; unset filters select all cases.
+By default the suite tests the production build, including HF downloads. For
+repeatable inference checks with prepared local weights, start the dev server
+and run the same suite with `SHERPAW_ASR_DEV_URL=http://127.0.0.1:5187/asr`.
+Cold FP32 downloads can exceed the test's 180-second loading deadline; the dev
+option uses local-models and avoids measuring network availability.
 Hardware-accelerated Chrome and prepared weights/bridges are required for GPU
 cases. Each case loads without microphone access, then receives 60 seconds at
 microphone speed. Zipformer uses repeated Chinese speech; others use a bilingual

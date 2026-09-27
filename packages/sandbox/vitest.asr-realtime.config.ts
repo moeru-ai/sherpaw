@@ -1,5 +1,6 @@
 import fakemic, { web } from '@sherpaw/vitest-plugin-fakemic'
 import { resolve } from 'node:path'
+import { env } from 'node:process'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
@@ -11,10 +12,10 @@ export default defineConfig({
       runtime: web({
         name: 'chrome-hardware-webgpu',
         prepare: new URL('./tests/asr/prepare.ts', import.meta.url).href,
-        url: 'http://127.0.0.1:5192/asr',
+        url: env.SHERPAW_ASR_DEV_URL ?? 'http://127.0.0.1:5192/asr',
         launch: { channel: 'chrome', headless: true },
         context: { permissions: ['microphone'] },
-        preview: { configFile: resolve(import.meta.dirname, 'vite.config.ts'), root: import.meta.dirname, port: 5192 },
+        preview: env.SHERPAW_ASR_DEV_URL ? undefined : { configFile: resolve(import.meta.dirname, 'vite.config.ts'), root: import.meta.dirname, port: 5192 },
       }),
     })],
   },
