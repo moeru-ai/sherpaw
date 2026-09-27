@@ -1,6 +1,6 @@
 # Sherpaw sandbox
 
-The Vue sandbox exposes ASR at `/asr` and speaker identification at `/speaker-identification`. Both routes are linked from the home page.
+The Vue sandbox exposes ASR at `/asr`, speaker identification at `/speaker-identification`, and keyword spotting at `/kws`. All routes are linked from the home page.
 
 ## Run
 
@@ -15,6 +15,24 @@ pnpm dev
 
 Open `/speaker-identification` at the URL printed by Vite. Load a model, register speakers with multiple recordings, and compare manually recorded identification results. Speakers and individual samples can be renamed or deleted as appropriate. Leaving the route releases its microphone and Worker; returning creates an empty session.
 
+## Keyword spotting playground
+
+Open `/kws`, choose **Model setup** and load the Chinese/English Zipformer 3M model, then select **Start** or **Test audio file**. Inside **Model setup**, expand **Keywords** to select a preset or edit the vocabulary.
+
+The English preset contains `Hey Iru`, `Hello Iru`, and `Iru Iru` (Iru pronounced “ee-roo”). The Chinese preset contains `你好肥鱼`, `大肥鱼`, and `肥鱼肥鱼`. Each line of space-separated tokens represents one pronunciation. Tokens must already be encoded for the model. Selecting a preset applies it immediately after loading. Manual edits require **Apply**.
+
+**Pause detection** stops matching; **Apply** resumes with the edited keywords. Invalid updates retain the active vocabulary. Updates reset the audio state. These presets are experimental and can miss natural pronunciation.
+
+Audio processing stays on the device. **Stop** releases the microphone; leaving the page ends the session. Detection timestamps are relative to decoder segments, not absolute positions in the recording.
+
+The deployed playground downloads its model from Hugging Face. Development first checks the local model packs under `models/huggingface/`, then falls back to Hugging Face. To download the local packs, run:
+
+```sh
+bash scripts/prepare-kws-models.sh
+```
+
+To build model packs yourself, use the scripts in `models/<model-name>/`.
+
 ## Speaker page organization
 
 - `src/pages/speaker-identification.vue`: route integration and mount/unmount lifecycle.
@@ -23,7 +41,7 @@ Open `/speaker-identification` at the URL printed by Vite. Load a model, registe
 - `../speaker-identification`: the public extractor/database API and library tests.
 - `../testing-audio/cases/speaker-identification`: the fixed, reviewed audio corpus.
 
-The page and tests load unchanged ONNX bytes from the pinned Hugging Face model submodules. A normal sandbox build includes model/WASM assets and excludes the test harness. Prepare the model submodules before building.
+The page and tests load unchanged ONNX bytes from the pinned Hugging Face model submodules. The speaker page still bundles its model/WASM assets and excludes the test harness. Prepare the model submodules before building.
 
 ## Deploy
 
@@ -31,9 +49,11 @@ The [Cloudflare Workers deployment guide](../../docs/deployment/cloudflare-worke
 
 ## Validate
 
+Run the sandbox tests and checks from the repository root:
+
 ```sh
 pnpm -F @sherpaw/sandbox typecheck
-pnpm -F @sherpaw/sandbox test:speaker
+pnpm -F @sherpaw/sandbox test
 pnpm -F @sherpaw/testing-audio test:speakers
 pnpm -F @sherpaw/sandbox build
 pnpm -F @sherpaw/sandbox preview

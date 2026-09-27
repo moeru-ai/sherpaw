@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import type { AudioProcessorMessage } from '../audio-processor.protocol'
 import { createOnlineRecognizer } from '@sherpaw/asr'
-import { PopoverArrow, PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue'
 import audioProcessor from '../audio-processor.worklet?url'
 import Button from '../components/Button.vue'
 import ModelSetup from '../components/ModelSetup.vue'
+import ModelSetupPopover from '../components/ModelSetupPopover.vue'
+import SandboxLayout from '../components/SandboxLayout.vue'
 import { provideASRStore } from '../store'
 
 const transcriptionsDisplayRef = useTemplateRef<HTMLDivElement>('transcriptionsDisplay')
@@ -157,52 +158,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div
-    h-dvh w-full font-sans
-    flex="~ col items-center justify-start"
-  >
-    <div
-      p-6 w-full font-sans
-      flex="~ col md:row items-center justify-between gap-4 shrink-0"
-    >
-      <div flex="~ col items-center md:items-start">
-        <div text-xl md:text-3xl font-black>
-          Sherpa-ONNX WASM
-        </div>
-        <div font-semibold>
-          ASR Sandbox
-        </div>
-      </div>
-
-      <PopoverRoot>
-        <PopoverTrigger
-          flex="~ row items-center gap-2"
-          bg="transparent hover:neutral/10"
-          rounded-2xl p-2 md:p-4
-          transition="background-color 300"
-          text-sm lg:text-base
-        >
-          <div uppercase>
-            Model setup
-          </div>
-          <div i-ri:ai-generate-3d-line text-xl :class="{ 'op-50': !asrModule }" />
-        </PopoverTrigger>
-        <PopoverPortal>
-          <PopoverContent
-            side="bottom"
-            :side-offset="0"
-            rounded-lg
-            bg-white shadow-sm b m-4
-            class="max-w-[calc(100dvw-var(--spacing)*4*2)] w-[460px] will-change-[transform,opacity]
-              data-[state=open]:animate-[fade-in_150ms_linear_1]
-              data-[state=closed]:animate-[fade-out_150ms_linear_1]"
-          >
-            <ModelSetup />
-            <PopoverArrow class="fill-white stroke-gray-200" />
-          </PopoverContent>
-        </PopoverPortal>
-      </PopoverRoot>
-    </div>
+  <SandboxLayout title="ASR" h-dvh>
+    <template #setup>
+      <ModelSetupPopover :ready="!!asrModule">
+        <ModelSetup />
+      </ModelSetupPopover>
+    </template>
 
     <div
       p-4 w-full relative
@@ -262,5 +223,5 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
-  </div>
+  </SandboxLayout>
 </template>

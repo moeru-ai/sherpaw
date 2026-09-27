@@ -37,6 +37,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/kws': RouteRecordInfo<
+      '/kws',
+      '/kws',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/speaker-identification': RouteRecordInfo<
       '/speaker-identification',
       '/speaker-identification',
@@ -66,6 +73,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/asr.vue': {
       routes:
         | '/asr'
+      views:
+        | never
+    }
+    'src/pages/kws.vue': {
+      routes:
+        | '/kws'
       views:
         | never
     }

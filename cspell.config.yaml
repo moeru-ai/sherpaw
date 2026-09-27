@@ -58,6 +58,8 @@ words:
   - CUDA
   - demi
   - downsample
+  - downmix
+  - downmixed
   - denoiser
   - Diacritization
   - diacritization
@@ -71,6 +73,7 @@ words:
   - endfunction
   - eventa
   - Fakemic
+  - Feiyu
   - Fars
   - Fsts
   - funasr
@@ -81,6 +84,7 @@ words:
   - hotwords
   - huggingface
   - iconify
+  - Iru
   - Kokoro
   - LIBSTDCPP
   - LSTM
@@ -91,6 +95,7 @@ words:
   - Neko
   - Nemo
   - noloop
+  - nums
   - NNAPI
   - npmjs
   - omnilingual
@@ -107,6 +112,7 @@ words:
   - riscv
   - RKNN
   - RNNT
+  - Rspack
   - sherpaw
   - silero
   - Spacemi
@@ -127,6 +133,8 @@ words:
   - wavs
   - webworkers
   - Wenet
+  - wenetspeech
+  - stof
   - worklet
   - XNNPACK
   - xlink

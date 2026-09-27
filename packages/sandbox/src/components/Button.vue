@@ -10,7 +10,7 @@ defineEmits<{
 
 <template>
   <button
-
+    :disabled="disabled"
     :class="{
       'bg-neutral': disabled,
       'cursor-not-allowed': disabled,
