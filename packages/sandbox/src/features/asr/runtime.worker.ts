@@ -1,37 +1,31 @@
-import type { Recognizer, RecognizerReply, RecognizerRequest } from './types'
+import { defineInvokeHandler } from '@moeru/eventa'
+import { createContext } from '@moeru/eventa/adapters/webworkers/worker'
+
+import type { Recognizer } from './protocol'
 
 import { createParaformerRecognizer } from './paraformer'
+import { operation, progress } from './protocol'
 import { createTransducerRecognizer } from './transducer'
 
+const { context } = createContext()
 let recognizer: Recognizer | undefined
 
-function reply(message: RecognizerReply) {
-  globalThis.postMessage(message)
-}
-
-/** Triggering workflow: createRecognizer RPC -> selected model adapter -> transcript and metrics reply. */
-globalThis.onmessage = async (event: MessageEvent<RecognizerRequest>) => {
-  const request = event.data
-  try {
-    let text = ''
-    if (request.kind === 'load') {
-      if (recognizer)
-        throw new Error('The worker already owns a recording session')
-      const create = request.options.modelId === 'paraformer' ? createParaformerRecognizer : createTransducerRecognizer
-      recognizer = await create(request.options, request.baseUrl, status => reply({ id: request.id, status }))
-    }
-    else {
-      if (!recognizer)
-        throw new Error('Model is not loaded')
-      if (request.kind === 'dispose')
-        await recognizer.dispose()
-      else
-        text = request.kind === 'accept' ? await recognizer.accept(request.samples) : await recognizer.finish()
-    }
-    reply({ id: request.id, snapshot: { text, decodedChunks: 0, gpuDispatches: 0, ...recognizer.stats?.() } })
+/** Triggering workflow: createRecognizer invoke -> model adapter -> transcript/metrics reply; Eventa propagates errors to the client. */
+defineInvokeHandler(context, operation, async (request) => {
+  let text = ''
+  if (request.kind === 'load') {
+    if (recognizer)
+      throw new Error('The worker already owns a recording session')
+    const create = request.options.modelId === 'paraformer' ? createParaformerRecognizer : createTransducerRecognizer
+    recognizer = await create(request.options, request.baseUrl, status => void context.emit(progress, status))
   }
-  catch (error) {
-    // The client terminates this worker on an error, releasing native and GPU state.
-    reply({ id: request.id, error: String(error) })
+  else {
+    if (!recognizer)
+      throw new Error('Model is not loaded')
+    if (request.kind === 'dispose')
+      await recognizer.dispose()
+    else
+      text = request.kind === 'accept' ? await recognizer.accept(request.samples) : await recognizer.finish()
   }
-}
+  return { text, decodedChunks: 0, gpuDispatches: 0, ...recognizer.stats?.() }
+})

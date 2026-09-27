@@ -1,3 +1,5 @@
+import { defineEventa, defineInvokeEventa } from '@moeru/eventa'
+
 export type AsrBackend = 'cpu' | 'webgpu' | 'webgpu-decoder' | 'webgpu-fp32' | 'webgpu-encoder'
 
 export interface RecognizerOptions {
@@ -22,13 +24,9 @@ export interface Recognizer {
 
 export interface RecognizerSnapshot extends RecognizerStats { text: string }
 export type RecognizerRequest
-  = | { id: number, kind: 'load', options: RecognizerOptions, baseUrl: string }
-    | { id: number, kind: 'accept', samples: Float32Array }
-    | { id: number, kind: 'finish' | 'dispose' }
+  = | { kind: 'load', options: RecognizerOptions, baseUrl: string }
+    | { kind: 'accept', samples: Float32Array }
+    | { kind: 'finish' | 'dispose' }
 
-export interface RecognizerReply {
-  id: number
-  status?: string
-  error?: string
-  snapshot?: RecognizerSnapshot
-}
+export const operation = defineInvokeEventa<RecognizerSnapshot, RecognizerRequest>('sherpaw:asr:operation')
+export const progress = defineEventa<string>('sherpaw:asr:progress')

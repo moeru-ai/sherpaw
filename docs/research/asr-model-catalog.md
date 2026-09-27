@@ -31,7 +31,7 @@ The page calls `createRecognizer({ modelId, backend, diagnostics })` and only
 handles recording and display. Model adapters share the Worker protocol, native
 runtime loading, PCM transfer, and ORT session/tensor transport:
 
-- `features/asr/recognizer.ts`, `runtime.worker.ts`, `types.ts`: session boundary.
+- `features/asr/recognizer.ts`, `runtime.worker.ts`, `protocol.ts`: Eventa session boundary, shared with the KWS transport approach.
 - `paraformer.ts`, `transducer.ts`: model-specific initialization and decoding.
 - `custom.ts`: legacy Model setup adapter for its existing main-thread WASM instance.
 - `native.ts`, `onnx.ts`: native and browser inference bridges.

@@ -6,7 +6,7 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { expect, inject } from 'vitest'
 
-import type { AsrBackend } from '../../src/features/asr/types'
+import type { AsrBackend } from '../../src/features/asr/protocol'
 import type { RealtimeSession } from './prepare'
 
 import { asrModels } from '../../src/features/asr/catalog'

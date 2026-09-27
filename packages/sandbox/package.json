@@ -14,6 +14,7 @@
   "dependencies": {
     "@iconify-json/ri": "^1.2.6",
     "@iconify-json/svg-spinners": "^1.2.4",
+    "@moeru/eventa": "1.0.1",
     "@sherpaw/asr": "workspace:^",
     "@sherpaw/kws": "workspace:^",
     "@sherpaw/preloader": "workspace:^",

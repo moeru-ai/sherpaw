@@ -2,7 +2,7 @@ import type { ASRModule } from '@sherpaw/asr'
 
 import { createOnlineRecognizer } from '@sherpaw/asr'
 
-import type { Recognizer } from './types'
+import type { Recognizer } from './protocol'
 
 /** Legacy model setup supplies a live WASM module, which must stay in its original realm. */
 export function createCustomRecognizer(module: ASRModule | undefined): Recognizer {

@@ -1,4 +1,4 @@
-import type { Recognizer, RecognizerOptions } from './types'
+import type { Recognizer, RecognizerOptions } from './protocol'
 
 import { asrModels } from './catalog'
 import { loadTransducerWeights } from './models'

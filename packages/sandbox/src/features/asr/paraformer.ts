@@ -1,5 +1,5 @@
 import type { Network } from './onnx'
-import type { Recognizer, RecognizerOptions } from './types'
+import type { Recognizer, RecognizerOptions } from './protocol'
 
 import { loadModelPack } from '../models'
 import { loadParaformerFloatWeights } from './models'

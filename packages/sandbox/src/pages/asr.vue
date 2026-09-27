@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import type { AsrBackend, Recognizer } from '../features/asr/protocol'
 import type { RealtimeEvent, RealtimeSnapshot } from '../features/asr/realtime-metrics'
-import type { AsrBackend, Recognizer } from '../features/asr/types'
 import { PopoverClose } from 'reka-ui'
 import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue'
 import Button from '../components/Button.vue'

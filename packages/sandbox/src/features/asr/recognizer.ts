@@ -1,89 +1,63 @@
-import type { Recognizer, RecognizerOptions, RecognizerReply, RecognizerRequest, RecognizerSnapshot } from './types'
+import { defineInvoke } from '@moeru/eventa'
+import { createContext } from '@moeru/eventa/adapters/webworkers'
 
+import type { Recognizer, RecognizerOptions, RecognizerRequest, RecognizerSnapshot } from './protocol'
+
+import { operation, progress } from './protocol'
 import RuntimeWorker from './runtime.worker?worker'
 
-/** Triggering workflow: ASR Load/Start -> selected model -> dedicated worker -> Recognizer PCM interface. */
+/** Triggering workflow: ASR Load/Start -> Eventa Worker context -> Recognizer PCM interface. */
 export async function createRecognizer(options: RecognizerOptions, report: (status: string) => void): Promise<Recognizer> {
   const worker = new RuntimeWorker()
-  let nextId = 0
-  let closed = false
+  const { context } = createContext(worker)
+  const invoke = defineInvoke(context, operation)
   let snapshot: RecognizerSnapshot = { text: '', decodedChunks: 0, gpuDispatches: 0 }
-  const pending = new Map<number, { resolve: (value: RecognizerSnapshot) => void, reject: (error: Error) => void, timer: ReturnType<typeof setTimeout> }>()
 
-  function close(error = new Error('Model worker released')) {
-    if (closed)
-      return
-    closed = true
+  /** Triggering workflow: dispose / invoke failure / Worker crash -> context abort -> release Worker listeners and resources. */
+  context.signal.addEventListener('abort', () => {
+    worker.onmessage = null
+    worker.onerror = null
+    worker.onmessageerror = null
     worker.terminate()
-    for (const request of pending.values()) {
-      clearTimeout(request.timer)
-      request.reject(error)
+  }, { once: true })
+  /** Triggering workflow: adapter initialization -> progress event -> sandbox loading status. */
+  context.on(progress, (event) => {
+    if (event.body)
+      report(event.body)
+  })
+
+  async function send(request: RecognizerRequest, transfer: Transferable[] = []) {
+    const timer = setTimeout(() => context.abort(new Error('Model operation exceeded five minutes')), 300000)
+    try {
+      snapshot = await invoke(request, { transfer })
+      return snapshot.text
     }
-    pending.clear()
+    catch (error) {
+      context.abort(error)
+      throw error
+    }
+    finally { clearTimeout(timer) }
   }
 
-  /** Triggering workflow: native worker reply -> progress/error/transcript -> waiting load or audio request. */
-  worker.onmessage = (event: MessageEvent<RecognizerReply>) => {
-    const message = event.data
-    if (message.status) {
-      report(message.status)
-      return
-    }
-    const request = pending.get(message.id)
-    if (!request)
-      return
-    clearTimeout(request.timer)
-    pending.delete(message.id)
-    if (message.error) {
-      const error = new Error(message.error)
-      request.reject(error)
-      close(error)
-    }
-    else if (message.snapshot) {
-      snapshot = message.snapshot
-      request.resolve(snapshot)
-    }
-  }
-  /** Triggering workflow: WASM/worker crash -> reject pending requests -> terminate and release model memory. */
-  worker.onerror = event => close(new Error(event.message || 'ASR worker crashed'))
-
-  function send(request: RecognizerRequest, transfer: Transferable[] = []) {
-    return new Promise<RecognizerSnapshot>((resolve, reject) => {
-      if (closed) {
-        reject(new Error('Model worker released'))
+  await send({ kind: 'load', options, baseUrl: new URL(import.meta.env.BASE_URL, location.href).href })
+  return {
+    /** Triggering workflow: microphone pump -> transferred PCM -> adapter.accept -> partial/final text. */
+    accept(samples) {
+      // Keep caller-owned buffers intact (test fixtures can be reused).
+      const copy = samples.slice()
+      return send({ kind: 'accept', samples: copy }, [copy.buffer])
+    },
+    /** Triggering workflow: Stop -> adapter.finish -> trailing context and final text. */
+    finish: () => send({ kind: 'finish' }),
+    /** Triggering workflow: Stop/model change -> native/ORT cleanup -> abort context and terminate Worker. */
+    async dispose() {
+      if (context.signal.aborted)
         return
+      try {
+        await send({ kind: 'dispose' })
       }
-      const timer = setTimeout(() => close(new Error('Model operation exceeded five minutes')), 300000)
-      pending.set(request.id, { resolve, reject, timer })
-      worker.postMessage(request, transfer)
-    })
-  }
-
-  try {
-    await send({ id: nextId++, kind: 'load', options, baseUrl: new URL(import.meta.env.BASE_URL, location.href).href })
-    return {
-      /** Triggering workflow: microphone pump -> transferred PCM -> adapter.accept -> partial/final text. */
-      async accept(samples) {
-        // Keep caller-owned buffers intact (test fixtures can be reused).
-        const copy = samples.slice()
-        return (await send({ id: nextId++, kind: 'accept', samples: copy }, [copy.buffer])).text
-      },
-      /** Triggering workflow: Stop -> adapter.finish -> drain trailing streaming context -> final text. */
-      async finish() { return (await send({ id: nextId++, kind: 'finish' })).text },
-      /** Triggering workflow: Stop/model change -> adapter cleanup -> terminate the owning Worker. */
-      async dispose() {
-        if (closed)
-          return
-        try {
-          await send({ id: nextId++, kind: 'dispose' })
-        }
-        finally { close() }
-      },
-      stats: () => ({ decodedChunks: snapshot.decodedChunks, gpuDispatches: snapshot.gpuDispatches ?? 0 }),
-    }
-  }
-  catch (error) {
-    close()
-    throw error
+      finally { context.abort(new Error('Model worker released')) }
+    },
+    stats: () => ({ decodedChunks: snapshot.decodedChunks, gpuDispatches: snapshot.gpuDispatches }),
   }
 }

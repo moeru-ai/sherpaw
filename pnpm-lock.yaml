@@ -308,6 +308,9 @@ importers:
       '@iconify-json/svg-spinners':
         specifier: ^1.2.4
         version: 1.2.4
+      '@moeru/eventa':
+        specifier: 1.0.1
+        version: 1.0.1
       '@sherpaw/asr':
         specifier: workspace:^
         version: link:../asr
