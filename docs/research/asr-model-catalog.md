@@ -21,13 +21,12 @@ X-ASR's published Hugging Face packs follow the existing Sherpaw layout; see
 Inside **Model setup**, **Load model** prepares the recognizer without microphone access; **Start** reuses
 it. **Stop**, model changes, and route exit release its resources. Paraformer's
 existing custom model setup remains available. Microphone input is the only
-interactive audio source. Recognition diagnostics are available in Model setup
-after recording.
+interactive audio source.
 
 ## Runtime
 
 CPU/WASM is the default. Each built-in recognizer owns a dedicated Worker.
-The page calls `createRecognizer({ modelId, backend, diagnostics })` and only
+The page calls `createRecognizer({ modelId, backend })` and only
 handles recording and display. Built-in and custom models use the same SDK
 recording lifecycle:
 
@@ -35,8 +34,7 @@ recording lifecycle:
 - `@sherpaw/asr/webgpu`: optional native module initialization and ORT session/tensor transport. Its backend only replaces inference during an awaited decode.
 - `features/asr/recognizer.ts`, `runtime.worker.ts`, `protocol.ts`: Eventa Worker communication, shared with the KWS transport approach.
 - `features/asr/load.ts`, `models.ts`: application model configuration and pinned local/HF loading. Custom Model setup calls the same SDK directly with its existing main-thread module.
-- `features/audio/microphone.ts`: shared microphone capture with KWS and speaker identification; ASR requests 16 kHz and retains render-clock diagnostics.
-- `realtime-metrics.ts`, `gpu-diagnostics.ts`: sandbox measurement and optional Worker diagnostics.
+- `features/audio/microphone.ts`: shared microphone capture with KWS and speaker identification; ASR requests 16 kHz.
 - `sherpa-onnx/asr-runtime/`: optional WebGPU target, tensor bridge and explicit upstream hook patches. Both native targets export the standard ASR C API; there are no separate model-specific lifecycle wrappers.
 
 Sherpa retains feature extraction, model caches, endpoint detection and decoding.
@@ -49,9 +47,7 @@ adding async bridge overhead to CPU inference. Paraformer's experimental
 backends use the same tensor transport, including INT64 streaming state.
 No custom GPU operators or model graph changes are required.
 
-GPU dispatch counters verify actual GPU activity. Instrumentation is disabled
-by default; the sandbox enables it inside the recognizer's Worker. Missing
-hardware support and bridge failures produce errors. Quantized operators can
+Missing hardware support and bridge failures produce errors. Quantized operators can
 fall back to CPU within ORT Web, so INT8 WebGPU may be slower than CPU. The X-ASR GPU path copies encoder
 inputs, outputs, and caches across the bridge each chunk and retains the native
 session for metadata/error recovery. Peak memory and Android/Electron native
@@ -123,12 +119,20 @@ option uses local-models and avoids measuring network availability.
 Hardware-accelerated Chrome and prepared weights/bridges are required for GPU
 cases. Each case loads without microphone access, then receives 60 seconds at
 microphone speed. Zipformer uses repeated Chinese speech; others use a bilingual
-fixture. Assertions cover late speech, capture/processing continuity, backlog,
-final flushing, GPU dispatches, stopped tracks, and Worker release. Reports go to
+fixture. Playwright observes capture samples, Worker replies and GPU dispatches;
+the application exposes no measurement hooks. Assertions cover late speech,
+captured/accepted sample totals, backlog, final flushing, GPU activity, stopped
+tracks, and Worker release. Accept RPC timings include scheduling and transfer,
+and are not inference-only or word-level latency. GPU counts cover live input
+after initialization and exclude Stop flushing. Reports go to
 `docs/research/asr-realtime/`; fixtures and reports stay local. Phrase checks are
 functional checks, not a CER/WER benchmark.
 
 ## X-ASR FP32 comparison
+
+These historical measurements used the earlier in-app instrumentation, removed
+from the current implementation. Their timing definitions differ from the
+current test-only RPC measurements.
 
 On 2026-09-26, Chrome 153 on the development Mac ran CPU and WebGPU sequentially
 with the same bilingual fixture. Both passed the lifecycle checks and produced

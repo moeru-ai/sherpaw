@@ -2,7 +2,7 @@ import { useDevicesList, useUserMedia } from '@vueuse/core'
 import { computed, effectScope, ref } from 'vue'
 
 /** Capture mono PCM. Web Audio resamples when a rate is requested; callers own batching. */
-export async function startMicrophone(signal: AbortSignal, onAudio: (samples: Float32Array, sampleRate: number, audioEndTime: number) => void, options: { sampleRate?: number, onError?: () => void } = {}) {
+export async function startMicrophone(signal: AbortSignal, onAudio: (samples: Float32Array, sampleRate: number) => void, options: { sampleRate?: number, onError?: () => void } = {}) {
   signal.throwIfAborted()
 
   const context = new AudioContext({ sampleRate: options.sampleRate })
@@ -55,9 +55,9 @@ export async function startMicrophone(signal: AbortSignal, onAudio: (samples: Fl
   }
 
   /** Triggering workflow: Capture.process -> MessagePort `message` -> collect -> onAudio. */
-  function collect(event: MessageEvent<{ samples: Float32Array, audioEndTime: number }>) {
+  function collect(event: MessageEvent<Float32Array>) {
     if (!signal.aborted)
-      onAudio(event.data.samples, context.sampleRate, event.data.audioEndTime)
+      onAudio(event.data, context.sampleRate)
   }
 
   signal.addEventListener('abort', abort, { once: true })
@@ -104,7 +104,6 @@ export async function startMicrophone(signal: AbortSignal, onAudio: (samples: Fl
 
     return {
       sampleRate: context.sampleRate,
-      get currentTime() { return context.currentTime },
       stop: release,
     }
   }

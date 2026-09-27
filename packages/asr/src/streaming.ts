@@ -15,7 +15,6 @@ export interface StreamingRecognizer {
   accept: (samples: Float32Array) => Promise<string>
   finish: () => Promise<string>
   dispose: () => Promise<void>
-  stats: () => { decodedChunks: number }
 }
 
 /**
@@ -45,7 +44,6 @@ export async function createStreamingRecognizer(
   const sampleRate = native.config.featConfig?.sampleRate ?? 16000
   const completed: string[] = []
   let text = ''
-  let decodedChunks = 0
   let finished = false
   let failure: unknown
   let pending = Promise.resolve()
@@ -71,7 +69,6 @@ export async function createStreamingRecognizer(
         await backend.decode(native, stream)
       else
         native.decode(stream)
-      decodedChunks++
     }
     const partial = native.getResult(stream).text as string
     text = [...completed, partial].filter(Boolean).join(' ')
@@ -116,6 +113,5 @@ export async function createStreamingRecognizer(
       })
       return disposal
     },
-    stats: () => ({ decodedChunks }),
   }
 }

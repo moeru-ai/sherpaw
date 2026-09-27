@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { AsrBackend, Recognizer } from '../features/asr/protocol'
-import type { RealtimeEvent, RealtimeSnapshot } from '../features/asr/realtime-metrics'
 import { PopoverClose } from 'reka-ui'
 import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue'
 import Button from '../components/Button.vue'
@@ -8,7 +7,6 @@ import ModelSetup from '../components/ModelSetup.vue'
 import ModelSetupPopover from '../components/ModelSetupPopover.vue'
 import SandboxLayout from '../components/SandboxLayout.vue'
 import { asrModels } from '../features/asr/catalog'
-import { RealtimeMetrics } from '../features/asr/realtime-metrics'
 import { startMicrophone } from '../features/audio/microphone'
 import { provideASRStore } from '../store'
 
@@ -24,10 +22,6 @@ const status = ref('Ready · built-in Paraformer zh-en')
 const error = ref('')
 const transcript = ref('')
 const backlog = ref(0)
-const measurement = ref<RealtimeSnapshot>()
-let metrics = new RealtimeMetrics()
-let pendingEndTime = 0
-let lastCapturePublish = 0
 let closed = false
 let engine: Recognizer | undefined
 let microphone: Awaited<ReturnType<typeof startMicrophone>> | undefined
@@ -43,14 +37,6 @@ watch(transcript, async () => {
   if (display)
     display.scrollTop = display.scrollHeight
 })
-
-/** Triggering workflow: pump/Stop -> realtime snapshot -> sandbox display and fakemic timeline collector. */
-function publishMetrics(kind: RealtimeEvent['kind'] = 'progress') {
-  measurement.value = metrics.snapshot(performance.now(), engine?.stats?.().gpuDispatches ?? measurement.value?.gpuDispatches ?? 0)
-  window.dispatchEvent(new CustomEvent<RealtimeEvent>('sherpaw:asr-realtime', {
-    detail: { kind, backend: backend.value, model: model.value, snapshot: measurement.value, text: transcript.value },
-  }))
-}
 
 async function release() {
   captureAbort?.abort()
@@ -90,7 +76,7 @@ async function ensureModel() {
   }
   else {
     const { createRecognizer } = await import('../features/asr/recognizer')
-    engine = await createRecognizer({ modelId: model.value, backend: backend.value, diagnostics: true }, message => status.value = message)
+    engine = await createRecognizer({ modelId: model.value, backend: backend.value }, message => status.value = message)
   }
   modelLoaded.value = true
 }
@@ -122,7 +108,6 @@ function pump() {
     while (pendingSize) {
       if (!engine)
         break
-      const audioEnd = pendingEndTime
       const samples = new Float32Array(pendingSize)
       let offset = 0
       for (const chunk of pending) {
@@ -132,11 +117,7 @@ function pump() {
       pending = []
       pendingSize = 0
       backlog.value = 0
-      const chunksBefore = engine.stats?.().decodedChunks ?? 0
-      const started = performance.now()
       transcript.value = await engine.accept(samples)
-      metrics.complete(samples.length, audioEnd, microphone!.currentTime, performance.now() - started, (engine.stats?.().decodedChunks ?? 0) > chunksBefore, transcript.value, performance.now())
-      publishMetrics()
     }
   })().catch(async (cause) => {
     error.value = String(cause)
@@ -150,7 +131,7 @@ function pump() {
 }
 
 /** Triggering workflow: startMicrophone collect -> validate PCM/backlog -> pump -> selected inference backend. */
-function receiveAudio(samples: Float32Array, sampleRate: number, audioEndTime: number) {
+function receiveAudio(samples: Float32Array, sampleRate: number) {
   if (phase.value !== 'recording')
     return
   if (sampleRate !== 16000 || pendingSize > 16000 * 10) {
@@ -158,17 +139,9 @@ function receiveAudio(samples: Float32Array, sampleRate: number, audioEndTime: n
     void stopRecording()
     return
   }
-  metrics.receive(samples.length, audioEndTime, microphone!.currentTime, performance.now())
-  pendingEndTime = audioEndTime
   pending.push(samples)
   pendingSize += samples.length
   backlog.value = pendingSize / 16000
-  // Slow worker inference must not hide ongoing microphone capture from the
-  // display or the fakemic stop condition. Publish at most ten times/second.
-  if (processing && audioEndTime - lastCapturePublish >= 0.1) {
-    lastCapturePublish = audioEndTime
-    publishMetrics()
-  }
   if (pendingSize >= 1600)
     void pump()
 }
@@ -181,10 +154,6 @@ async function startRecording() {
   phase.value = 'loading'
   error.value = ''
   transcript.value = ''
-  metrics = new RealtimeMetrics()
-  measurement.value = undefined
-  pendingEndTime = 0
-  lastCapturePublish = 0
   pending = []
   pendingSize = 0
   try {
@@ -220,7 +189,6 @@ async function stopRecording() {
   if (phase.value !== 'recording')
     return
   phase.value = 'stopping'
-  const stopStarted = performance.now()
   captureAbort?.abort()
   try {
     await pump()
@@ -229,8 +197,6 @@ async function stopRecording() {
   }
   catch (cause) { error.value = String(cause) }
   finally {
-    metrics.finish(performance.now() - stopStarted, transcript.value, performance.now())
-    publishMetrics('stopped')
     await release()
     phase.value = 'idle'
     backlog.value = 0
@@ -307,20 +273,6 @@ onBeforeUnmount(() => {
           <p text-sm>
             {{ status }}
           </p>
-          <details v-if="measurement" text-sm>
-            <summary cursor-pointer>
-              Recognition diagnostics
-            </summary>
-            <dl mt-3 grid="~ cols-2 gap-2" aria-label="Realtime metrics">
-              <dt>Audio processed</dt><dd>{{ measurement.processedAudioSeconds.toFixed(1) }} s</dd>
-              <dt>First text</dt><dd>{{ measurement.firstTextMs === null ? 'Waiting…' : `${Math.round(measurement.firstTextMs)} ms` }}</dd>
-              <dt>Processing delay p95</dt><dd>{{ Math.round(measurement.audioEndToCompletionP95Ms) }} ms</dd>
-              <dt>Peak unprocessed audio</dt><dd>{{ measurement.maxOutstandingSeconds.toFixed(2) }} s</dd>
-            </dl>
-            <p mt-2 text-xs>
-              First text includes leading silence. Processing delay measures audio batches, not individual words.
-            </p>
-          </details>
         </div>
       </ModelSetupPopover>
     </template>

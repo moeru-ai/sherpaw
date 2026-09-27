@@ -85,7 +85,7 @@ it('keeps endpoint text and flushes the transducer tail exactly once', async () 
   expect(await session.finish()).toBe('first last')
   expect(stream.acceptWaveform.mock.calls.at(-1)).toEqual([16000, new Float32Array(16000)])
   expect(stream.inputFinished).toHaveBeenCalledOnce()
-  expect(session.stats().decodedChunks).toBe(2)
+  expect(native.decode).toHaveBeenCalledTimes(2)
   await session.dispose()
 })
 

@@ -1,7 +1,7 @@
 import { defineInvoke } from '@moeru/eventa'
 import { createContext } from '@moeru/eventa/adapters/webworkers'
 
-import type { Recognizer, RecognizerOptions, RecognizerRequest, RecognizerSnapshot } from './protocol'
+import type { Recognizer, RecognizerOptions, RecognizerRequest } from './protocol'
 
 import { operation, progress } from './protocol'
 import RuntimeWorker from './runtime.worker?worker'
@@ -11,7 +11,6 @@ export async function createRecognizer(options: RecognizerOptions, report: (stat
   const worker = new RuntimeWorker()
   const { context } = createContext(worker)
   const invoke = defineInvoke(context, operation)
-  let snapshot: RecognizerSnapshot = { text: '', decodedChunks: 0, gpuDispatches: 0 }
 
   /** Triggering workflow: dispose / invoke failure / Worker crash -> context abort -> release Worker listeners and resources. */
   context.signal.addEventListener('abort', () => {
@@ -29,8 +28,7 @@ export async function createRecognizer(options: RecognizerOptions, report: (stat
   async function send(request: RecognizerRequest, transfer: Transferable[] = []) {
     const timer = setTimeout(() => context.abort(new Error('Model operation exceeded five minutes')), 300000)
     try {
-      snapshot = await invoke(request, { transfer })
-      return snapshot.text
+      return await invoke(request, { transfer })
     }
     catch (error) {
       context.abort(error)
@@ -58,6 +56,5 @@ export async function createRecognizer(options: RecognizerOptions, report: (stat
       }
       finally { context.abort(new Error('Model worker released')) }
     },
-    stats: () => ({ decodedChunks: snapshot.decodedChunks, gpuDispatches: snapshot.gpuDispatches }),
   }
 }

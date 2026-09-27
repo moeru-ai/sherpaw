@@ -6,7 +6,6 @@ import { loadVirtualData } from '@sherpaw/preloader'
 import type { Recognizer, RecognizerOptions } from './protocol'
 
 import { asrModels } from './catalog'
-import { countGpuDispatches } from './gpu-diagnostics'
 import { loadPackedWeights, loadParaformerFloatWeights, loadTransducerWeights } from './models'
 
 /** Triggering workflow: runtime.worker load -> application model policy -> shared SDK recording lifecycle. */
@@ -52,21 +51,8 @@ export async function loadRecognizer(options: RecognizerOptions, report: (messag
       enableEndpoint: paraformer ? 0 : 1,
       rule2MinTrailingSilence: 0.8,
     }, execution)
-    const counter = countGpuDispatches(Boolean(gpuApi && options.diagnostics))
     report(`Ready · ${label} · ${gpuApi ? 'WebGPU' : 'CPU / WASM'} · streaming`)
-    return {
-      ...session,
-      /** Triggering workflow: worker dispose -> SDK cleanup -> restore worker-only GPU instrumentation. */
-      async dispose() {
-        try {
-          await session.dispose()
-        }
-        finally {
-          counter.dispose()
-        }
-      },
-      stats: () => ({ ...session.stats(), gpuDispatches: counter.read() }),
-    }
+    return session
   }
   finally {
     // Native sessions own their weights now; discard temporary filesystem copies.
