@@ -1,8 +1,17 @@
 {
-  "references": [
-    { "path": "./tsconfig.config.json" },
-    { "path": "./tsconfig.lib.json" },
-    { "path": "./tsconfig.tests.json" }
-  ],
-  "files": []
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ESNext", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["vite/client", "node"],
+    "allowImportingTsExtensions": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "skipLibCheck": true
+  },
+  "include": ["src", "tests", "tsdown.config.ts", "vitest*.config.ts"]
 }
