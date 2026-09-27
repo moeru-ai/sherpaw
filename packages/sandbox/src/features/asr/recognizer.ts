@@ -39,7 +39,7 @@ export async function createRecognizer(options: RecognizerOptions, report: (stat
     finally { clearTimeout(timer) }
   }
 
-  await send({ kind: 'load', options, baseUrl: new URL(import.meta.env.BASE_URL, location.href).href })
+  await send({ kind: 'load', options })
   return {
     /** Triggering workflow: microphone pump -> transferred PCM -> adapter.accept -> partial/final text. */
     accept(samples) {

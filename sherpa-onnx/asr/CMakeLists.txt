@@ -40,6 +40,7 @@ set(exported_functions
 
 set(exported_runtime_methods
 	ccall
+	FS_unlink
 	stringToUTF8
 	setValue
 	getValue
@@ -55,8 +56,10 @@ set(exported_runtime_methods
 
 set_emcc_flags(MY_FLAGS "${exported_functions}" "${exported_runtime_methods}")
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${MY_FLAGS}")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MY_FLAGS}")
-set(CMAKE_EXECUTABLE_LINKER_FLAGS "${CMAKE_EXECUTABLE_LINKER_FLAGS} ${MY_FLAGS}")
-
 plan_build(asr)
+set_target_properties(asr PROPERTIES LINK_FLAGS "${MY_FLAGS}")
+
+option(SHERPAW_ASR_WEBGPU "Build the optional ASR WebGPU backend" OFF)
+if(SHERPAW_ASR_WEBGPU)
+  add_subdirectory(../asr-runtime "${CMAKE_CURRENT_BINARY_DIR}/webgpu")
+endif()

@@ -1,5 +1,5 @@
-// Experiment-only model boundary. Generated Paraformer/Zipformer sources call this
-// hook; the pinned upstream checkout and all ordinary targets stay unchanged.
+// Optional model boundary shared by Paraformer and Zipformer. Patched build-local
+// sources call this hook; ordinary ASR builds retain the upstream implementation.
 #pragma once
 #include "onnxruntime_cxx_api.h"
 #include <vector>

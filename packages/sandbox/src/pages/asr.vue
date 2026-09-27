@@ -82,8 +82,10 @@ async function ensureModel() {
   if (engine)
     return
   if (backend.value === 'custom') {
-    const { createCustomRecognizer } = await import('../features/asr/custom')
-    engine = createCustomRecognizer(asrModule.value)
+    if (!asrModule.value)
+      throw new Error('Load and initialize your model in Model setup first.')
+    const { createStreamingRecognizer } = await import('@sherpaw/asr')
+    engine = await createStreamingRecognizer(asrModule.value)
     status.value = 'CPU / WASM · custom model'
   }
   else {

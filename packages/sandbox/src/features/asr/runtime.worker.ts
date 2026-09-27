@@ -3,9 +3,8 @@ import { createContext } from '@moeru/eventa/adapters/webworkers/worker'
 
 import type { Recognizer } from './protocol'
 
-import { createParaformerRecognizer } from './paraformer'
+import { loadRecognizer } from './load'
 import { operation, progress } from './protocol'
-import { createTransducerRecognizer } from './transducer'
 
 const { context } = createContext()
 let recognizer: Recognizer | undefined
@@ -16,8 +15,7 @@ defineInvokeHandler(context, operation, async (request) => {
   if (request.kind === 'load') {
     if (recognizer)
       throw new Error('The worker already owns a recording session')
-    const create = request.options.modelId === 'paraformer' ? createParaformerRecognizer : createTransducerRecognizer
-    recognizer = await create(request.options, request.baseUrl, status => void context.emit(progress, status))
+    recognizer = await loadRecognizer(request.options, status => void context.emit(progress, status))
   }
   else {
     if (!recognizer)
@@ -27,5 +25,6 @@ defineInvokeHandler(context, operation, async (request) => {
     else
       text = request.kind === 'accept' ? await recognizer.accept(request.samples) : await recognizer.finish()
   }
-  return { text, decodedChunks: 0, gpuDispatches: 0, ...recognizer.stats?.() }
+  const stats = recognizer.stats?.()
+  return { text, decodedChunks: stats?.decodedChunks ?? 0, gpuDispatches: stats?.gpuDispatches ?? 0 }
 })

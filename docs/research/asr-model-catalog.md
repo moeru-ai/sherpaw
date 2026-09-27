@@ -28,21 +28,21 @@ after recording.
 
 CPU/WASM is the default. Each built-in recognizer owns a dedicated Worker.
 The page calls `createRecognizer({ modelId, backend, diagnostics })` and only
-handles recording and display. Model adapters share the Worker protocol, native
-runtime loading, PCM transfer, and ORT session/tensor transport:
+handles recording and display. Built-in and custom models use the same SDK
+recording lifecycle:
 
-- `features/asr/recognizer.ts`, `runtime.worker.ts`, `protocol.ts`: Eventa session boundary, shared with the KWS transport approach.
-- `paraformer.ts`, `transducer.ts`: model-specific initialization and decoding.
-- `custom.ts`: legacy Model setup adapter for its existing main-thread WASM instance.
-- `native.ts`, `onnx.ts`: native and browser inference bridges.
-- `features/models.ts`, `asr/models.ts`: local-models dev loading and pinned HF fallback.
+- `@sherpaw/asr` → `createStreamingRecognizer`: PCM input, decode, endpoint accumulation, final flushing and disposal through the existing `OnlineRecognizer` / `OnlineStream` bindings. Calls are serialized, including asynchronous inference and cleanup.
+- `@sherpaw/asr/webgpu`: optional native module initialization and ORT session/tensor transport. Its backend only replaces inference during an awaited decode.
+- `features/asr/recognizer.ts`, `runtime.worker.ts`, `protocol.ts`: Eventa Worker communication, shared with the KWS transport approach.
+- `features/asr/load.ts`, `models.ts`: application model configuration and pinned local/HF loading. Custom Model setup calls the same SDK directly with its existing main-thread module.
 - `features/audio/microphone.ts`: shared microphone capture with KWS and speaker identification; ASR requests 16 kHz and retains render-clock diagnostics.
-- `realtime-metrics.ts`, `gpu-diagnostics.ts`: measurement and optional diagnostics.
-- `sherpa-onnx/asr-runtime/`: native runtimes and explicit upstream hook patches.
+- `realtime-metrics.ts`, `gpu-diagnostics.ts`: sandbox measurement and optional Worker diagnostics.
+- `sherpa-onnx/asr-runtime/`: optional WebGPU target, tensor bridge and explicit upstream hook patches. Both native targets export the standard ASR C API; there are no separate model-specific lifecycle wrappers.
 
-The native C API retains Sherpa feature extraction, endpoint detection, decoding,
-and flushing. Patches apply to build-local sources with zero fuzz; upstream
-submodules stay unchanged.
+Sherpa retains feature extraction, model caches, endpoint detection and decoding.
+The SDK supplies final input context (Paraformer final flag or transducer tail)
+and accumulates completed utterances. Patches apply to build-local sources with
+zero fuzz; upstream submodules stay unchanged.
 X-ASR FP32 can run its encoder in ONNX Runtime Web while keeping decoder/joiner
 on CPU. Separate synchronous CPU and asynchronous WebGPU WASM builds avoid
 adding async bridge overhead to CPU inference. Paraformer's experimental
@@ -90,11 +90,14 @@ uv run scripts/prepare-paraformer-fp32.py
 
 The archive preparer still accepts `x-asr` and `x-asr-fp32` for model packaging;
 `models/<upstream-name>/download.sh` uses the same pinned archive verification.
-Generated weights and WASM binaries are not committed. `SHERPAW_DEPS_CACHE`
+Generated weights and the optional WebGPU build are not committed. The existing CPU SDK ships its ordinary prebuilt runtime. `SHERPAW_DEPS_CACHE`
 optionally reuses an existing native dependency cache during bridge builds.
 ASR weights are downloaded at runtime instead of copied into production builds.
-Deployment still requires the locally built ASR JS/WASM bridges; model download
-requires network access to Hugging Face when no local dev cache is available.
+CPU recognition uses the standard SDK build. WebGPU requires running the native
+build script before building `@sherpaw/asr`: its generated JS/WASM and ORT assets
+are packaged under `dist/prebuilt/`. The CPU entry does not import ORT; the
+optional `@sherpaw/asr/webgpu` entry loads it. Model downloads require network
+access to Hugging Face when no local dev cache is available.
 
 ## Automated verification
 

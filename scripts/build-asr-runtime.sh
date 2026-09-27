@@ -24,5 +24,5 @@ cmake -S "$repo/sherpa-onnx" -B "$repo/sherpa-onnx/build-asr-runtime" \
   -DSHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION=ON -DSHERPA_ONNX_ENABLE_WEBSOCKET=OFF \
   -DSHERPA_ONNX_ENABLE_GPU=OFF -DSHERPA_ONNX_ENABLE_WASM=ON \
   -DSHERPA_ONNX_ENABLE_BINARY=OFF -DSHERPA_ONNX_LINK_LIBSTDCPP_STATICALLY=OFF \
-  -DSHERPAW_ASR_RUNTIME=ON "${cache_args[@]}"
-cmake --build "$repo/sherpa-onnx/build-asr-runtime" --target paraformer-asr catalog-asr catalog-asr-webgpu --parallel 8
+  -DSHERPAW_ASR_WEBGPU=ON "${cache_args[@]}"
+cmake --build "$repo/sherpa-onnx/build-asr-runtime" --target asr-webgpu --parallel 8

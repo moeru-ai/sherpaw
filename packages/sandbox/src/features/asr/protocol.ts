@@ -1,3 +1,5 @@
+import type { StreamingRecognizer } from '@sherpaw/asr'
+
 import { defineEventa, defineInvokeEventa } from '@moeru/eventa'
 
 export type AsrBackend = 'cpu' | 'webgpu' | 'webgpu-decoder' | 'webgpu-fp32' | 'webgpu-encoder'
@@ -15,16 +17,13 @@ export interface RecognizerStats {
 }
 
 /** A single recording session, accepting mono 16 kHz PCM in order. */
-export interface Recognizer {
-  accept: (samples: Float32Array) => Promise<string>
-  finish: () => Promise<string>
-  dispose: () => Promise<void>
-  stats?: () => RecognizerStats
+export interface Recognizer extends Omit<StreamingRecognizer, 'stats'> {
+  stats?: () => { decodedChunks: number, gpuDispatches?: number }
 }
 
 export interface RecognizerSnapshot extends RecognizerStats { text: string }
 export type RecognizerRequest
-  = | { kind: 'load', options: RecognizerOptions, baseUrl: string }
+  = | { kind: 'load', options: RecognizerOptions }
     | { kind: 'accept', samples: Float32Array }
     | { kind: 'finish' | 'dispose' }
 

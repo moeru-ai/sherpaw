@@ -1,3 +1,4 @@
+/// <reference types="@webgpu/types" />
 /** Optional instrumentation scoped to an ASR worker, which owns all GPU work in its realm. */
 export function countGpuDispatches(enabled: boolean) {
   let count = 0

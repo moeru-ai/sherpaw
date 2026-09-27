@@ -86,6 +86,8 @@ export interface WebAssemblyModule extends EmscriptenModule,
   setValue: typeof setValue
   getValue: typeof getValue
 
+  /** Available on ASR builds; removes temporary model files after session creation. */
+  FS_unlink?: (path: string) => void
   FS_createDataFile: typeof FS['createDataFile']
 
   addRunDependency: typeof addRunDependency

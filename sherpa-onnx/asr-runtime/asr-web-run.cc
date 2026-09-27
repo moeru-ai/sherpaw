@@ -4,6 +4,12 @@
 #include "nlohmann/json.hpp"
 
 bool asr_web_enabled = false;
+
+// Triggering workflow: SDK finishes recognizer initialization -> enable the
+// optional model bridge before accepting audio; CPU stays on native sessions.
+extern "C" void SherpawSetWebGpuEnabled(int enabled) {
+  asr_web_enabled = enabled != 0;
+}
 namespace {
 Ort::AllocatorWithDefaultOptions allocator;
 size_t ElementBytes(int type) { return type == ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64 ? 8 : 4; }
