@@ -95,8 +95,11 @@ optionally reuses an existing native dependency cache during bridge builds.
 ASR weights are downloaded at runtime instead of copied into production builds.
 CPU recognition uses the standard SDK build. WebGPU requires running the native
 build script before building `@sherpaw/asr`: its generated JS/WASM and ORT assets
-are packaged under `dist/prebuilt/`. The CPU entry does not import ORT; the
-optional `@sherpaw/asr/webgpu` entry loads it. Model downloads require network
+are packaged under `dist/prebuilt/` only when both native GPU files exist.
+Incomplete native pairs fail the package build. ORT is an optional peer dependency;
+applications using WebGPU install `onnxruntime-web@1.27.0` (the sandbox already does).
+A CPU package built without native GPU files carries no ORT WASM assets.
+The CPU entry does not import ORT; the optional `@sherpaw/asr/webgpu` entry loads it. Model downloads require network
 access to Hugging Face when no local dev cache is available.
 
 ## Automated verification

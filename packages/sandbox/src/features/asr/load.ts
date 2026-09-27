@@ -5,10 +5,9 @@ import { loadVirtualData } from '@sherpaw/preloader'
 
 import type { Recognizer, RecognizerOptions } from './protocol'
 
-import { loadModelPack } from '../models'
 import { asrModels } from './catalog'
 import { countGpuDispatches } from './gpu-diagnostics'
-import { loadParaformerFloatWeights, loadTransducerWeights } from './models'
+import { loadPackedWeights, loadParaformerFloatWeights, loadTransducerWeights } from './models'
 
 /** Triggering workflow: runtime.worker load -> application model policy -> shared SDK recording lifecycle. */
 export async function loadRecognizer(options: RecognizerOptions, report: (message: string) => void): Promise<Recognizer> {
@@ -25,10 +24,7 @@ export async function loadRecognizer(options: RecognizerOptions, report: (messag
   const gpuApi = backend === 'cpu' ? undefined : await import('@sherpaw/asr/webgpu')
   const module = gpuApi ? await gpuApi.initWebGpuASRModule() : await initASRModule()
   const files = paraformer
-    ? await loadModelPack('sherpaw-paraformer-zh-en', '46701cc733a82ed5cb94c7f3200a002d010243f6').then(({ data, metadata }) => {
-        const bytes = new Uint8Array(data)
-        return metadata.files.map(file => ({ filename: file.filename, bytes: bytes.subarray(file.start, file.end) }))
-      })
+    ? await loadPackedWeights('sherpaw-paraformer-zh-en', '46701cc733a82ed5cb94c7f3200a002d010243f6')
     : await loadTransducerWeights(model!)
   if (model && files.reduce((size, file) => size + file.bytes.byteLength, 0) !== model.modelBytes)
     throw new Error(`Incomplete model weights: ${label}`)
