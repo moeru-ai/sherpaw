@@ -47,16 +47,21 @@ describe('Model selector and continuous microphone input', () => {
       const fixtureManifest = JSON.parse(await readFile(new URL(`./fixtures/generated/${chineseOnly ? 'manifest-chinese' : 'manifest'}.json`, import.meta.url), 'utf8'))
       let failure: unknown
       try {
+        // Reuse the original Transcription page and its Model setup popover.
+        expect(await audio.page.getByRole('heading', { name: 'Transcription', exact: true }).count()).toBe(1)
+        expect(await audio.page.getByLabel('ASR model', { exact: true }).count()).toBe(0)
+        await audio.page.getByRole('button', { name: 'Model setup', exact: true }).click()
         // Exercise preloading via the visible selector, with no microphone opened.
         await audio.page.getByLabel('ASR model', { exact: true }).selectOption(model)
         await audio.page.getByLabel('Inference backend').selectOption(backend)
         await audio.page.getByRole('button', { name: 'Load model', exact: true }).click()
-        await audio.page.getByRole('button', { name: 'Start', exact: true }).waitFor({ timeout: 180000 })
+        await expect.poll(() => audio.page.getByLabel('ASR model', { exact: true }).isEnabled(), { timeout: 180000 }).toBe(true)
         const loaded = await audio.snapshot()
         expect(loaded.error).toBe('')
         expect(loaded.tracks).toEqual([])
         expect(loaded.mainThreadGpuUntouched).toBe(true)
         expect(audio.page.workers()).toHaveLength(1)
+        await audio.page.getByRole('button', { name: 'Close model setup' }).click()
         // Do not reselect a model: Start must reuse the preloaded worker.
         await audio.page.getByRole('button', { name: 'Start', exact: true }).click()
         await audio.page.getByRole('button', { name: 'Stop transcription' }).waitFor({ timeout: 180000 })

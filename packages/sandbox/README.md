@@ -43,7 +43,7 @@ Speaker tests cover UI interactions, route cleanup, sample management, recording
 
 ## Streaming ASR models
 
-The `/asr` selector offers Paraformer zh-en, X-ASR zh-en (INT8 or FP32), and
+The existing Transcription page's **Model setup** popover offers Paraformer zh-en, X-ASR zh-en (INT8 or FP32), and
 Chinese Zipformer 2025. Use **Load model** to preload, then **Start** to open the microphone.
 X-ASR and Zipformer use dedicated Workers. X-ASR FP32 offers an experimental
 WebGPU encoder with CPU decoder/joiner; other catalog variants use CPU/WASM.

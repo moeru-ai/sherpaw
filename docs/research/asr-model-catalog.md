@@ -1,6 +1,7 @@
 # Streaming ASR model selector
 
-The `/asr` sandbox offers three streaming model families without an external VAD:
+The sandbox's existing **Transcription** page offers three streaming model
+families through its **Model setup** popover, without an external VAD:
 
 | Model | Runtime files | Backend |
 | --- | ---: | --- |
@@ -17,10 +18,11 @@ the decoder keeps its upstream precision. Sizes above exclude runtime memory.
 X-ASR's published Hugging Face packs follow the existing Sherpaw layout; see
 [packaging and verification](./x-asr-model-packaging.md).
 
-**Load model** prepares the recognizer without microphone access; **Start** reuses
+Inside **Model setup**, **Load model** prepares the recognizer without microphone access; **Start** reuses
 it. **Stop**, model changes, and route exit release its resources. Paraformer's
 existing custom model setup remains available. Microphone input is the only
-interactive audio source.
+interactive audio source. Recognition diagnostics are available in Model setup
+after recording.
 
 ## Runtime
 
