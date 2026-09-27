@@ -31,7 +31,7 @@ In development, `virtual:local-models` exports `fetchLocalModel(path): Promise<R
 
 For production builds the virtual module exports an async function that throws when called. The same sandbox code catches it and downloads from Hugging Face. Building requires no local KWS model, emits no KWS model assets or local paths, and Cloudflare deployment does not prepare KWS models. The WASM runtime remains bundled; inference and audio stay on the device.
 
-`pnpm -F @sherpaw/sandbox test:kws` exercises the real UI, Worker, packed model, file input, microphone, vocabulary replacement, error recovery and route cleanup. Upstream Chinese and English fixtures use a separate regression vocabulary. Private recording tests are opt-in via `SHERPAW_KWS_TEST_RECORDING`, `SHERPAW_KWS_TEST_REPEATED_RECORDING`, `SHERPAW_KWS_TEST_CHINESE_RECORDING` and `SHERPAW_KWS_TEST_NATURAL_RECORDING`; they require specific local WAV fixtures, and the last includes a known failing seven-utterance target. Keep those recordings and their analysis notes outside Git. Japanese remains unverified.
+`pnpm -F @sherpaw/sandbox test:kws` runs Playwright Test from `e2e/kws/` and exercises the real UI, Worker, packed model, file input, microphone, vocabulary replacement, error recovery and route cleanup. Upstream Chinese and English fixtures use a separate regression vocabulary. Private recording tests are opt-in via `SHERPAW_KWS_TEST_RECORDING`, `SHERPAW_KWS_TEST_REPEATED_RECORDING`, `SHERPAW_KWS_TEST_CHINESE_RECORDING` and `SHERPAW_KWS_TEST_NATURAL_RECORDING`; they require specific local WAV fixtures, and the last includes a known failing seven-utterance target. Keep those recordings and their analysis notes outside Git. Japanese remains unverified.
 
 ## Speaker page organization
 
@@ -49,12 +49,12 @@ The [Cloudflare Workers deployment guide](../../docs/deployment/cloudflare-worke
 
 ## Validate
 
-All sandbox tests use `vitest.config.ts`: Node tests drive the pages and test the Vite plugin, while browser tests exercise the recorder. `tsconfig.tests.json` checks all test sources. `pnpm -F @sherpaw/sandbox test` runs them together; the feature commands below filter test paths without separate configs. Run `pnpm -F @sherpaw/kws test:prepare` to download the pinned packs and upstream audio fixtures for KWS regression tests. Production loading tests intercept the exact HF URLs with those model bytes for repeatability.
+KWS end-to-end tests use `playwright.config.ts`, with development and production projects. Playwright owns the browser/page fixtures, starts an isolated Vite server and builds a production preview, and saves failure screenshots and traces under `test-results/`. `pnpm -F @sherpaw/sandbox test:e2e` runs this suite; `test:kws` filters it to KWS. Existing speaker regressions, Vite plugin tests and recorder browser tests remain under Vitest (`pnpm -F @sherpaw/sandbox test`). `tsconfig.tests.json` checks both runners’ test sources and configuration. Run `pnpm -F @sherpaw/kws test:prepare` to download the pinned packs and upstream audio fixtures for KWS regression tests. Production loading tests intercept the exact HF URLs with those model bytes for repeatability.
 
 ```sh
 pnpm -F @sherpaw/sandbox typecheck
 pnpm -F @sherpaw/sandbox test:speaker
-pnpm -F @sherpaw/sandbox test:kws
+pnpm -F @sherpaw/sandbox test:e2e
 pnpm -F @sherpaw/testing-audio test:speakers
 pnpm -F @sherpaw/sandbox build
 pnpm -F @sherpaw/sandbox preview
