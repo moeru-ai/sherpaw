@@ -340,6 +340,29 @@ describe('native ownership and updates', () => {
     spotter.dispose()
   })
 
+  it('resets only the stream and preserves it if replacement allocation fails', () => {
+    const r = runtime()
+    const spotter = createKeywordSpotter(r.typed, { model, keywords: [keyword] })
+
+    spotter.processAudio(new Float32Array(4), 16000)
+    r.module._SherpaOnnxCreateKeywordStream.mockReturnValueOnce(0)
+
+    expect(() => spotter.reset()).toThrow(/create keyword stream/)
+    expect(r.streams.size).toBe(1)
+    expect(() => spotter.processAudio(new Float32Array(4), 48000)).toThrow(/constant/)
+
+    spotter.reset()
+    spotter.processAudio(new Float32Array(4), 48000)
+
+    expect(r.module._SherpawCreateKeywordSpotter).toHaveBeenCalledTimes(1)
+    expect(r.streams.size).toBe(1)
+
+    spotter.dispose()
+
+    expect(r.detectors.size + r.streams.size + r.allocated.size).toBe(0)
+    expect(() => spotter.reset()).toThrow(/disposed/)
+  })
+
   it('preserves special tokens and native timestamp precision', () => {
     const r = runtime()
     const spotter = createKeywordSpotter(r.typed, { model, keywords: [keyword] })

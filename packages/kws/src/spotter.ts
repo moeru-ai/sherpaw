@@ -194,6 +194,22 @@ export function createKeywordSpotter(module: KWSModule, config: KeywordSpotterCo
       return detections
     },
 
+    reset() {
+      requireLive()
+
+      if (!current)
+        return
+
+      const stream = module._SherpaOnnxCreateKeywordStream(current.spotter)
+
+      if (!stream)
+        throw new Error('Unable to create keyword stream')
+
+      module._SherpaOnnxDestroyOnlineStream(current.stream)
+      current.stream = stream
+      current.sampleRate = undefined
+    },
+
     dispose() {
       if (disposed)
         return

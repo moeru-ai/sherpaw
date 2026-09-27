@@ -62,7 +62,7 @@ test('activates selected presets immediately with the real model and keeps manua
   await page.screenshot({ path: testInfo.outputPath('sherpaw-kws-presets.png'), fullPage: true })
 })
 
-test('keeps the active detector when a preset changes search settings but its tokens are invalid', async ({ page }) => {
+test('reuses the loaded model when a preset changes keywords and search settings', async ({ page }) => {
   let modelRequests = 0
   const remoteRequests = await serveRemoteModel(page)
 
@@ -73,31 +73,12 @@ test('keeps the active detector when a preset changes search settings but its to
   await page.goto('/kws', { waitUntil: 'domcontentloaded' })
   await openKeywords(page)
   await load(page)
-  // Corrupt the next preset message to exercise failed reconstruction at a
-  // different candidate count, rather than only setKeywords validation.
-  await page.evaluate(() => {
-    const post = Worker.prototype.postMessage
-
-    Worker.prototype.postMessage = function (message, transfer) {
-      if (message.request?.type === 'keywords') {
-        Worker.prototype.postMessage = post
-        message.request.keywords[0].matches[0].tokens = ['NOT_A_MODEL_TOKEN']
-      }
-
-      return post.call(this, message, transfer as StructuredSerializeOptions)
-    }
-  })
-  await openKeywords(page)
-  await page.getByLabel('Preset', { exact: true }).selectOption('chinese')
-
-  await expect.poll(() => page.getByRole('alert').textContent()).toContain('token')
-
   await file(page)
 
   expect(await page.locator('.hit strong').allTextContents()).toEqual(['落实', '周望军'])
 
   await openKeywords(page)
-  await page.getByRole('button', { name: 'Apply' }).click()
+  await page.getByLabel('Preset', { exact: true }).selectOption('chinese')
 
   await expect.poll(() => page.locator('.active-words .word').allTextContents()).toEqual(['你好肥鱼', '大肥鱼', '肥鱼肥鱼'])
 

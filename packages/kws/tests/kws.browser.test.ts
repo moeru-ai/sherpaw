@@ -5,7 +5,7 @@ import type { Detection, KeywordEntry, KeywordSpotter, KWSModel, KWSModule } fro
 
 // Exercise the published JS layout and its relative WASM URL, not only source.
 // eslint-disable-next-line antfu/no-import-dist
-import { createKeywordSpotter, initKWSModule } from '../dist/index.js'
+import { createKeywordSpotter, initKWSModule } from '../dist/core.js'
 
 const files = import.meta.glob<string>('./models/**/*.wav', { eager: true, query: '?url', import: 'default' })
 const packs = import.meta.glob<string>('../../../models/huggingface/sherpa-onnx-kws-*/install/bin/wasm/preload.{data,js.metadata}', { eager: true, query: '?url', import: 'default' })

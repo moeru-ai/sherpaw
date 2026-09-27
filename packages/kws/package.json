@@ -13,6 +13,9 @@
   "keywords": [],
   "exports": {
     ".": "./dist/index.js",
+    "./core": "./dist/core.js",
+    "./worker": "./dist/worker.js",
+    "./node": "./dist/node.js",
     "./package.json": "./package.json",
     "./module.wasm": "./dist/prebuilt/kws.wasm"
   },
@@ -30,10 +33,10 @@
     "test:run:browser": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
+    "@sherpaw/preloader": "workspace:^",
     "@sherpaw/shared": "workspace:^"
   },
   "devDependencies": {
-    "@sherpaw/preloader": "workspace:^",
     "@types/emscripten": "^1.41.5",
     "@types/node": "^24.6.0",
     "@vitest/browser-playwright": "^4.1.9",

@@ -75,6 +75,8 @@ export interface KeywordSpotter {
    * Synchronous; use a Worker to keep inference and model reloads off the UI.
    */
   processAudio: (samples: Float32Array, sampleRate: number) => Detection[]
+  /** Discard buffered audio and reset sample-rate tracking without reloading the model. */
+  reset: () => void
   /** Idempotent. Pending updates reject; further processing throws. */
   dispose: () => void
 }

@@ -241,13 +241,13 @@ importers:
 
   packages/kws:
     dependencies:
+      '@sherpaw/preloader':
+        specifier: workspace:^
+        version: link:../preloader
       '@sherpaw/shared':
         specifier: workspace:^
         version: link:../shared
     devDependencies:
-      '@sherpaw/preloader':
-        specifier: workspace:^
-        version: link:../preloader
       '@types/emscripten':
         specifier: ^1.41.5
         version: 1.41.5

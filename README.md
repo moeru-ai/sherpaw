@@ -31,7 +31,7 @@ Speaker identification is available in [`@sherpaw/speaker-identification`](packa
 
 ## Development at the WASM/C level
 
-Streaming keyword spotting is available in [`@sherpaw/kws`](packages/kws/README.md). It accepts caller-provided PCM and encoded model tokens, supports replacing the complete vocabulary while running, and loads models separately through `@sherpaw/preloader`. Try the [sandbox playground](packages/sandbox/README.md#keyword-spotting-playground) at `/kws` with a microphone or an audio file.
+Streaming keyword spotting is available in [`@sherpaw/kws`](packages/kws/README.md). It runs in a Worker by default, accepts caller-provided PCM, downloaded model packs and encoded tokens, and supports replacing the complete vocabulary while running. Node applications use `@sherpaw/kws/node`; the explicit synchronous interface is available from `@sherpaw/kws/core`. Try the [sandbox playground](packages/sandbox/README.md#keyword-spotting-playground) at `/kws` with a microphone or an audio file.
 
 ### Prerequisites
 
