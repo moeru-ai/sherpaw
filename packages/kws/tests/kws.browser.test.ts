@@ -1,7 +1,11 @@
+/// <reference types="vite/client" />
+
 import { loadData } from '@sherpaw/preloader'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
-import type { Detection, KeywordEntry, KeywordSpotter, KWSModel, KWSModule } from '../src/types'
+import type { NativeKeywordSpotter as KeywordSpotter } from '../src/spotter'
+import type { Detection, KeywordEntry, KWSModel } from '../src/types'
+import type { KWSModule } from '../src/wasm'
 
 // Exercise the published JS layout and its relative WASM URL, not only source.
 // eslint-disable-next-line antfu/no-import-dist

@@ -77,7 +77,7 @@ export async function startMicrophone(signal: AbortSignal, onAudio: (samples: Fl
     catch (error) {
       signal.throwIfAborted()
 
-      // Like AIRI, retry the browser default if the enumerated input went away.
+      // Retry the browser default if the enumerated input is no longer available.
       if (!selectedAudioInput.value || !(error instanceof DOMException)
         || !['NotFoundError', 'OverconstrainedError'].includes(error.name)) {
         throw error

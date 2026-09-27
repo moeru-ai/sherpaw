@@ -1,4 +1,3 @@
-export type { Detection, KeywordEntry, KeywordMatch } from './types'
-export type { WorkerKeywordSpotter as KeywordSpotter, WorkerKeywordSpotterConfig as KeywordSpotterConfig, KeywordUpdateOptions, KWSModelPack } from './worker-types'
+export type { Detection, KeywordEntry, KeywordMatch, KeywordSpotter, KeywordSpotterConfig, KeywordUpdateOptions, KWSModelPack } from './types'
 
-export { createKeywordSpotter } from './worker'
+export { createKeywordSpotter } from './web/worker'

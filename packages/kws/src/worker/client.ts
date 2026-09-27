@@ -3,12 +3,12 @@ import type { WorkerContextExtensions } from '@moeru/eventa/adapters/webworkers'
 
 import { defineInvoke } from '@moeru/eventa'
 
-import type { WorkerKeywordSpotter, WorkerKeywordSpotterConfig } from './worker-types'
+import type { KeywordSpotter, KeywordSpotterConfig } from '../types'
 
 import * as events from './events'
 
 /** Shares detector lifetime and audio backpressure across Eventa's browser and Node adapters. */
-export async function createWorkerSpotter<Options>(context: EventContext<WorkerContextExtensions, Options>, config: WorkerKeywordSpotterConfig, terminate: () => void): Promise<WorkerKeywordSpotter> {
+export async function createWorkerSpotter<Options>(context: EventContext<WorkerContextExtensions, Options>, config: KeywordSpotterConfig, terminate: () => void): Promise<KeywordSpotter> {
   const { signal, maxPendingAudio = 4 } = config
   const initialize = defineInvoke(context, events.initialize)
   const setKeywords = defineInvoke(context, events.setKeywords)

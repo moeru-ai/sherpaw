@@ -1,15 +1,14 @@
 import { createContext } from '@moeru/eventa/adapters/worker-threads'
 import { Worker } from 'node:worker_threads'
 
-import type { WorkerKeywordSpotter, WorkerKeywordSpotterConfig } from './worker-types'
+import type { KeywordSpotter, KeywordSpotterConfig } from '../types'
 
-import { createWorkerSpotter } from './worker-client'
+import { createWorkerSpotter } from '../worker/client'
 
-export type { Detection, KeywordEntry, KeywordMatch } from './types'
-export type { WorkerKeywordSpotter as KeywordSpotter, WorkerKeywordSpotterConfig as KeywordSpotterConfig, KeywordUpdateOptions, KWSModelPack } from './worker-types'
+export type { Detection, KeywordEntry, KeywordMatch, KeywordSpotter, KeywordSpotterConfig, KeywordUpdateOptions, KWSModelPack } from '../types'
 
 /** Node counterpart of the browser factory; model loading and inference run in a worker thread. */
-export async function createKeywordSpotter(config: WorkerKeywordSpotterConfig): Promise<WorkerKeywordSpotter> {
+export async function createKeywordSpotter(config: KeywordSpotterConfig): Promise<KeywordSpotter> {
   const worker = new Worker(new URL('./node-worker.js', import.meta.url))
   const { context } = createContext(worker)
 

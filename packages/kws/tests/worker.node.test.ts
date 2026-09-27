@@ -146,7 +146,14 @@ describe('published Node worker', () => {
     const spotter = await createKeywordSpotter({ model, keywords: [first] })
 
     try {
-      const update = spotter.setKeywords([second], { maxActivePaths: 8 })
+      const replacement = structuredClone(second)
+      const options = { maxActivePaths: 8 }
+      const update = spotter.setKeywords([replacement], options)
+
+      replacement.matches[0].tokens[0] = 'NOT_A_MODEL_TOKEN'
+      replacement.label = 'mutated'
+      options.maxActivePaths = 0
+
       const afterUpdate = spotter.processAudio(chinese, 16000)
       const pause = spotter.setKeywords([])
       const whilePaused = spotter.processAudio(chinese, 16000)

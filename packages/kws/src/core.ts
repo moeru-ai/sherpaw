@@ -1,13 +1,6 @@
-import type { KWSModule } from './types'
-
-import init from './prebuilt/kws.js'
-
-export type { Detection, KeywordEntry, KeywordMatch, KeywordSpotter, KeywordSpotterConfig, KWSModel, KWSModule } from './types'
+export type { NativeKeywordSpotter as KeywordSpotter, NativeKeywordSpotterConfig as KeywordSpotterConfig } from './spotter'
+export type { Detection, KeywordEntry, KeywordMatch, KeywordUpdateOptions, KWSModel } from './types'
+export type { KWSModule } from './wasm'
 
 export { createKeywordSpotter } from './spotter'
-
-export async function initKWSModule(): Promise<KWSModule> {
-  const wasmUrl = new URL('./prebuilt/kws.wasm', import.meta.url).toString()
-
-  return init({ locateFile: () => wasmUrl })
-}
+export { initKWSModule } from './wasm'

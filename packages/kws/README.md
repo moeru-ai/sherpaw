@@ -60,13 +60,13 @@ Both keywords and individual matches accept `score` (default `1`, positive) and 
 
 Initialization requires at least one keyword. Keep the sample rate constant until a reset or vocabulary update. Detection timestamps are seconds within the decoder segment, not absolute recording positions. For audio files, append about one second of silence to flush the final detection.
 
-Optional configuration includes `signal` for cancellation, `maxActivePaths` (default `4`) for the search beam, and `maxPendingAudio` (default `4`) for outstanding audio requests. Await audio processing to avoid exceeding the queue limit. See the [types](src/worker-types.ts) for details.
+Optional configuration includes `signal` for cancellation, `maxActivePaths` (default `4`) for the search beam, and `maxPendingAudio` (default `4`) for outstanding audio requests. Await audio processing to avoid exceeding the queue limit. See the [types](src/types.ts) for details.
 
 ## Other entrypoints
 
 - `@sherpaw/kws/node`: the same async interface using Node worker threads.
 - `@sherpaw/kws/worker`: import inside a custom Worker entry, then pass that Worker as `createKeywordSpotter(config, { worker })`. The detector owns and terminates it.
-- `@sherpaw/kws/core`: synchronous `initKWSModule()` and `createKeywordSpotter(module, config)` for use with `@sherpaw/preloader`.
+- `@sherpaw/kws/core`: `initKWSModule()` initializes WASM asynchronously; `createKeywordSpotter(module, config)` creates a detector with synchronous audio processing for use with `@sherpaw/preloader`.
 
 Vite 7 requires `optimizeDeps: { exclude: ['@sherpaw/kws'] }`. Vite 8 and Rspack support the default Worker setup.
 

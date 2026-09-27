@@ -17,19 +17,21 @@ Open `/speaker-identification` at the URL printed by Vite. Load a model, registe
 
 ## Keyword spotting playground
 
-Open `/kws`, choose **Model setup** and load the Chinese/English Zipformer 3M model, then select **Start** or **Test audio file**. The page shares its layout, model-setup popover and buttons with `/asr`. Inside **Model setup**, expand **Keywords** to select a preset or edit the vocabulary.
+Open `/kws`, choose **Model setup** and load the Chinese/English Zipformer 3M model, then select **Start** or **Test audio file**. Inside **Model setup**, expand **Keywords** to select a preset or edit the vocabulary.
 
-The English preset contains `Hey Iru`, `Hello Iru`, and `Iru Iru` (Iru pronounced “ee-roo”). The Chinese preset contains `你好肥鱼`, `大肥鱼`, and `肥鱼肥鱼`. Each row is `{ label, matches, score, threshold }`; each line of space-separated tokens represents one pronunciation. Tokens must already be encoded for the model. Selecting a preset applies it immediately after loading. Manual edits require **Apply**.
+The English preset contains `Hey Iru`, `Hello Iru`, and `Iru Iru` (Iru pronounced “ee-roo”). The Chinese preset contains `你好肥鱼`, `大肥鱼`, and `肥鱼肥鱼`. Each line of space-separated tokens represents one pronunciation. Tokens must already be encoded for the model. Selecting a preset applies it immediately after loading. Manual edits require **Apply**.
 
-**Pause detection** applies an empty vocabulary; applying the draft again resumes detection. Invalid updates retain the active vocabulary. Vocabulary changes reset audio state. The playground uses 16 search candidates for English and 32 for Chinese. These are experimental presets: natural pronunciation can still be missed, and passing the upstream regression fixtures does not establish wake-word accuracy.
+**Pause detection** stops matching; **Apply** resumes with the edited keywords. Invalid updates retain the active vocabulary. Updates reset the audio state. These presets are experimental and can miss natural pronunciation.
 
-Audio stays on the device. KWS and speaker identification share the microphone lifecycle and raw PCM worklet in `src/features/audio/`. Following AIRI, `useDevicesList` selects the available default input and `useUserMedia` owns the stream. Each recording has its own Vue effect scope, released together with the stream on stop/abort, including a late permission grant. A stale device retries the browser default; the input stays fixed during a recording. KWS batches and clamps its input while speaker recordings normalize the whole clip. Stopping or leaving the route releases the device; leaving aborts the package-owned detector, including pending initialization. Files are downmixed to mono and padded with one second of silence. The last 100 detections include source names and upstream segment timestamps, which can restart after a hit and are not absolute audio positions.
+Audio processing stays on the device. **Stop** releases the microphone; leaving the page ends the session. Detection timestamps are relative to decoder segments, not absolute positions in the recording.
 
-The sandbox downloads the pinned Hugging Face `preload.data` and `preload.js.metadata` at runtime and passes `{ data, metadata }` to `createKeywordSpotter()` from `@sherpaw/kws`. Its URL and fallback policy live in `src/features/kws/models.ts`; `@sherpaw/kws` has no model download policy, local paths or Hugging Face URLs. Library users fetch their chosen model in JS/TS and pass it to the asynchronous factory; the package mounts it inside its Worker. The sandbox has no KWS RPC client, message protocol or inference Worker entry.
+The deployed playground downloads its model from Hugging Face. Development first checks the local model packs under `models/huggingface/`, then falls back to Hugging Face. To download the local packs, run:
 
-In development, `virtual:local-models` exports `fetchLocalModel(path): Promise<Response>`. The Vite plugin serves files relative to the repository's `models/` directory over the dev server. KWS first tries `huggingface/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20/install/bin/wasm/`. If local loading fails, it downloads the remote pack. To use local packs, optionally run `bash scripts/prepare-kws-models.sh`. Source download/build/pack scripts remain under `models/<model-name>/`.
+```sh
+bash scripts/prepare-kws-models.sh
+```
 
-For production builds the virtual module exports an async function that throws when called. The same sandbox code catches it and downloads from Hugging Face. Building requires no local KWS model, emits no KWS model assets or local paths, and Cloudflare deployment does not prepare KWS models. The WASM runtime remains bundled; inference and audio stay on the device.
+To build model packs yourself, use the scripts in `models/<model-name>/`.
 
 ## Speaker page organization
 
@@ -47,11 +49,11 @@ The [Cloudflare Workers deployment guide](../../docs/deployment/cloudflare-worke
 
 ## Validate
 
-Sandbox tests use `vitest.config.ts` for the existing speaker regressions, recorder browser tests and Vite plugin tests. `tsconfig.tests.json` checks their sources and configuration. Run `pnpm -F @sherpaw/sandbox test` for the full sandbox suite. KWS model and Worker behavior is covered by the [package tests](../kws/README.md#models-and-verification).
+Run the sandbox tests and checks from the repository root:
 
 ```sh
 pnpm -F @sherpaw/sandbox typecheck
-pnpm -F @sherpaw/sandbox test:speaker
+pnpm -F @sherpaw/sandbox test
 pnpm -F @sherpaw/testing-audio test:speakers
 pnpm -F @sherpaw/sandbox build
 pnpm -F @sherpaw/sandbox preview

@@ -217,7 +217,7 @@ async function listen() {
     let batch: Float32Array | undefined
     let offset = 0
 
-    // Keep 100 ms requests without making the shared recorder clip speaker audio.
+    // Batch and clamp microphone PCM into 100 ms requests.
     await startMicrophone(controller.signal, (samples, sampleRate) => {
       batch ??= new Float32Array(Math.round(sampleRate / 10))
 

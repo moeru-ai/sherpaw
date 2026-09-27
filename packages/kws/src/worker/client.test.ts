@@ -3,12 +3,12 @@ import { createContext } from '@moeru/eventa/adapters/worker-threads/worker'
 import { MessageChannel } from 'node:worker_threads'
 import { expect, it, vi } from 'vitest'
 
-import type { WorkerKeywordSpotterConfig } from './worker-types'
+import type { KeywordSpotterConfig } from '../types'
 
+import { createWorkerSpotter } from './client'
 import * as events from './events'
-import { createWorkerSpotter } from './worker-client'
 
-const config: WorkerKeywordSpotterConfig = {
+const config: KeywordSpotterConfig = {
   model: { data: new ArrayBuffer(0), metadata: { files: [], remote_package_size: 0 } },
   keywords: [{ label: 'test', matches: [{ tokens: ['a'] }] }],
   maxPendingAudio: 1,

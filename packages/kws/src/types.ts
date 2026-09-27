@@ -1,21 +1,4 @@
-import type { WebAssemblyModule } from '@sherpaw/shared'
-
-/** Exports of the standalone KWS runtime. Compatible with @sherpaw/preloader. */
-export interface KWSModule extends WebAssemblyModule {
-  FS: typeof FS
-  _SherpawCreateKeywordSpotter: (encoder: number, decoder: number, joiner: number, tokens: number, keywords: number, maxActivePaths: number) => number
-  _SherpaOnnxCreateKeywordStream: (spotter: number) => number
-  _SherpaOnnxIsKeywordStreamReady: (spotter: number, stream: number) => number
-  _SherpaOnnxDecodeKeywordStream: (spotter: number, stream: number) => void
-  _SherpaOnnxResetKeywordStream: (spotter: number, stream: number) => void
-  _SherpaOnnxGetKeywordResult: (spotter: number, stream: number) => number
-  _SherpaOnnxDestroyKeywordResult: (result: number) => void
-  _SherpawKeywordResultKeyword: (result: number) => number
-  _SherpawKeywordResultCount: (result: number) => number
-  _SherpawKeywordResultToken: (result: number, index: number) => number
-  _SherpawKeywordResultTimestamp: (result: number, index: number) => number
-  _SherpawKeywordResultStartTime: (result: number) => number
-}
+import type { DataMetadata } from '@sherpaw/preloader'
 
 export interface KeywordMatch {
   /** Already encoded model tokens; no text, pinyin, phoneme or BPE conversion. */
@@ -45,14 +28,6 @@ export interface KWSModel {
   tokens: string
 }
 
-export interface KeywordSpotterConfig {
-  model: KWSModel
-  /** Positive int32 search beam size. Default: 4. Larger values cost more CPU. */
-  maxActivePaths?: number
-  /** Must contain at least one entry at creation. */
-  keywords: readonly KeywordEntry[]
-}
-
 export interface Detection {
   label: string
   /** Upstream segment start time in seconds, passed through unchanged. */
@@ -62,21 +37,36 @@ export interface Detection {
   tokens: string[]
 }
 
+/** A downloaded Emscripten preload pack. The caller retains ownership of its bytes. */
+export interface KWSModelPack {
+  data: ArrayBuffer | Uint8Array
+  metadata: DataMetadata
+  /** Defaults to encoder.onnx, decoder.onnx, joiner.onnx and tokens.txt. */
+  paths?: KWSModel
+}
+
+export interface KeywordUpdateOptions {
+  /** Positive int32 search beam. Omission preserves the current setting. */
+  maxActivePaths?: number
+}
+
+export interface KeywordSpotterConfig extends KeywordUpdateOptions {
+  model: KWSModelPack
+  keywords: readonly KeywordEntry[]
+  /** Aborting cancels initialization or disposes the initialized detector. */
+  signal?: AbortSignal
+  /** Maximum outstanding audio requests, including the executing request. Default: 4. */
+  maxPendingAudio?: number
+}
+
+/** All operations execute in call order on the detector's dedicated Worker. */
 export interface KeywordSpotter {
-  /**
-   * Replace the entire vocabulary in call order. [] pauses and discards audio.
-   * Successful replacement resets the audio state and timestamp origin.
-   * Rejection preserves the previous vocabulary. Input is copied at call time.
-   */
-  setKeywords: (entries: readonly KeywordEntry[]) => Promise<void>
-  /**
-   * Consume mono PCM in [-1, 1] at a fixed sample rate until the next update,
-   * decode ready frames, and reset after each hit.
-   * Synchronous; use a Worker to keep inference and model reloads off the UI.
-   */
-  processAudio: (samples: Float32Array, sampleRate: number) => Detection[]
-  /** Discard buffered audio and reset sample-rate tracking without reloading the model. */
-  reset: () => void
-  /** Idempotent. Pending updates reject; further processing throws. */
+  /** Replaces keywords and search settings atomically; [] pauses. Rejection preserves both. Input is copied at call time. */
+  setKeywords: (entries: readonly KeywordEntry[], options?: KeywordUpdateOptions) => Promise<void>
+  /** Copies mono PCM without detaching the caller's buffer. Rejects when the audio queue is full. */
+  processAudio: (samples: Float32Array, sampleRate: number) => Promise<Detection[]>
+  /** Starts a fresh audio stream without reloading models or changing keywords. */
+  reset: () => Promise<void>
+  /** Terminates the Worker and rejects pending operations. Safe to repeat. */
   dispose: () => void
 }

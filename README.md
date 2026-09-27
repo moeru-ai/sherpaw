@@ -29,9 +29,9 @@ The [sandbox](packages/sandbox) includes speaker identification at `/speaker-ide
 
 Speaker identification is available in [`@sherpaw/speaker-identification`](packages/speaker-identification/README.md), with WASM embedding extraction, enrollment, scored identification, and verification. Download and preload-pack scripts are available for CAM++ Chinese/English advanced and ERes2NetV2 Chinese. See the [model research](docs/research/speaker-identification.md) and [browser / fake-microphone experiments](docs/research/speaker-identification-experiments.md).
 
-## Development at the WASM/C level
+Streaming keyword spotting is available in [`@sherpaw/kws`](packages/kws/README.md). It runs in a Worker, accepts PCM audio and encoded keyword tokens, and supports replacing keywords while listening. Try the [sandbox playground](packages/sandbox/README.md#keyword-spotting-playground) at `/kws` with a microphone or an audio file.
 
-Streaming keyword spotting is available in [`@sherpaw/kws`](packages/kws/README.md). It runs in a Worker by default, accepts caller-provided PCM, downloaded model packs and encoded tokens, and supports replacing the complete vocabulary while running. Node applications use `@sherpaw/kws/node`; the explicit synchronous interface is available from `@sherpaw/kws/core`. Try the [sandbox playground](packages/sandbox/README.md#keyword-spotting-playground) at `/kws` with a microphone or an audio file.
+## Development at the WASM/C level
 
 ### Prerequisites
 

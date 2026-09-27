@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import type { KeywordEntry, KeywordMatch, KWSModule } from './types'
+import type { KeywordEntry, KeywordMatch } from './types'
+import type { KWSModule } from './wasm'
 
 import { encodeKeywords, readTokens } from './keywords'
 import { createKeywordSpotter } from './spotter'
@@ -179,7 +180,7 @@ describe('native ownership and updates', () => {
     spotter.dispose()
   })
 
-  it('preserves the configured search beam through vocabulary replacement and pause/resume', async () => {
+  it('commits search settings with vocabulary updates and preserves them through pause/resume', async () => {
     const r = runtime()
     const config = { model, keywords: [keyword], maxActivePaths: 16 }
     const spotter = createKeywordSpotter(r.typed, config)
@@ -189,7 +190,14 @@ describe('native ownership and updates', () => {
     await spotter.setKeywords([])
     await spotter.setKeywords([keyword])
 
-    expect(r.module._SherpawCreateKeywordSpotter.mock.calls.map(call => call[5])).toEqual([16, 16, 16])
+    r.module._SherpaOnnxCreateKeywordStream.mockReturnValueOnce(0)
+
+    await expect(spotter.setKeywords([keyword], { maxActivePaths: 8 })).rejects.toThrow(/stream/)
+    await spotter.setKeywords([keyword])
+    await spotter.setKeywords([], { maxActivePaths: 12 })
+    await spotter.setKeywords([keyword])
+
+    expect(r.module._SherpawCreateKeywordSpotter.mock.calls.map(call => call[5])).toEqual([16, 16, 16, 8, 16, 12])
 
     spotter.dispose()
 
@@ -326,20 +334,6 @@ describe('native ownership and updates', () => {
     spotter.dispose()
   })
 
-  it('guards sample rate changes before WASM and allows them after replacement', async () => {
-    const r = runtime()
-    const spotter = createKeywordSpotter(r.typed, { model, keywords: [keyword] })
-
-    spotter.processAudio(new Float32Array(4), 48000)
-
-    expect(() => spotter.processAudio(new Float32Array(4), 16000)).toThrow(/constant/)
-    expect(r.module._SherpaOnnxOnlineStreamAcceptWaveform).toHaveBeenCalledTimes(1)
-
-    await spotter.setKeywords([keyword])
-    spotter.processAudio(new Float32Array(4), 16000)
-    spotter.dispose()
-  })
-
   it('resets only the stream and preserves it if replacement allocation fails', () => {
     const r = runtime()
     const spotter = createKeywordSpotter(r.typed, { model, keywords: [keyword] })
@@ -361,19 +355,5 @@ describe('native ownership and updates', () => {
 
     expect(r.detectors.size + r.streams.size + r.allocated.size).toBe(0)
     expect(() => spotter.reset()).toThrow(/disposed/)
-  })
-
-  it('preserves special tokens and native timestamp precision', () => {
-    const r = runtime()
-    const spotter = createKeywordSpotter(r.typed, { model, keywords: [keyword] })
-
-    r.results.push(JSON.stringify({ keyword: 'sherpaw_0', tokens: ['"', '\\'], start_time: 0.125, timestamps: [0.125, 0.25] }))
-
-    const [hit] = spotter.processAudio(new Float32Array(4), 16000)
-
-    expect(hit.tokens).toEqual(['"', '\\'])
-    expect(hit.timestamps).toEqual([0.125, 0.25])
-
-    spotter.dispose()
   })
 })

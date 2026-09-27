@@ -1,6 +1,22 @@
-import type { Detection, KeywordSpotter, KeywordSpotterConfig, KWSModule } from './types'
+import type { Detection, KeywordEntry, KeywordSpotter, KeywordUpdateOptions, KWSModel } from './types'
+import type { KWSModule } from './wasm'
 
 import { encodeKeywords, readTokens } from './keywords'
+
+export interface NativeKeywordSpotterConfig extends KeywordUpdateOptions {
+  model: KWSModel
+  /** Must contain at least one entry at creation. */
+  keywords: readonly KeywordEntry[]
+}
+
+export interface NativeKeywordSpotter extends Omit<KeywordSpotter, 'processAudio' | 'reset'> {
+  /** Consume mono PCM and decode synchronously on the calling thread. */
+  processAudio: (samples: Float32Array, sampleRate: number) => Detection[]
+  /** Discard buffered audio and reset sample-rate tracking. */
+  reset: () => void
+  /** Releases the native detector and stream, leaving model files available for reuse. */
+  dispose: () => void
+}
 
 interface NativeState {
   spotter: number
@@ -9,12 +25,16 @@ interface NativeState {
   sampleRate?: number
 }
 
-/** Owns the native detector, stream and temporary allocations, but not model files. */
-export function createKeywordSpotter(module: KWSModule, config: KeywordSpotterConfig): KeywordSpotter {
-  const maxActivePaths = config.maxActivePaths ?? 4
-
-  if (!Number.isInteger(maxActivePaths) || maxActivePaths < 1 || maxActivePaths > 2147483647)
+function validateSearchBeam(value: number): void {
+  if (!Number.isInteger(value) || value < 1 || value > 2147483647)
     throw new RangeError('maxActivePaths must be a positive int32 integer')
+}
+
+/** Owns the native detector, stream and temporary allocations, but not model files. */
+export function createKeywordSpotter(module: KWSModule, config: NativeKeywordSpotterConfig): NativeKeywordSpotter {
+  let maxActivePaths = config.maxActivePaths ?? 4
+
+  validateSearchBeam(maxActivePaths)
 
   // Snapshot paths so caller mutation cannot alter a queued replacement.
   const paths = [config.model.encoder, config.model.decoder, config.model.joiner, config.model.tokens]
@@ -41,7 +61,7 @@ export function createKeywordSpotter(module: KWSModule, config: KeywordSpotterCo
     module._SherpaOnnxDestroyKeywordSpotter(state.spotter)
   }
 
-  function create(encoded: ReturnType<typeof encodeKeywords>): NativeState {
+  function create(encoded: ReturnType<typeof encodeKeywords>, searchBeam: number): NativeState {
     const pointers: number[] = []
     let spotter = 0
 
@@ -57,7 +77,7 @@ export function createKeywordSpotter(module: KWSModule, config: KeywordSpotterCo
         module.stringToUTF8(text, ptr, size)
       }
 
-      spotter = module._SherpawCreateKeywordSpotter(pointers[0], pointers[1], pointers[2], pointers[3], pointers[4], maxActivePaths)
+      spotter = module._SherpawCreateKeywordSpotter(pointers[0], pointers[1], pointers[2], pointers[3], pointers[4], searchBeam)
 
       if (!spotter)
         throw new Error('Unable to create keyword spotter; check the KWS transducer model')
@@ -81,7 +101,7 @@ export function createKeywordSpotter(module: KWSModule, config: KeywordSpotterCo
     }
   }
 
-  let current: NativeState | undefined = create(initial)
+  let current: NativeState | undefined = create(initial, maxActivePaths)
   let disposed = false
   let queue = Promise.resolve()
 
@@ -91,12 +111,18 @@ export function createKeywordSpotter(module: KWSModule, config: KeywordSpotterCo
   }
 
   return {
-    setKeywords(entries) {
+    setKeywords(entries, options) {
+      const requestedSearchBeam = options?.maxActivePaths
+
       // Encode now, before yielding, to snapshot mutable caller input.
       let encoded: ReturnType<typeof encodeKeywords>
 
       try {
         requireLive()
+
+        if (requestedSearchBeam !== undefined)
+          validateSearchBeam(requestedSearchBeam)
+
         encoded = encodeKeywords(entries, vocabulary)
       }
       catch (error) {
@@ -106,10 +132,12 @@ export function createKeywordSpotter(module: KWSModule, config: KeywordSpotterCo
       const update = queue.then(() => {
         requireLive()
 
-        const next = encoded.labels.size ? create(encoded) : undefined
+        const searchBeam = requestedSearchBeam ?? maxActivePaths
+        const next = encoded.labels.size ? create(encoded, searchBeam) : undefined
         const previous = current
 
         current = next
+        maxActivePaths = searchBeam
         release(previous)
       })
 
@@ -137,7 +165,7 @@ export function createKeywordSpotter(module: KWSModule, config: KeywordSpotterCo
         return []
 
       if (current.sampleRate !== undefined && current.sampleRate !== sampleRate)
-        throw new RangeError('sampleRate must stay constant until setKeywords creates a new stream')
+        throw new RangeError('sampleRate must stay constant within an audio stream')
 
       const { spotter, stream, labels } = current
       const ptr = module._malloc(samples.byteLength)
