@@ -111,11 +111,9 @@ describe('keyword validation', () => {
 
   it('rejects duplicate sequences, sparse input, and malformed token files', () => {
     expect(() => encodeKeywords([keyword, keyword], vocabulary)).toThrow(/Duplicate/)
-
     expect(() => encodeKeywords([{ ...keyword, matches: [{ tokens: ['a'] }, { tokens: ['a'] }] }], vocabulary)).toThrow(/Duplicate/)
 
     expect(() => encodeKeywords(Array.from({ length: 1 }) as KeywordEntry[], vocabulary)).toThrow()
-
     expect(() => encodeKeywords([{ ...keyword, matches: Array.from({ length: 1 }) as KeywordMatch[] }], vocabulary)).toThrow()
 
     for (const text of ['', 'a', 'a 1\nb 1', 'a 1\na 2'])
@@ -127,7 +125,6 @@ describe('keyword validation', () => {
     const encoded = encodeKeywords([{ ...keyword, label }], vocabulary)
 
     expect(encoded.text).toBe('a :1 #0.25 @sherpaw_0')
-
     expect(encoded.labels.get('sherpaw_0')).toBe(label)
   })
 })
@@ -158,7 +155,6 @@ describe('native ownership and updates', () => {
     const hits = spotter.processAudio(new Float32Array(32), 16000)
 
     expect(hits.map(hit => hit.label)).toEqual(['one keyword', 'one keyword'])
-
     expect(hits.map(hit => hit.tokens)).toEqual([['a'], ['b']])
 
     spotter.dispose()
@@ -174,7 +170,6 @@ describe('native ownership and updates', () => {
       label: 'replacement',
       matches: [{ tokens: ['b'] }, { tokens: ['unknown'] }],
     }])).rejects.toThrow(/unknown/)
-
     expect(r.module._SherpawCreateKeywordSpotter).toHaveBeenCalledTimes(1)
 
     r.results.push(JSON.stringify({ keyword: 'sherpaw_0', tokens: ['a'], start_time: 0, timestamps: [0.4] }))
@@ -212,7 +207,6 @@ describe('native ownership and updates', () => {
       expect(() => createKeywordSpotter(r.typed, { model, keywords: [keyword], maxActivePaths })).toThrow(/maxActivePaths/)
 
     expect(r.module._SherpawCreateKeywordSpotter).not.toHaveBeenCalled()
-
     expect(r.allocated.size).toBe(0)
   })
 
@@ -231,11 +225,8 @@ describe('native ownership and updates', () => {
     r.module._SherpaOnnxCreateKeywordStream.mockReturnValueOnce(0)
 
     await expect(spotter.setKeywords([keyword])).rejects.toThrow(/create keyword stream/)
-
     expect(r.detectors.size).toBe(1)
-
     expect(r.streams.size).toBe(1)
-
     expect(r.allocated.size).toBe(0)
 
     await spotter.setKeywords([keyword])
@@ -263,9 +254,7 @@ describe('native ownership and updates', () => {
     expect(r.configs[1]).toContain('b :1')
 
     expect(r.detectors.size + r.streams.size).toBe(0)
-
     expect(spotter.processAudio(new Float32Array(16), 16000)).toEqual([])
-
     expect(r.module._SherpaOnnxOnlineStreamAcceptWaveform).not.toHaveBeenCalled()
 
     await spotter.setKeywords([keyword])
@@ -281,11 +270,8 @@ describe('native ownership and updates', () => {
     spotter.dispose()
 
     await expect(pending).rejects.toThrow(/disposed/)
-
     await expect(spotter.setKeywords([])).rejects.toThrow(/disposed/)
-
     expect(() => spotter.processAudio(new Float32Array(), 16000)).toThrow(/disposed/)
-
     expect(r.detectors.size + r.streams.size + r.allocated.size).toBe(0)
   })
 
@@ -300,9 +286,7 @@ describe('native ownership and updates', () => {
       { label: 'first', tokens: ['a'], startTime: 2, timestamps: [0.4] },
       { label: 'first', tokens: ['a'], startTime: 2, timestamps: [0.4] },
     ])
-
     expect(r.module._SherpaOnnxResetKeywordStream).toHaveBeenCalledTimes(2)
-
     expect(r.allocated.size).toBe(0)
 
     spotter.dispose()
@@ -321,7 +305,6 @@ describe('native ownership and updates', () => {
     r.results.push('invalid JSON')
 
     expect(() => spotter.processAudio(new Float32Array(32), 16000)).toThrow()
-
     expect(r.allocated.size).toBe(0)
 
     spotter.dispose()
@@ -338,7 +321,6 @@ describe('native ownership and updates', () => {
       expect(() => spotter.processAudio(new Float32Array([value]), 16000)).toThrow(/PCM/)
 
     expect(() => spotter.processAudio(new Float32Array(1), 0)).toThrow(/sampleRate/)
-
     expect(r.module._SherpaOnnxOnlineStreamAcceptWaveform).not.toHaveBeenCalled()
 
     spotter.dispose()
@@ -351,7 +333,6 @@ describe('native ownership and updates', () => {
     spotter.processAudio(new Float32Array(4), 48000)
 
     expect(() => spotter.processAudio(new Float32Array(4), 16000)).toThrow(/constant/)
-
     expect(r.module._SherpaOnnxOnlineStreamAcceptWaveform).toHaveBeenCalledTimes(1)
 
     await spotter.setKeywords([keyword])
@@ -368,7 +349,6 @@ describe('native ownership and updates', () => {
     const [hit] = spotter.processAudio(new Float32Array(4), 16000)
 
     expect(hit.tokens).toEqual(['"', '\\'])
-
     expect(hit.timestamps).toEqual([0.125, 0.25])
 
     spotter.dispose()

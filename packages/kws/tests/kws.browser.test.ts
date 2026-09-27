@@ -93,13 +93,9 @@ describe.each([
       const hits = feed(spotter, samples)
 
       expect(hits.map(hit => hit.label)).toEqual([first.label, second.label])
-
       expect(hits[0].tokens).toEqual(first.matches[0].tokens)
-
       expect(hits[0].timestamps).toHaveLength(first.matches[0].tokens.length)
-
       expect(hits[0].startTime).toBeGreaterThanOrEqual(0)
-
       expect(hits[0].timestamps[0]).toBeGreaterThan(0)
 
       expect(feed(spotter, samples).map(hit => hit.label)).toEqual([first.label, second.label])
@@ -130,7 +126,6 @@ describe.each([
       const hits = feed(spotter, samples)
 
       expect(hits.map(hit => hit.label)).toEqual(['grouped', 'grouped'])
-
       expect(hits.map(hit => hit.tokens)).toEqual([first.matches[0].tokens, second.matches[0].tokens])
 
       await spotter.setKeywords([{ label: 'grouped', matches: second.matches }])
@@ -147,13 +142,10 @@ describe.each([
 
     try {
       expect(feed(spotter, unrelated)).toEqual([])
-
       expect(feed(spotter, new Float32Array(32000))).toEqual([])
 
       await expect(spotter.setKeywords([{ ...first, matches: [{ tokens: ['NOT_A_MODEL_TOKEN'] }] }])).rejects.toThrow(/token/)
-
       await expect(spotter.setKeywords([{ ...first, threshold: 2 }])).rejects.toThrow(/threshold/)
-
       expect(feed(spotter, samples).map(hit => hit.label)).toEqual([first.label])
 
       // Update with a partially accepted utterance: none of it may survive.
@@ -196,11 +188,8 @@ describe.each([
       spotter.dispose()
 
       await expect(pending).rejects.toThrow(/disposed/)
-
       expect(destroy.mock.calls.map(([ptr]) => ptr).sort()).toEqual(create.mock.results.map(r => r.value).sort())
-
       expect(destroyStream.mock.calls.map(([ptr]) => ptr).sort()).toEqual(createStream.mock.results.map(r => r.value).sort())
-
       expect(freeResult).toHaveBeenCalledTimes(result.mock.calls.length)
 
       expect(() => spotter.processAudio(samples, 16000)).toThrow(/disposed/)

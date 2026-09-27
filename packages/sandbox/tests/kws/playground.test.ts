@@ -124,9 +124,7 @@ it('activates selected presets immediately with the real model and keeps manual 
     await page.getByLabel('Preset', { exact: true }).selectOption('chinese')
 
     expect(await labels()).toEqual(chinese)
-
     await expect.poll(() => page.locator('.active-words .word').allTextContents()).toEqual(chinese)
-
     expect(await page.getByRole('alert').count()).toBe(0)
 
     for (const filename of ['en_0.wav', 'en_1.wav', 'zh_0.wav', 'zh_1.wav', 'zh_2.wav', 'zh_3.wav', 'zh_4.wav', 'zh_5.wav', 'zh_6.wav']) {
@@ -145,14 +143,12 @@ it('activates selected presets immediately with the real model and keeps manual 
     await page.getByLabel('Preset', { exact: true }).selectOption('english')
 
     await expect.poll(() => page.locator('.active-words .word').allTextContents()).toEqual(english)
-
     expect(await labels()).toEqual(english)
 
     await openKeywords(page)
     await page.getByLabel('Preset', { exact: true }).selectOption('chinese')
 
     await expect.poll(() => page.locator('.active-words .word').allTextContents()).toEqual(chinese)
-
     expect(await labels()).toEqual(chinese)
 
     await openKeywords(page)
@@ -217,7 +213,6 @@ it('keeps the active detector when a preset changes search settings but its toke
     expect(await page.locator('.hit').count()).toBe(0)
 
     expect(modelRequests).toBe(1)
-
     expect(remoteRequests).toEqual([])
   }
   finally {
@@ -266,7 +261,6 @@ it.skipIf(!recording)('detects all Iru phrases in a local recording through file
       await page.getByLabel('Test audio file').setInputFiles({ name, mimeType: 'audio/wav', buffer: Buffer.from(encodeWavPcm16(padded, sampleRate)) })
 
       await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain(`${name} complete`)
-
       expect(await page.locator('.hit strong').allTextContents()).toEqual(expected)
     }
 
@@ -285,7 +279,6 @@ it.skipIf(!recording)('detects all Iru phrases in a local recording through file
       await page.getByLabel('Test audio file').setInputFiles({ name: `${name}.wav`, mimeType: 'audio/wav', buffer: Buffer.from(encodeWavPcm16(padded, sampleRate)) })
 
       await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain(`${name}.wav complete`)
-
       expect(await page.locator('.hit').count()).toBe(0)
     }
 
@@ -339,7 +332,6 @@ it.skipIf(!repeatedRecording)('detects mixed-language Hello Iru pronunciations i
     await page.getByLabel('Test audio file').setInputFiles({ name: 'repeated-offset.wav', mimeType: 'audio/wav', buffer: Buffer.from(encodeWavPcm16(padded, sampleRate)) })
 
     await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain('repeated-offset.wav complete')
-
     expect(await page.locator('.hit strong').allTextContents()).toEqual([
       'Hello Iru',
       'Hello Iru',
@@ -361,7 +353,6 @@ it.skipIf(!repeatedRecording)('detects mixed-language Hello Iru pronunciations i
       await page.getByLabel('Test audio file').setInputFiles({ name, mimeType: 'audio/wav', buffer })
 
       await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain(`${name} complete`)
-
       expect(await page.locator('.hit strong').allTextContents()).toEqual(['Hello Iru'])
     }
   }
@@ -399,7 +390,6 @@ it.skipIf(!chineseRecording)('recovers Chinese preset phrases in a local recordi
     await page.getByLabel('Test audio file').setInputFiles({ name: 'single-name.wav', mimeType: 'audio/wav', buffer })
 
     await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain('single-name.wav complete')
-
     expect(await page.locator('.hit').count()).toBe(0)
 
     await closeSetup(page)
@@ -459,7 +449,6 @@ it.skipIf(!naturalRecording)('retains the repeated-name prefix while competing k
     await page.getByLabel('Test audio file').setInputFiles({ name: 'repeated-prefix.wav', mimeType: 'audio/wav', buffer })
 
     await expect.poll(() => page.getByRole('status').textContent(), { timeout: 30000 }).toContain('repeated-prefix.wav complete')
-
     expect(await page.locator('.hit strong').allTextContents()).toEqual(['肥鱼肥鱼', '肥鱼肥鱼'])
   }
   finally {
@@ -481,7 +470,6 @@ it.skipIf(!naturalRecording)('detects all seven natural repeated-name utterances
     await file(page, naturalRecording!)
 
     expect(await page.getByRole('alert').count()).toBe(0)
-
     expect(await page.locator('.hit strong').allTextContents()).toEqual(Array.from({ length: 7 }, () => '肥鱼肥鱼'))
   }
   finally {
@@ -537,7 +525,6 @@ it('uses the real Worker for files, replaces keywords atomically, pauses and res
     await page.getByRole('button', { name: 'Apply' }).click()
 
     await expect.poll(() => page.getByRole('alert').textContent()).toContain('unknown keyword token')
-
     expect(await page.locator('.active-words .word').allTextContents()).toEqual(['落实'])
 
     await closeSetup(page)
@@ -550,7 +537,6 @@ it('uses the real Worker for files, replaces keywords atomically, pauses and res
     await page.getByRole('button', { name: 'Pause detection' }).click()
 
     await expect.poll(() => page.getByLabel('Test audio file').isDisabled()).toBe(true)
-
     await expect.poll(() => page.locator('.active-words .word').count()).toBe(0)
 
     await openKeywords(page)
@@ -565,7 +551,6 @@ it('uses the real Worker for files, replaces keywords atomically, pauses and res
     await file(page)
 
     expect(await page.locator('.hit strong').allTextContents()).toEqual(['落实'])
-
     expect(exceptions).toEqual([])
 
     await page.setViewportSize({ width: 390, height: 844 })
@@ -625,7 +610,6 @@ it('streams fake microphone audio and releases capture and Worker when leaving t
     await page.waitForURL(url)
 
     await expect.poll(() => closedWorkers).toBe(1)
-
     expect(await page.evaluate(() => (window as unknown as { kwsTestTracks: MediaStreamTrack[] }).kwsTestTracks.map(track => track.readyState))).toEqual(['ended'])
 
     await page.getByRole('link', { name: 'Keyword spotting' }).click()
@@ -729,7 +713,6 @@ it('loads the production Worker, WASM, models and microphone worklet', async () 
     await load(page)
 
     expect(remoteRequests.sort()).toEqual(['preload.data', 'preload.js.metadata'])
-
     expect(localRequests).toEqual([])
 
     await file(page, 'en_0.wav')

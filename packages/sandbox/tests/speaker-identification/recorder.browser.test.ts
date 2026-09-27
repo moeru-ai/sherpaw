@@ -58,7 +58,6 @@ it.each([0.5, 1.25])('accepts microphone audio with peak %s through the real rec
 
     // A legitimate floating-point Web Audio signal must not trigger the PCM range error.
     expect(() => extractor.extract(audio.samples, audio.sampleRate)).not.toThrow()
-
     expect(audio.samples.every(value => Number.isFinite(value) && Math.abs(value) <= 1)).toBe(true)
   }
   finally {
@@ -85,13 +84,11 @@ it('normalizes an entire 61.2-second recording without clipping or truncating it
   normalizeRecording(samples)
 
   expect(samples.length / audio.sampleRate).toBe(61.2)
-
   expect(samples).toEqual(original.map(value => value / 1.25))
 
   const vector = extractor.extract(samples, audio.sampleRate)
 
   expect(vector.length).toBe(extractor.dimension)
-
   expect(vector.every(Number.isFinite)).toBe(true)
 })
 
@@ -153,7 +150,6 @@ it.each([false, true])('uses VueUse device selection and releases its listeners 
     capture = await startMicrophone(new AbortController().signal, () => {})
 
     expect(acquire).toHaveBeenCalledTimes(missingDevice ? 2 : 1)
-
     expect(acquire.mock.calls[0]![0]).toMatchObject({ audio: { deviceId: { exact: 'default' }, channelCount: 1 } })
 
     if (missingDevice)
@@ -167,7 +163,6 @@ it.each([false, true])('uses VueUse device selection and releases its listeners 
     await capture.stop()
 
     expect(remove.mock.calls.some(([event, callback]) => event === 'devicechange' && callback === listener![1])).toBe(true)
-
     expect(destination.stream.getTracks().every(track => track.readyState === 'ended')).toBe(true)
   }
   finally {
