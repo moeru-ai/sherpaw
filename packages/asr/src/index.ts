@@ -3,6 +3,7 @@ import type { WebAssemblyModule } from '@sherpaw/shared'
 export type { WebAssemblyModule as ASRModule } from '@sherpaw/shared'
 
 export * from './asr'
+export * from './streaming'
 
 export async function initASRModule(): Promise<WebAssemblyModule> {
   // @ts-expect-error Missing types

@@ -19,6 +19,29 @@ ignorePaths:
 dictionaryDefinitions: []
 dictionaries: []
 words:
+  - asyncify
+  - COPYONLY
+  - csukuangfj
+  - DBUILD
+  - DCMAKE
+  - DFETCHCONTENT
+  - DSHERPAW
+  - eigen
+  - hclust
+  - kaldi
+  - kaldifst
+  - kissfft
+  - networkidle
+  - openfst
+  - protobufjs
+  - quantizer
+  - sentencepiece
+  - sess
+  - unstub
+  - unpaced
+  - webgpu
+  - workgroups
+  - worktree
   - basemove
   - dawidd
   - formants

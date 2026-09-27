@@ -1,4 +1,4 @@
-// Capture keeps the AudioContext's actual sample rate; sherpa resamples.
+// Capture keeps the AudioContext's actual sample rate.
 class Capture extends AudioWorkletProcessor {
   /**
    * Triggering workflow:

@@ -8,11 +8,13 @@
     "preview": "vite preview",
     "typecheck": "vue-tsc -b && tsc --noEmit -p tsconfig.tests.json",
     "test:speaker": "vitest run tests/speaker-identification",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:asr-realtime": "node ../../scripts/generate-realtime-asr.mjs && pnpm build && vitest run --config vitest.asr-realtime.config.ts"
   },
   "dependencies": {
     "@iconify-json/ri": "^1.2.6",
     "@iconify-json/svg-spinners": "^1.2.4",
+    "@moeru/eventa": "1.0.1",
     "@sherpaw/asr": "workspace:^",
     "@sherpaw/kws": "workspace:^",
     "@sherpaw/preloader": "workspace:^",
@@ -25,6 +27,7 @@
     "@vitejs/plugin-vue": "^6.0.1",
     "@vue/tsconfig": "^0.8.1",
     "@vueuse/core": "^14.0.0",
+    "onnxruntime-web": "1.27.0",
     "pretty-bytes": "^7.1.0",
     "reka-ui": "^2.6.0",
     "typescript": "~5.9.3",
@@ -38,6 +41,7 @@
   "devDependencies": {
     "@sherpaw/vitest-plugin-fakemic": "workspace:^",
     "@vitest/browser-playwright": "^4.1.9",
+    "@webgpu/types": "0.1.74",
     "playwright": "^1.57.0",
     "unplugin-basemove": "0.0.1",
     "vitest": "^4.1.9"
