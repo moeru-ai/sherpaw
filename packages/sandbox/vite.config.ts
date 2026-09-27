@@ -8,14 +8,12 @@ import { defineConfig } from 'vite'
 
 import { localModels } from './plugins/local-models'
 
-const modelsDirectory = fileURLToPath(new URL('../../models', import.meta.url))
-
 export default defineConfig({
   // Route components import this after Vite scans the entry point.
   optimizeDeps: { include: ['reka-ui'] },
-  worker: { format: 'es', plugins: () => [localModels(modelsDirectory)] },
+  worker: { format: 'es' },
   plugins: [
-    localModels(modelsDirectory),
+    localModels(fileURLToPath(new URL('../../models', import.meta.url))),
     VueRouter(),
     vue(),
     UnoCSS(),
