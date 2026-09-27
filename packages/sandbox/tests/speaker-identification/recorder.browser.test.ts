@@ -5,6 +5,7 @@ import { createExtractor, initSpeakerIdentificationModule } from '@sherpaw/speak
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 
 import { modelUrl, readAudio } from '../../../speaker-identification/tests/audio'
+import { startMicrophone } from '../../src/features/audio/microphone'
 import { normalizeRecording, startRecording } from '../../src/features/speaker-identification/recorder'
 
 let extractor: Extractor
@@ -103,5 +104,42 @@ it('stops a late microphone stream when the route is left while permission is pe
     microphone.mockRestore()
     destination.stream.getTracks().forEach(track => track.stop())
     await source.close()
+  }
+})
+
+it.each([false, true])('uses VueUse device selection and releases its listeners (missing device: %s)', async (missingDevice) => {
+  const context = new AudioContext()
+  const destination = context.createMediaStreamDestination()
+  const devices = vi.spyOn(navigator.mediaDevices, 'enumerateDevices').mockResolvedValue([
+    { deviceId: 'another-input', kind: 'audioinput', label: 'Other mic', groupId: 'other', toJSON: () => ({}) },
+    { deviceId: 'default', kind: 'audioinput', label: 'Default mic', groupId: 'default', toJSON: () => ({}) },
+  ])
+  const acquire = vi.spyOn(navigator.mediaDevices, 'getUserMedia').mockResolvedValue(destination.stream)
+  if (missingDevice)
+    acquire.mockRejectedValueOnce(new DOMException('Device disconnected', 'NotFoundError'))
+  const add = vi.spyOn(navigator.mediaDevices, 'addEventListener')
+  const remove = vi.spyOn(navigator.mediaDevices, 'removeEventListener')
+  let capture: Awaited<ReturnType<typeof startMicrophone>> | undefined
+  try {
+    capture = await startMicrophone(new AbortController().signal, () => {})
+    expect(acquire).toHaveBeenCalledTimes(missingDevice ? 2 : 1)
+    expect(acquire.mock.calls[0]![0]).toMatchObject({ audio: { deviceId: { exact: 'default' }, channelCount: 1 } })
+    if (missingDevice)
+      expect(acquire.mock.calls[1]![0]!.audio).not.toHaveProperty('deviceId')
+    const listener = add.mock.calls.find(([event]) => event === 'devicechange')
+    expect(listener).toBeDefined()
+    await capture.stop()
+    await capture.stop()
+    expect(remove.mock.calls.some(([event, callback]) => event === 'devicechange' && callback === listener![1])).toBe(true)
+    expect(destination.stream.getTracks().every(track => track.readyState === 'ended')).toBe(true)
+  }
+  finally {
+    await capture?.stop()
+    devices.mockRestore()
+    acquire.mockRestore()
+    add.mockRestore()
+    remove.mockRestore()
+    destination.stream.getTracks().forEach(track => track.stop())
+    await context.close()
   }
 })

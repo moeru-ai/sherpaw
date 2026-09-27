@@ -1,15 +1,39 @@
+import { useDevicesList, useUserMedia } from '@vueuse/core'
+import { computed, effectScope, ref } from 'vue'
+
 /** Capture raw mono PCM at the device rate. The caller owns any batching or normalization. */
 export async function startMicrophone(signal: AbortSignal, onAudio: (samples: Float32Array, sampleRate: number) => void) {
   signal.throwIfAborted()
   const context = new AudioContext()
-  let stream: MediaStream | undefined
+  // Recording starts in event handlers, outside Vue setup. Own the VueUse
+  // watchers/devicechange listener for exactly this capture's lifetime.
+  const scope = effectScope(true)
+  const { media, selectedAudioInput, audioInputs } = scope.run(() => {
+    const { audioInputs } = useDevicesList({ constraints: { audio: true }, requestPermissions: false })
+    const selectedAudioInput = ref('')
+    const constraints = computed<MediaStreamConstraints>(() => ({
+      audio: {
+        ...(selectedAudioInput.value ? { deviceId: { exact: selectedAudioInput.value } } : {}),
+        channelCount: 1,
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+      },
+    }))
+    // Keep the input fixed for one recording; switching streams mid-capture
+    // would also require reconnecting the graph and resetting decoder state.
+    const media = useUserMedia({ constraints, enabled: false, autoSwitch: false })
+    return { media, selectedAudioInput, audioInputs }
+  })!
   let source: MediaStreamAudioSourceNode | undefined
   let capture: AudioWorkletNode | undefined
   let closed: Promise<void> | undefined
 
-  /** Triggering workflow: caller stop / AbortSignal `abort` -> {@link release} -> tracks.stop, port detach and AudioContext.close. */
+  /** Triggering workflow: KWS stopMicrophone / recorder.stop / AbortSignal `abort` -> release -> VueUse stop, scope disposal and AudioContext.close. */
   function release() {
-    stream?.getTracks().forEach(track => track.stop())
+    // Also stop a stream whose permission request completed after scope disposal.
+    media.stop()
+    scope.stop()
     if (capture) {
       capture.port.onmessage = null
       capture.disconnect()
@@ -20,12 +44,12 @@ export async function startMicrophone(signal: AbortSignal, onAudio: (samples: Fl
     return closed
   }
 
-  /** Triggering workflow: caller AbortController.abort -> {@link abort} -> {@link release}. */
+  /** Triggering workflow: KWS stopMicrophone / speaker disposePage -> AbortController.abort -> release. */
   function abort() {
     void release().catch(() => {})
   }
 
-  /** Triggering workflow: Capture.process -> MessagePort `message` -> {@link collect} -> {@link onAudio}. */
+  /** Triggering workflow: Capture.process -> MessagePort `message` -> collect -> onAudio. */
   function collect(event: MessageEvent<Float32Array>) {
     if (!signal.aborted)
       onAudio(event.data, context.sampleRate)
@@ -36,8 +60,25 @@ export async function startMicrophone(signal: AbortSignal, onAudio: (samples: Fl
     await context.audioWorklet.addModule(new URL('./capture.worklet.js', import.meta.url))
     signal.throwIfAborted()
     await context.resume()
-    stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false } })
+    selectedAudioInput.value = audioInputs.value.find(device => device.deviceId === 'default')?.deviceId
+      || audioInputs.value[0]?.deviceId || ''
+    let stream: MediaStream | undefined
+    try {
+      stream = await media.start()
+    }
+    catch (error) {
+      signal.throwIfAborted()
+      // Like AIRI, retry the browser default if the enumerated input went away.
+      if (!selectedAudioInput.value || !(error instanceof DOMException)
+        || !['NotFoundError', 'OverconstrainedError'].includes(error.name)) {
+        throw error
+      }
+      selectedAudioInput.value = ''
+      stream = await media.start()
+    }
     signal.throwIfAborted()
+    if (!stream)
+      throw new Error('当前浏览器不支持麦克风采集。')
     source = context.createMediaStreamSource(stream)
     capture = new AudioWorkletNode(context, 'microphone-capture')
     capture.port.onmessage = collect
