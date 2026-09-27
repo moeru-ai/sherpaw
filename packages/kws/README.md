@@ -70,7 +70,7 @@ finally {
 
 ## Worker entry and synchronous core
 
-The default browser factory uses the standard `new Worker(new URL('./worker.js', import.meta.url), { type: 'module' })` syntax understood by [Vite](https://vite.dev/guide/features.html#web-workers) and [Rspack](https://rspack.rs/guide/features/web-workers). It has no Vite-specific imports or plugin requirement. Vite 8 and Rspack work with their default Worker handling. In Vite 7, set `optimizeDeps: { exclude: ['@sherpaw/kws'] }`: its older dependency prebundler otherwise relocates the relative Worker URL. No `worker.format` override is needed. Keep the published JS chunks and `dist/prebuilt/kws.wasm` together when serving without a bundler. The WASM is also exported as `@sherpaw/kws/module.wasm`.
+The default browser factory uses the standard `new Worker(new URL('./worker-entry.js', import.meta.url), { type: 'module' })` syntax understood by [Vite](https://vite.dev/guide/features.html#web-workers) and [Rspack](https://rspack.rs/guide/features/web-workers). It has no Vite-specific imports or plugin requirement. Vite 8 and Rspack work with their default Worker handling. In Vite 7, set `optimizeDeps: { exclude: ['@sherpaw/kws'] }`: its older dependency prebundler otherwise relocates the relative Worker URL. No `worker.format` override is needed. Keep the published JS chunks and `dist/prebuilt/kws.wasm` together when serving without a bundler. The WASM is also exported as `@sherpaw/kws/module.wasm`.
 
 Applications that need their own Worker entry can create a local file containing:
 
@@ -162,8 +162,10 @@ pnpm -F @sherpaw/kws test:run
 pnpm -F @sherpaw/kws test:run:browser
 ```
 
-Browser tests load the built npm JS, bundled WASM, external model files and upstream WAVs through HTTP in Chromium. They cover Chinese/English hits, unrelated audio and silence, repeated hits, multiple hits in one chunk, replacement, pause/resume, invalid-update rollback and native resource destruction across repeated updates. Test downloads stay outside the published package.
+Browser tests load the built npm JS, bundled WASM, external model files and upstream WAVs through HTTP in Chromium. They cover Chinese/English hits, unrelated audio and silence, repeated hits, multiple hits in one chunk, replacement, pause/resume, invalid-update rollback and native resource destruction across repeated updates. The default browser Worker is also exercised for ordered updates, buffer ownership, error propagation and disposal. Test downloads stay outside the published package.
 
 To rebuild the runtime, activate Emscripten 4.0.23 and run `cd sherpa-onnx && ./build.sh` from the repository root. The `kws` CMake target installs `kws.js` and `kws.wasm` into this package's `src/prebuilt/` directory, using the pinned upstream submodule and no model preload.
+
+Worker communication uses [Eventa](https://github.com/moeru-ai/eventa) invoke events and its browser/Node adapters. The package owns ordered decoding, audio backpressure and Worker lifetime.
 
 Node integration tests exercise the built `/node` entry with the real WASM and audio fixtures, including ownership, queue ordering, rollback, reset, queue limits, abort and disposal.

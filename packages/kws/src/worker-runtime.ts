@@ -1,12 +1,17 @@
+import type { EventContext } from '@moeru/eventa'
+import type { WorkerContextExtensions } from '@moeru/eventa/adapters/webworkers'
+
+import { defineInvokeHandler } from '@moeru/eventa'
 import { loadData } from '@sherpaw/preloader'
 
-import type { KeywordSpotter, KWSModel, KWSModule } from './types'
-import type { Command, Reply, Request } from './worker-protocol'
+import type { KeywordEntry, KeywordSpotter, KWSModel, KWSModule } from './types'
+import type { KeywordUpdateOptions, WorkerKeywordSpotterConfig } from './worker-types'
 
 import { createKeywordSpotter, initKWSModule } from './core'
+import * as events from './events'
 
 /** Owns one runtime and serializes all model, vocabulary and audio operations. */
-export function createWorkerHandler(reply: (reply: Reply) => void): (command: Command) => void {
+export function registerWorkerHandlers<Options extends { raw?: unknown }>(context: EventContext<WorkerContextExtensions, Options>): void {
   let spotter: KeywordSpotter | undefined
   let module: KWSModule
   let model: KWSModel
@@ -14,65 +19,63 @@ export function createWorkerHandler(reply: (reply: Reply) => void): (command: Co
   let nativeMaxActivePaths = 4
   let queue = Promise.resolve()
 
-  async function handle(request: Request): Promise<Reply['detections']> {
-    if (request.type === 'initialize') {
-      if (spotter)
-        throw new Error('Keyword Worker is already initialized')
+  // Vocabulary replacement must finish before the next audio frame is decoded.
+  function enqueue<T>(operation: () => T | Promise<T>): Promise<T> {
+    const result = queue.then(operation)
 
-      module = await initKWSModule()
-      model = request.model.paths ?? { encoder: 'encoder.onnx', decoder: 'decoder.onnx', joiner: 'joiner.onnx', tokens: 'tokens.txt' }
-      loadData({ module, data: request.model.data, metadata: request.model.metadata })
-      spotter = createKeywordSpotter(module, { model, keywords: request.keywords, maxActivePaths: request.maxActivePaths })
-      maxActivePaths = request.maxActivePaths ?? 4
-      nativeMaxActivePaths = maxActivePaths
+    queue = result.then(() => {}, () => {})
 
-      return
-    }
+    return result
+  }
 
+  function detector(): KeywordSpotter {
     if (!spotter)
       throw new Error('Keyword Worker is not initialized')
 
-    if (request.type === 'audio')
-      return spotter.processAudio(request.samples, request.sampleRate)
+    return spotter
+  }
 
-    if (request.type === 'reset') {
-      spotter.reset()
+  /** Triggering workflow: events.initialize -> defineInvokeHandler -> enqueue -> initialize loads the model and creates the detector. */
+  async function initialize(config: Omit<WorkerKeywordSpotterConfig, 'signal' | 'maxPendingAudio'>) {
+    if (spotter)
+      throw new Error('Keyword Worker is already initialized')
 
-      return
-    }
+    module = await initKWSModule()
+    model = config.model.paths ?? { encoder: 'encoder.onnx', decoder: 'decoder.onnx', joiner: 'joiner.onnx', tokens: 'tokens.txt' }
+    loadData({ module, data: config.model.data, metadata: config.model.metadata })
+    spotter = createKeywordSpotter(module, { model, keywords: config.keywords, maxActivePaths: config.maxActivePaths })
+    maxActivePaths = config.maxActivePaths ?? 4
+    nativeMaxActivePaths = maxActivePaths
+  }
 
-    const nextMaxActivePaths = request.options?.maxActivePaths ?? maxActivePaths
+  /** Triggering workflow: events.setKeywords -> defineInvokeHandler -> enqueue -> replace updates the detector atomically. */
+  async function replace(keywords: readonly KeywordEntry[], options?: KeywordUpdateOptions) {
+    const current = detector()
+    const nextMaxActivePaths = options?.maxActivePaths ?? maxActivePaths
 
     if (!Number.isInteger(nextMaxActivePaths) || nextMaxActivePaths < 1 || nextMaxActivePaths > 2147483647)
       throw new RangeError('maxActivePaths must be a positive int32 integer')
 
-    if (request.keywords.length && nextMaxActivePaths !== nativeMaxActivePaths) {
-      const next = createKeywordSpotter(module, { model, keywords: request.keywords, maxActivePaths: nextMaxActivePaths })
+    if (keywords.length && nextMaxActivePaths !== nativeMaxActivePaths) {
+      const next = createKeywordSpotter(module, { model, keywords, maxActivePaths: nextMaxActivePaths })
 
-      spotter.dispose()
+      current.dispose()
       spotter = next
       nativeMaxActivePaths = nextMaxActivePaths
     }
     else {
-      await spotter.setKeywords(request.keywords)
+      await current.setKeywords(keywords)
     }
 
     maxActivePaths = nextMaxActivePaths
   }
 
-  /** Triggering workflow: browser onMessage / parentPort message -> enqueue -> handle -> reply settles the public operation. */
-  function enqueue({ id, request }: Command) {
-    queue = queue.then(async () => {
-      try {
-        reply({ id, detections: await handle(request) })
-      }
-      catch (cause) {
-        const error = cause instanceof Error ? cause : new Error(String(cause))
+  defineInvokeHandler(context, events.initialize, config => enqueue(() => initialize(config)))
+  defineInvokeHandler(context, events.setKeywords, ({ keywords, options }) => enqueue(() => replace(keywords, options)))
 
-        reply({ id, error: { name: error.name, message: error.message } })
-      }
-    })
-  }
+  /** Triggering workflow: events.processAudio -> defineInvokeHandler -> enqueue -> detector.processAudio -> detections returned by Eventa. */
+  defineInvokeHandler(context, events.processAudio, ({ samples, sampleRate }) => enqueue(() => detector().processAudio(samples, sampleRate)))
 
-  return enqueue
+  /** Triggering workflow: events.reset -> defineInvokeHandler -> enqueue -> detector.reset starts a fresh audio stream. */
+  defineInvokeHandler(context, events.reset, () => enqueue(() => detector().reset()))
 }

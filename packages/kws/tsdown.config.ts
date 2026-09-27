@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsdown'
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/core.ts', 'src/worker.ts', 'src/node.ts', 'src/node-worker.ts'],
+  entry: ['src/index.ts', 'src/core.ts', 'src/worker-entry.ts', 'src/node.ts', 'src/node-worker.ts'],
   copy: [{ from: 'src/prebuilt/kws.wasm', to: 'dist/prebuilt/kws.wasm' }],
   dts: true,
   plugins: [{

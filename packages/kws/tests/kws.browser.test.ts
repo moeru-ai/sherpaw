@@ -6,6 +6,8 @@ import type { Detection, KeywordEntry, KeywordSpotter, KWSModel, KWSModule } fro
 // Exercise the published JS layout and its relative WASM URL, not only source.
 // eslint-disable-next-line antfu/no-import-dist
 import { createKeywordSpotter, initKWSModule } from '../dist/core.js'
+// eslint-disable-next-line antfu/no-import-dist
+import { createKeywordSpotter as createWorkerSpotter } from '../dist/index.js'
 
 const files = import.meta.glob<string>('./models/**/*.wav', { eager: true, query: '?url', import: 'default' })
 const packs = import.meta.glob<string>('../../../models/huggingface/sherpa-onnx-kws-*/install/bin/wasm/preload.{data,js.metadata}', { eager: true, query: '?url', import: 'default' })
@@ -240,3 +242,45 @@ describe.each([
     })
   }
 })
+
+it('detects keywords in the default browser Worker without taking caller buffers', async () => {
+  const directory = 'sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20'
+  const prefix = `../../../models/huggingface/${directory}/install/bin/wasm/preload`
+  const [dataResponse, metadataResponse, samples] = await Promise.all([
+    fetch(packs[`${prefix}.data`]),
+    fetch(packs[`${prefix}.js.metadata`]),
+    audio(directory, 'zh_5.wav'),
+  ])
+  const model = { data: await dataResponse.arrayBuffer(), metadata: await metadataResponse.json() }
+  const modelSize = model.data.byteLength
+  const spotter = await createWorkerSpotter({ model, keywords: [first] })
+
+  try {
+    const original = samples.slice()
+    const update = spotter.setKeywords([second])
+    const processing = spotter.processAudio(samples, 16000)
+
+    samples.fill(0)
+    await update
+
+    expect((await processing).map(hit => hit.label)).toEqual([second.label])
+    expect(model.data.byteLength).toBe(modelSize)
+    expect(samples.byteLength).toBe(original.byteLength)
+
+    await expect(spotter.setKeywords([{ label: 'invalid', matches: [{ tokens: ['NOT_A_MODEL_TOKEN'] }] }])).rejects.toThrow(/token/i)
+    await spotter.reset()
+
+    expect((await spotter.processAudio(original, 16000)).map(hit => hit.label)).toEqual([second.label])
+
+    const pending = spotter.processAudio(original, 16000)
+    const rejected = expect(pending).rejects.toThrow(/disposed/i)
+
+    spotter.dispose()
+
+    await rejected
+    await expect(spotter.reset()).rejects.toThrow(/disposed/i)
+  }
+  finally {
+    spotter.dispose()
+  }
+}, 30000)

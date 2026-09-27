@@ -241,6 +241,9 @@ importers:
 
   packages/kws:
     dependencies:
+      '@moeru/eventa':
+        specifier: 1.0.1
+        version: 1.0.1
       '@sherpaw/preloader':
         specifier: workspace:^
         version: link:../preloader
@@ -1146,6 +1149,26 @@ packages:
       electron:
         optional: true
       h3:
+        optional: true
+      web-worker:
+        optional: true
+
+  '@moeru/eventa@1.0.1':
+    resolution: {integrity: sha512-dDQcB/acJBhMiOFrleXMuCSTtbAGsIZWNSNkoEB31wWBIrg4VwDtaX/XtMq8dAjmD3ixPnjSPtb2/rMbwZBseQ==}
+    peerDependencies:
+      '@tauri-apps/api': '>=2'
+      electron: '>=39'
+      h3: '>=2.0.1-rc.22'
+      hono: '>=4.12.25'
+      web-worker: ^1.5.0
+    peerDependenciesMeta:
+      '@tauri-apps/api':
+        optional: true
+      electron:
+        optional: true
+      h3:
+        optional: true
+      hono:
         optional: true
       web-worker:
         optional: true
@@ -3043,6 +3066,11 @@ packages:
     engines: {node: ^18 || >=20}
     hasBin: true
 
+  nanoid@6.0.1:
+    resolution: {integrity: sha512-3wVS3i51pE2pi1k5FFL/95BGfVS0kSsvDVuGXHOtxox/TywUmtgq+3qiTOTbs9J7KfHaXPiN171k/A6dBnaXFw==}
+    engines: {node: ^22 || ^24 || >=26}
+    hasBin: true
+
   natural-compare@1.4.0:
     resolution: {integrity: sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==}
 
@@ -4382,6 +4410,11 @@ snapshots:
     dependencies:
       nanoid: 5.1.6
       picomatch: 4.0.4
+
+  '@moeru/eventa@1.0.1':
+    dependencies:
+      nanoid: 6.0.1
+      picomatch: 4.0.7
 
   '@moeru/std@0.1.0-beta.17': {}
 
@@ -6517,6 +6550,8 @@ snapshots:
   nanoid@3.3.12: {}
 
   nanoid@5.1.6: {}
+
+  nanoid@6.0.1: {}
 
   natural-compare@1.4.0: {}
 

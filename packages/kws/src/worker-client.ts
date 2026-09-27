@@ -1,115 +1,38 @@
-import type { Detection } from './types'
-import type { Command, Reply, Request } from './worker-protocol'
+import type { EventContext } from '@moeru/eventa'
+import type { WorkerContextExtensions } from '@moeru/eventa/adapters/webworkers'
+
+import { defineInvoke } from '@moeru/eventa'
+
 import type { WorkerKeywordSpotter, WorkerKeywordSpotterConfig } from './worker-types'
 
-/** Internal transport shared by browser Workers and Node worker threads. */
-export interface WorkerTransport {
-  postMessage: (command: Command, transfer?: ArrayBuffer[]) => void
-  subscribe: (reply: (reply: Reply) => void, failure: (error: Error) => void) => () => void
-  terminate: () => void
-}
+import * as events from './events'
 
-export async function createWorkerSpotter(transport: WorkerTransport, config: WorkerKeywordSpotterConfig): Promise<WorkerKeywordSpotter> {
-  let sequence = 0
-  let closed: Error | undefined
-  let audioPending = 0
-  const pending = new Map<number, { resolve: (detections: Detection[]) => void, reject: (error: Error) => void }>()
+/** Shares detector lifetime and audio backpressure across Eventa's browser and Node adapters. */
+export async function createWorkerSpotter<Options>(context: EventContext<WorkerContextExtensions, Options>, config: WorkerKeywordSpotterConfig, terminate: () => void): Promise<WorkerKeywordSpotter> {
   const { signal, maxPendingAudio = 4 } = config
+  const initialize = defineInvoke(context, events.initialize)
+  const setKeywords = defineInvoke(context, events.setKeywords)
+  const processAudio = defineInvoke(context, events.processAudio)
+  const reset = defineInvoke(context, events.reset)
+  let audioPending = 0
 
-  /** Triggering workflow: worker message -> transport.subscribe -> complete -> settle the matching public operation. */
-  function complete(reply: Reply) {
-    const callback = pending.get(reply.id)
-
-    if (!callback)
-      return
-
-    pending.delete(reply.id)
-
-    if (reply.error)
-      callback.reject(Object.assign(new Error(reply.error.message), { name: reply.error.name }))
-    else
-      callback.resolve(reply.detections ?? [])
-  }
-
-  const unsubscribe = transport.subscribe(complete, dispose)
-
-  /** Triggering workflow: public dispose / transport failure / abort -> dispose -> reject requests and terminate the Worker. */
-  function dispose(error = new Error('Keyword spotter has been disposed')) {
-    if (closed)
-      return
-
-    closed = error
+  /** Triggering workflow: Eventa context abort (dispose / Worker failure / config.signal) -> release -> terminate. */
+  function release() {
     signal?.removeEventListener('abort', abort)
-    unsubscribe()
-    transport.terminate()
-
-    for (const callback of pending.values())
-      callback.reject(error)
-
-    pending.clear()
+    terminate()
   }
 
-  /** Triggering workflow: config.signal abort -> abort -> dispose cancels initialization and queued work. */
+  /** Triggering workflow: config.signal abort -> abort -> context.abort cancels initialization and queued work. */
   function abort() {
-    dispose(signal?.reason instanceof Error ? signal.reason : new DOMException('Keyword spotter aborted', 'AbortError'))
+    context.abort(signal?.reason instanceof Error ? signal.reason : new DOMException('Keyword spotter aborted', 'AbortError'))
   }
 
-  async function request(request: Request): Promise<Detection[]> {
-    if (closed)
-      throw closed
-
-    const audio = request.type === 'audio'
-
-    if (audio && !(request.samples instanceof Float32Array))
-      throw new TypeError('samples must be a Float32Array')
-
-    if (audio && audioPending >= maxPendingAudio)
-      throw new Error('Keyword spotter audio queue is full')
-
-    if (audio)
-      audioPending++
-
-    try {
-      return await new Promise<Detection[]>((resolve, reject) => {
-        const id = ++sequence
-
-        pending.set(id, { resolve, reject })
-
-        try {
-          if (request.type === 'audio') {
-            // Copy only this view, then transfer the owned copy. A short view of
-            // a long recording must not clone its entire backing buffer per frame.
-            const samples = new Float32Array(request.samples)
-
-            transport.postMessage({ id, request: { ...request, samples } }, [samples.buffer])
-          }
-          else if (request.type === 'initialize') {
-            const source = request.model.data
-
-            if (!(source instanceof ArrayBuffer) && !(source instanceof Uint8Array))
-              throw new TypeError('Model data must be an ArrayBuffer or Uint8Array')
-
-            // Own the model snapshot too, including views backed by shared memory.
-            const data = new Uint8Array(source instanceof ArrayBuffer ? new Uint8Array(source) : source)
-
-            transport.postMessage({ id, request: { ...request, model: { ...request.model, data } } }, [data.buffer])
-          }
-          else {
-            transport.postMessage({ id, request })
-          }
-        }
-        catch (error) {
-          pending.delete(id)
-          reject(error)
-        }
-      })
-    }
-    finally {
-      if (audio)
-        audioPending--
-    }
+  /** Triggering workflow: public dispose / initialization failure -> dispose -> context.abort rejects pending invokes and releases the Worker. */
+  function dispose() {
+    context.abort(new Error('Keyword spotter has been disposed'))
   }
 
+  context.signal.addEventListener('abort', release, { once: true })
   signal?.addEventListener('abort', abort, { once: true })
 
   try {
@@ -118,10 +41,16 @@ export async function createWorkerSpotter(transport: WorkerTransport, config: Wo
     if (!Number.isSafeInteger(maxPendingAudio) || maxPendingAudio < 1)
       throw new RangeError('maxPendingAudio must be a positive safe integer')
 
-    await request({ type: 'initialize', model: config.model, keywords: config.keywords, maxActivePaths: config.maxActivePaths })
+    const source = config.model.data
 
-    if (closed)
-      throw closed
+    if (!(source instanceof ArrayBuffer) && !(source instanceof Uint8Array))
+      throw new TypeError('Model data must be an ArrayBuffer or Uint8Array')
+
+    // Own the snapshot, including views backed by shared memory. Caller bytes stay usable.
+    const data = new Uint8Array(source instanceof ArrayBuffer ? new Uint8Array(source) : source)
+
+    await initialize({ model: { ...config.model, data }, keywords: config.keywords, maxActivePaths: config.maxActivePaths }, { transfer: [data.buffer] })
+    context.signal.throwIfAborted()
   }
   catch (error) {
     dispose()
@@ -130,18 +59,31 @@ export async function createWorkerSpotter(transport: WorkerTransport, config: Wo
   }
 
   return {
-    async setKeywords(keywords, options) {
-      await request({ type: 'keywords', keywords, options })
+    setKeywords: (keywords, options) => setKeywords({ keywords, options }),
+
+    async processAudio(samples, sampleRate) {
+      context.signal.throwIfAborted()
+
+      if (!(samples instanceof Float32Array))
+        throw new TypeError('samples must be a Float32Array')
+
+      if (audioPending >= maxPendingAudio)
+        throw new Error('Keyword spotter audio queue is full')
+
+      audioPending++
+
+      try {
+        // Copy just this view, not the backing buffer of an entire recording.
+        const copy = new Float32Array(samples)
+
+        return await processAudio({ samples: copy, sampleRate }, { transfer: [copy.buffer] })
+      }
+      finally {
+        audioPending--
+      }
     },
 
-    processAudio(samples, sampleRate) {
-      return request({ type: 'audio', samples, sampleRate })
-    },
-
-    async reset() {
-      await request({ type: 'reset' })
-    },
-
+    reset,
     dispose,
   }
 }

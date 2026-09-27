@@ -135,7 +135,7 @@ it('stops a late microphone stream when the route is left while permission is pe
   }
 })
 
-it('recovers audio when the selected microphone has disconnected', async () => {
+it('falls back to the default input when the selected microphone is unavailable at startup', async () => {
   const context = new AudioContext()
   const destination = context.createMediaStreamDestination()
   const oscillator = context.createOscillator()

@@ -1,4 +1,4 @@
-import { createContext } from '@moeru/eventa/adapters/worker-threads/worker'
+import { createContext } from '@moeru/eventa/adapters/webworkers/worker'
 
 import { registerWorkerHandlers } from './worker-runtime'
 

@@ -1,12 +1,21 @@
-import type { Command } from './worker-protocol'
+import { createContext } from '@moeru/eventa/adapters/webworkers'
 
-import { createWorkerHandler } from './worker-runtime'
+import type { WorkerKeywordSpotter, WorkerKeywordSpotterConfig } from './worker-types'
 
-const handle = createWorkerHandler(reply => globalThis.postMessage(reply))
+import { createWorkerSpotter } from './worker-client'
 
-/** Triggering workflow: browser Worker message -> onMessage -> serialized keyword runtime. */
-function onMessage(event: MessageEvent<Command>) {
-  handle(event.data)
+/**
+ * Creates an isolated detector. A supplied Worker entry may import @sherpaw/kws/worker.
+ * Ownership of that Worker transfers to this detector, including termination on failure/disposal.
+ */
+export async function createKeywordSpotter(config: WorkerKeywordSpotterConfig, options: { worker?: Worker } = {}): Promise<WorkerKeywordSpotter> {
+  const worker = options.worker ?? new Worker(new URL('./worker-entry.js', import.meta.url), { type: 'module' })
+  const { context } = createContext(worker)
+
+  return createWorkerSpotter(context, config, () => {
+    worker.onmessage = null
+    worker.onerror = null
+    worker.onmessageerror = null
+    worker.terminate()
+  })
 }
-
-globalThis.addEventListener('message', onMessage)

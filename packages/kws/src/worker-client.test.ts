@@ -1,8 +1,11 @@
+import { defineInvokeHandler } from '@moeru/eventa'
+import { createContext } from '@moeru/eventa/adapters/worker-threads/worker'
+import { MessageChannel } from 'node:worker_threads'
 import { expect, it, vi } from 'vitest'
 
-import type { Command, Reply } from './worker-protocol'
 import type { WorkerKeywordSpotterConfig } from './worker-types'
 
+import * as events from './events'
 import { createWorkerSpotter } from './worker-client'
 
 const config: WorkerKeywordSpotterConfig = {
@@ -11,93 +14,74 @@ const config: WorkerKeywordSpotterConfig = {
   maxPendingAudio: 1,
 }
 
-function transport() {
-  let reply: (message: Reply) => void
-  let failure: (error: Error) => void
-  const commands: Command[] = []
-  const unsubscribe = vi.fn()
-  const terminate = vi.fn()
-  const postMessage = vi.fn((command: Command) => {
-    commands.push(command)
+function connection() {
+  const { port1, port2 } = new MessageChannel()
+  const { context } = createContext({ messagePort: port1 })
+  const { context: remote } = createContext({ messagePort: port2 })
+  const terminate = vi.fn(() => {
+    port1.close()
+    port2.close()
   })
 
-  return {
-    commands,
-    unsubscribe,
-    terminate,
-    postMessage,
-    subscribe(onReply: typeof reply, onFailure: typeof failure) {
-      reply = onReply
-      failure = onFailure
+  defineInvokeHandler(remote, events.initialize, () => {})
 
-      return unsubscribe
-    },
-
-    respond(message: Omit<Reply, 'id'> = {}) {
-      reply({ id: commands.at(-1)!.id, ...message })
-    },
-
-    fail(error: Error) {
-      failure(error)
-    },
-  }
+  return { context, remote, port: port1, terminate }
 }
 
-it('terminates and rejects initialization when the Worker fails before its first reply', async () => {
-  const worker = transport()
-  const pending = createWorkerSpotter(worker, config)
+it('terminates and rejects initialization when the transport fails before its first reply', async () => {
+  const { context, port, terminate } = connection()
+  const pending = createWorkerSpotter(context, config, terminate)
 
-  worker.fail(new Error('Worker could not load'))
+  port.emit('error', new Error('Worker could not load'))
 
   await expect(pending).rejects.toThrow('Worker could not load')
-  expect(worker.terminate).toHaveBeenCalledTimes(1)
-  expect(worker.unsubscribe).toHaveBeenCalledTimes(1)
+  expect(terminate).toHaveBeenCalledTimes(1)
 })
 
-it('rejects every pending operation when the Worker crashes and makes disposal idempotent', async () => {
-  const worker = transport()
-  const initializing = createWorkerSpotter(worker, config)
+it('rejects every pending operation when the transport fails and makes disposal idempotent', async () => {
+  const { context, port, terminate } = connection()
+  const spotter = await createWorkerSpotter(context, config, terminate)
 
-  worker.respond()
+  try {
+    const settled = Promise.allSettled([
+      spotter.processAudio(new Float32Array(4), 16000),
+      spotter.reset(),
+    ])
+    const failure = new Error('Worker stopped')
 
-  const spotter = await initializing
-  const audio = spotter.processAudio(new Float32Array(4), 16000)
-  const reset = spotter.reset()
-  const settled = Promise.allSettled([audio, reset])
-  const failure = new Error('Worker stopped')
+    port.emit('error', failure)
+    spotter.dispose()
 
-  worker.fail(failure)
-  spotter.dispose()
-
-  expect(await settled).toEqual([
-    { status: 'rejected', reason: failure },
-    { status: 'rejected', reason: failure },
-  ])
-  await expect(spotter.setKeywords([])).rejects.toThrow('Worker stopped')
-  expect(worker.terminate).toHaveBeenCalledTimes(1)
-  expect(worker.unsubscribe).toHaveBeenCalledTimes(1)
+    expect(await settled).toEqual([
+      { status: 'rejected', reason: failure },
+      { status: 'rejected', reason: failure },
+    ])
+    await expect(spotter.setKeywords([])).rejects.toThrow('Worker stopped')
+    expect(terminate).toHaveBeenCalledTimes(1)
+  }
+  finally {
+    spotter.dispose()
+  }
 })
 
 it('recovers after a cloning failure without leaving the audio queue occupied', async () => {
-  const worker = transport()
-  const initializing = createWorkerSpotter(worker, config)
+  const { context, remote, port, terminate } = connection()
 
-  worker.respond()
+  defineInvokeHandler(remote, events.processAudio, () => [])
 
-  const spotter = await initializing
-
-  worker.postMessage.mockImplementationOnce(() => {
+  const spotter = await createWorkerSpotter(context, config, terminate)
+  const postMessage = vi.spyOn(port, 'postMessage').mockImplementationOnce(() => {
     throw new DOMException('Uncloneable request', 'DataCloneError')
   })
 
-  await expect(spotter.processAudio(new Float32Array(4), 16000)).rejects.toThrow('Uncloneable request')
+  try {
+    await expect(spotter.processAudio(new Float32Array(4), 16000)).rejects.toThrow('Uncloneable request')
 
-  const next = spotter.processAudio(new Float32Array(4), 16000)
-
-  worker.respond({ detections: [] })
-
-  await expect(next).resolves.toEqual([])
-  expect(worker.terminate).not.toHaveBeenCalled()
-
-  spotter.dispose()
+    await expect(spotter.processAudio(new Float32Array(4), 16000)).resolves.toEqual([])
+    expect(terminate).not.toHaveBeenCalled()
+  }
+  finally {
+    postMessage.mockRestore()
+    spotter.dispose()
+  }
 })
