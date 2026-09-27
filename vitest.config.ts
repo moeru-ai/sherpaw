@@ -9,7 +9,7 @@ export default defineConfig(() => {
         'packages/kws/vitest.config.ts',
         'packages/kws/vitest.node.config.ts',
         'packages/preloader',
-        'packages/speaker-diarization',
+        'packages/speaker-diarization/vitest.node.config.ts',
         'packages/speaker-identification',
         'packages/vad',
         'packages/vad-asr',

@@ -46,5 +46,5 @@ install(
   "$<TARGET_FILE_DIR:${target}>/${target}.js"
   "$<TARGET_FILE_DIR:${target}>/${target}.wasm"
   DESTINATION
-  "${PROJECT_SOURCE_DIR}/../packages/speaker-diarization/src"
+  "${PROJECT_SOURCE_DIR}/../packages/speaker-diarization/src/prebuilt"
 )
