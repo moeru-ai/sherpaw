@@ -1,7 +1,7 @@
 {
   "name": "@sherpaw/testing-audio",
   "type": "module",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Sherpaw browser audio pipeline tests",
   "author": "Moeru AI",

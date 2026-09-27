@@ -1,7 +1,7 @@
 {
   "name": "@sherpaw/kws",
   "type": "module",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Streaming keyword spotting with replaceable token vocabularies and standalone Sherpa-ONNX WASM",
   "author": "Makito <i@maki.to>",
   "license": "Apache-2.0",
