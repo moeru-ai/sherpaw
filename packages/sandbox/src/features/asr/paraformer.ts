@@ -1,11 +1,10 @@
 import type { Network } from './onnx'
 import type { Recognizer, RecognizerOptions } from './types'
 
-import { acceptAudio, fetchChecked, loadNativeRuntime } from './native'
+import { loadModelPack } from '../models'
+import { loadParaformerFloatWeights } from './models'
+import { acceptAudio, loadNativeRuntime } from './native'
 import { createOnnxBridge } from './onnx'
-
-const packUrl = new URL('../../../../../models/huggingface/sherpaw-paraformer-zh-en/install/bin/wasm/preload.data', import.meta.url).href
-const metadataUrl = new URL('../../../../../models/huggingface/sherpaw-paraformer-zh-en/install/bin/wasm/preload.js.metadata', import.meta.url).href
 
 /** Triggering workflow: runtime.worker load -> Paraformer pack and optional ORT sessions -> recording adapter. */
 export async function createParaformerRecognizer(options: RecognizerOptions, baseUrl: string, report: (message: string) => void): Promise<Recognizer> {
@@ -34,8 +33,8 @@ export async function createParaformerRecognizer(options: RecognizerOptions, bas
     return runtime.ccall('AsrText', 'string', [], []) as string
   }
   try {
-    const metadata: { files: { filename: string, start: number, end: number }[] } = await (await fetchChecked(metadataUrl)).json()
-    const pack = new Uint8Array(await (await fetchChecked(packUrl)).arrayBuffer())
+    const { data, metadata } = await loadModelPack('sherpaw-paraformer-zh-en', '46701cc733a82ed5cb94c7f3200a002d010243f6')
+    const pack = new Uint8Array(data)
     const weights: Parameters<typeof createOnnxBridge>[1] = {}
     for (const entry of metadata.files) {
       const bytes = pack.subarray(entry.start, entry.end)
@@ -44,7 +43,7 @@ export async function createParaformerRecognizer(options: RecognizerOptions, bas
         const network = entry.filename.slice(1, -5) as Network
         weights[network] = {
           bytes: backend === 'webgpu-fp32'
-            ? new Uint8Array(await (await fetchChecked(new URL(`asr-models/paraformer-fp32/${network}.onnx`, baseUrl))).arrayBuffer())
+            ? await loadParaformerFloatWeights(network)
             : bytes,
           provider: backend === 'webgpu-decoder' && network === 'encoder' ? 'wasm' : 'webgpu',
         }

@@ -1,16 +1,15 @@
 <script setup lang="ts">
-import type { AudioProcessorMessage } from '../audio-processor.protocol'
 import type { RealtimeEvent, RealtimeSnapshot } from '../features/asr/realtime-metrics'
 import type { AsrBackend, Recognizer } from '../features/asr/types'
 import { PopoverClose } from 'reka-ui'
 import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue'
-import audioProcessor from '../audio-processor.worklet?worker&url'
 import Button from '../components/Button.vue'
 import ModelSetup from '../components/ModelSetup.vue'
 import ModelSetupPopover from '../components/ModelSetupPopover.vue'
 import SandboxLayout from '../components/SandboxLayout.vue'
 import { asrModels } from '../features/asr/catalog'
 import { RealtimeMetrics } from '../features/asr/realtime-metrics'
+import { startMicrophone } from '../features/audio/microphone'
 import { provideASRStore } from '../store'
 
 const { asrModule } = provideASRStore()
@@ -31,10 +30,8 @@ let pendingEndTime = 0
 let lastCapturePublish = 0
 let closed = false
 let engine: Recognizer | undefined
-let audioCtx: AudioContext | undefined
-let microphone: MediaStream | undefined
-let source: MediaStreamAudioSourceNode | undefined
-let worklet: AudioWorkletNode | undefined
+let microphone: Awaited<ReturnType<typeof startMicrophone>> | undefined
+let captureAbort: AbortController | undefined
 let pending: Float32Array[] = []
 let pendingSize = 0
 let processing: Promise<void> | undefined
@@ -55,25 +52,14 @@ function publishMetrics(kind: RealtimeEvent['kind'] = 'progress') {
   }))
 }
 
-function disconnectMicrophone() {
-  if (worklet)
-    worklet.port.onmessage = null
-  source?.disconnect()
-  worklet?.disconnect()
-  microphone?.getTracks().forEach(track => track.stop())
-  microphone = undefined
-  source = undefined
-  worklet = undefined
-}
-
 async function release() {
-  disconnectMicrophone()
+  captureAbort?.abort()
   const current = engine
   engine = undefined
   modelLoaded.value = false
   await current?.dispose()
-  await audioCtx?.close()
-  audioCtx = undefined
+  await microphone?.stop()
+  microphone = undefined
 }
 
 /** Triggering workflow: model/backend selector change -> release loaded worker -> next Load/Start uses the new selection. */
@@ -147,7 +133,7 @@ function pump() {
       const chunksBefore = engine.stats?.().decodedChunks ?? 0
       const started = performance.now()
       transcript.value = await engine.accept(samples)
-      metrics.complete(samples.length, audioEnd, audioCtx!.currentTime, performance.now() - started, (engine.stats?.().decodedChunks ?? 0) > chunksBefore, transcript.value, performance.now())
+      metrics.complete(samples.length, audioEnd, microphone!.currentTime, performance.now() - started, (engine.stats?.().decodedChunks ?? 0) > chunksBefore, transcript.value, performance.now())
       publishMetrics()
     }
   })().catch(async (cause) => {
@@ -161,26 +147,24 @@ function pump() {
   return processing
 }
 
-/** Triggering workflow: worklet.port message -> validate PCM/backlog -> pump -> selected inference backend. */
-function receiveAudio(event: MessageEvent<AudioProcessorMessage>) {
-  if (phase.value !== 'recording' || event.data.type !== 'data')
+/** Triggering workflow: startMicrophone collect -> validate PCM/backlog -> pump -> selected inference backend. */
+function receiveAudio(samples: Float32Array, sampleRate: number, audioEndTime: number) {
+  if (phase.value !== 'recording')
     return
-  const message = event.data
-  if (message.sampleRate !== 16000 || pendingSize > 16000 * 10) {
-    error.value = message.sampleRate !== 16000 ? 'Unexpected microphone sample rate.' : 'Inference is falling behind by more than 10 seconds. Try a smaller model or a faster backend.'
+  if (sampleRate !== 16000 || pendingSize > 16000 * 10) {
+    error.value = sampleRate !== 16000 ? 'Unexpected microphone sample rate.' : 'Inference is falling behind by more than 10 seconds. Try a smaller model or a faster backend.'
     void stopRecording()
     return
   }
-  const samples = new Float32Array(message.data)
-  metrics.receive(samples.length, message.audioEndTime, audioCtx!.currentTime, performance.now())
-  pendingEndTime = message.audioEndTime
+  metrics.receive(samples.length, audioEndTime, microphone!.currentTime, performance.now())
+  pendingEndTime = audioEndTime
   pending.push(samples)
   pendingSize += samples.length
   backlog.value = pendingSize / 16000
   // Slow worker inference must not hide ongoing microphone capture from the
   // display or the fakemic stop condition. Publish at most ten times/second.
-  if (processing && message.audioEndTime - lastCapturePublish >= 0.1) {
-    lastCapturePublish = message.audioEndTime
+  if (processing && audioEndTime - lastCapturePublish >= 0.1) {
+    lastCapturePublish = audioEndTime
     publishMetrics()
   }
   if (pendingSize >= 1600)
@@ -202,34 +186,25 @@ async function startRecording() {
   pending = []
   pendingSize = 0
   try {
-    audioCtx = new AudioContext({ sampleRate: 16000 })
-    await audioCtx.resume()
     await ensureModel()
     if (closed) {
       await release()
       return
     }
-    microphone = await navigator.mediaDevices.getUserMedia({ audio: true })
+    captureAbort = new AbortController()
+    microphone = await startMicrophone(captureAbort.signal, receiveAudio, {
+      sampleRate: 16000,
+      /** Triggering workflow: capture processor error -> visible error -> stopRecording and cleanup. */
+      onError() {
+        error.value = 'Microphone audio processing failed.'
+        void stopRecording()
+      },
+    })
     if (closed) {
       await release()
       return
-    }
-    await audioCtx.audioWorklet.addModule(audioProcessor)
-    if (closed) {
-      await release()
-      return
-    }
-    source = audioCtx.createMediaStreamSource(microphone)
-    worklet = new AudioWorkletNode(audioCtx, 'audio-processor')
-    worklet.port.onmessage = receiveAudio
-    /** Triggering workflow: AudioWorklet processor error -> visible error -> stopRecording and cleanup. */
-    worklet.onprocessorerror = () => {
-      error.value = 'Microphone audio processing failed.'
-      void stopRecording()
     }
     phase.value = 'recording'
-    source.connect(worklet)
-    worklet.connect(audioCtx.destination)
   }
   catch (cause) {
     error.value = String(cause)
@@ -244,7 +219,7 @@ async function stopRecording() {
     return
   phase.value = 'stopping'
   const stopStarted = performance.now()
-  disconnectMicrophone()
+  captureAbort?.abort()
   try {
     await pump()
     if (engine)
@@ -263,6 +238,7 @@ async function stopRecording() {
 /** Triggering workflow: route unmount -> mark initialization cancelled -> stop recording and release microphone/session resources. */
 onBeforeUnmount(() => {
   closed = true
+  captureAbort?.abort()
   if (phase.value === 'recording')
     void stopRecording()
   else if (phase.value === 'idle')

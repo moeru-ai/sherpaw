@@ -35,6 +35,8 @@ runtime loading, PCM transfer, and ORT session/tensor transport:
 - `paraformer.ts`, `transducer.ts`: model-specific initialization and decoding.
 - `custom.ts`: legacy Model setup adapter for its existing main-thread WASM instance.
 - `native.ts`, `onnx.ts`: native and browser inference bridges.
+- `features/models.ts`, `asr/models.ts`: local-models dev loading and pinned HF fallback.
+- `features/audio/microphone.ts`: shared microphone capture with KWS and speaker identification; ASR requests 16 kHz and retains render-clock diagnostics.
 - `realtime-metrics.ts`, `gpu-diagnostics.ts`: measurement and optional diagnostics.
 - `sherpa-onnx/asr-runtime/`: native runtimes and explicit upstream hook patches.
 
@@ -61,27 +63,38 @@ Use Python 3.11+, Git LFS, pnpm, and activated Emscripten 4.0.23:
 
 ```sh
 pnpm install
-git submodule update --init --recursive sherpa-onnx/upstream \
-  models/huggingface/sherpaw-paraformer-zh-en
-git -C models/huggingface/sherpaw-paraformer-zh-en lfs pull
+git submodule update --init --recursive sherpa-onnx/upstream
 pnpm -F @sherpaw/speaker-identification test:prepare
-python3 scripts/prepare-asr-models.py
 bash scripts/build-asr-runtime.sh
-# Additional original FP32 weights for Paraformer's FP32 WebGPU option:
-uv run scripts/prepare-paraformer-fp32.py
 pnpm --filter @sherpaw/sandbox... build
 pnpm --filter @sherpaw/sandbox dev --host 127.0.0.1 --port 5187
 ```
 
-The model preparer accepts IDs `x-asr`, `x-asr-fp32`, and `zipformer-zh`; each also
-has `models/<upstream-name>/download.sh`. Weights live under each model's `model/`
-directory and are served through generated public symlinks. Generated weights
-and WASM binaries are not committed. `SHERPAW_DEPS_CACHE` optionally reuses an
-existing native dependency cache during bridge builds.
+ASR follows the KWS loading policy: the `local-models` Vite plugin serves
+prepared weights from `models/` during development. Missing local weights and
+production builds use pinned Hugging Face URLs. X-ASR and Paraformer read the
+existing `preload.data` / `preload.js.metadata` packs; Chinese Zipformer and
+Paraformer FP32 read upstream ONNX files. Browser inference no longer needs the
+preparer's archive manifest or `public/asr-models` symlinks.
 
-Local production builds copy prepared ONNX assets. They exceed Cloudflare's
-static per-file limit, and the deployment uploader currently handles `.data`
-files only. Public deployment still needs CDN/manifest integration.
+Optional local caches:
+
+```sh
+git submodule update --init models/huggingface/sherpaw-paraformer-zh-en \
+  models/huggingface/sherpaw-x-asr-zh-en-480ms-int8 \
+  models/huggingface/sherpaw-x-asr-zh-en-480ms-fp32
+# Run git lfs pull in those submodules if LFS smudging is disabled.
+python3 scripts/prepare-asr-models.py zipformer-zh
+uv run scripts/prepare-paraformer-fp32.py
+```
+
+The archive preparer still accepts `x-asr` and `x-asr-fp32` for model packaging;
+`models/<upstream-name>/download.sh` uses the same pinned archive verification.
+Generated weights and WASM binaries are not committed. `SHERPAW_DEPS_CACHE`
+optionally reuses an existing native dependency cache during bridge builds.
+ASR weights are downloaded at runtime instead of copied into production builds.
+Deployment still requires the locally built ASR JS/WASM bridges; model download
+requires network access to Hugging Face when no local dev cache is available.
 
 ## Automated verification
 

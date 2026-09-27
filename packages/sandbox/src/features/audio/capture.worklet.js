@@ -1,4 +1,4 @@
-// Capture keeps the AudioContext's actual sample rate; sherpa resamples.
+// Capture keeps the AudioContext's actual sample rate and render clock.
 class Capture extends AudioWorkletProcessor {
   /**
    * Triggering workflow:
@@ -11,7 +11,7 @@ class Capture extends AudioWorkletProcessor {
     if (channel?.length) {
       const samples = channel.slice()
 
-      this.port.postMessage(samples, [samples.buffer])
+      this.port.postMessage({ samples, audioEndTime: currentTime + samples.length / sampleRate }, [samples.buffer])
     }
 
     return true

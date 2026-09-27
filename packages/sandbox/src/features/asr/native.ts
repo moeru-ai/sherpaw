@@ -3,18 +3,10 @@ import type { TensorBridge } from './onnx'
 export interface NativeRuntime extends TensorBridge {
   HEAPF32: Float32Array
   FS: {
-    mkdirTree: (path: string) => void
     writeFile: (path: string, bytes: Uint8Array) => void
     unlink: (path: string) => void
   }
   ccall: (name: string, result: string | null, types: string[], args: unknown[], options?: { async: true }) => any
-}
-
-export async function fetchChecked(url: string | URL) {
-  const response = await fetch(url)
-  if (!response.ok)
-    throw new Error(`HTTP ${response.status}: ${url}`)
-  return response
 }
 
 /** Load one model adapter's native runtime and retain its latest initialization errors. */

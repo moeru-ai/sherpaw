@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Download pinned Sherpa ASR assets into models/ and expose them to the sandbox."""
+"""Download and verify pinned Sherpa ASR assets for local inference and packaging."""
 import concurrent.futures
 import hashlib
 import json
-import os
 from pathlib import Path
 import subprocess
 import sys
@@ -11,7 +10,6 @@ import tarfile
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG = json.loads((ROOT / 'models/asr-catalog.json').read_text())
-PUBLIC = ROOT / 'packages/sandbox/public/asr-models'
 
 
 def digest(path):
@@ -67,9 +65,6 @@ def prepare(model):
         raise ValueError(f'Unexpected runtime file sizes: {target}')
     manifest = dict(**model, files=files)
     (target / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
-    link = PUBLIC / model['id']
-    if not link.exists():
-        link.symlink_to(os.path.relpath(target, PUBLIC), target_is_directory=True)
     print(f"Prepared {model['id']}: {manifest['modelBytes'] / 1e6:.1f} MB", flush=True)
 
 
@@ -78,6 +73,5 @@ if __name__ == '__main__':
     known = {m['id'] for m in CATALOG['models']}
     if set(selected) - known:
         raise SystemExit(f'Unknown models: {set(selected) - known}')
-    PUBLIC.mkdir(parents=True, exist_ok=True)
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
         list(pool.map(prepare, [m for m in CATALOG['models'] if not selected or m['id'] in selected]))

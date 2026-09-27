@@ -5,7 +5,7 @@
 """Fetch verified upstream FP32 Paraformer weights for the browser bridge.
 
 Run: uv run scripts/prepare-paraformer-fp32.py
-Artifacts are ignored under sandbox/public/asr-models/paraformer-fp32/.
+Artifacts stay under models/sherpa-onnx-streaming-paraformer-bilingual-zh-en/fp32/.
 """
 import hashlib
 import json
@@ -16,7 +16,7 @@ import onnx
 from huggingface_hub import hf_hub_download
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "packages/sandbox/public/asr-models"
+OUT = ROOT / "models/sherpa-onnx-streaming-paraformer-bilingual-zh-en/fp32"
 REPO = "csukuangfj/sherpa-onnx-streaming-paraformer-bilingual-zh-en"
 REVISION = "8e40c43232a1c5c66c82111efc5820d3accca11b"
 SHA256 = {
@@ -57,7 +57,7 @@ def main():
             native_info[name] = model_info(onnx.load_model_from_string(data))
     manifest = {"repo": REPO, "revision": REVISION, "models": {}}
     for name in ("encoder.onnx", "decoder.onnx"):
-        target = OUT / "paraformer-fp32" / name
+        target = OUT / name
         target.parent.mkdir(parents=True, exist_ok=True)
         if not target.exists() or digest(target) != SHA256[name]:
             url = f"https://huggingface.co/{REPO}/resolve/{REVISION}/{name}"

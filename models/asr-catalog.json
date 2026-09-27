@@ -17,7 +17,8 @@
         "decoder": "decoder.onnx",
         "joiner": "joiner.int8.onnx",
         "tokens": "tokens.txt"
-      }
+      },
+      "revision": "ad658fa0201659a09ea3c176129a191c77ecae8f"
     },
     {
       "id": "x-asr",
@@ -36,6 +37,10 @@
         "decoder": "decoder.onnx",
         "joiner": "joiner.int8.onnx",
         "tokens": "tokens.txt"
+      },
+      "pack": {
+        "model": "sherpaw-x-asr-zh-en-480ms-int8",
+        "revision": "d9ab70a45493b97ae76e08574fcbc5ad0c5d0039"
       }
     },
     {
@@ -55,6 +60,10 @@
         "decoder": "decoder.onnx",
         "joiner": "joiner.onnx",
         "tokens": "tokens.txt"
+      },
+      "pack": {
+        "model": "sherpaw-x-asr-zh-en-480ms-fp32",
+        "revision": "f3a06007903a562980abed2f5487b47428faf9b4"
       }
     }
   ]

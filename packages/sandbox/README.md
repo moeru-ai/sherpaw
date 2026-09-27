@@ -67,6 +67,8 @@ The existing Transcription page's **Model setup** popover offers Paraformer zh-e
 Chinese Zipformer 2025. Use **Load model** to preload, then **Start** to open the microphone.
 X-ASR and Zipformer use dedicated Workers. X-ASR FP32 offers an experimental
 WebGPU encoder with CPU decoder/joiner; other catalog variants use CPU/WASM.
-Paraformer also offers experimental WebGPU backends. These sandbox experiments require additional
-model assets and locally built WASM bridges; follow the
+Paraformer also offers experimental WebGPU backends. ASR shares KWS's local-models Vite plugin and
+model-pack loader: dev uses prepared local weights when available, and builds download pinned HF weights.
+The microphone capture is shared with KWS and speaker identification. ASR still requires
+locally built WASM bridges; follow the
 [ASR preparation and validation guide](../../docs/research/asr-model-catalog.md).
