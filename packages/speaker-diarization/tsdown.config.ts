@@ -1,15 +1,8 @@
+import type { Options } from 'tsdown'
+
 import { defineConfig } from 'tsdown'
 
-export default defineConfig({
-  entry: {
-    'index': 'src/index.ts',
-    'core': 'src/core.ts',
-    'worker-entry': 'src/web/entry.ts',
-    'node': 'src/node/index.ts',
-    'node-worker': 'src/node/entry.ts',
-  },
-  copy: [{ from: 'src/prebuilt/sherpa-onnx-wasm-main-speaker-diarization.wasm', to: 'dist/prebuilt/sherpa-onnx-wasm-main-speaker-diarization.wasm' }],
-  dts: true,
+const runtimeAssets = {
   plugins: [{
     name: 'speaker-diarization-runtime-assets',
     // Emscripten emits a Node-only import and a fallback URL relative to the
@@ -26,4 +19,28 @@ export default defineConfig({
       }
     },
   }],
-})
+} satisfies Options
+
+export default defineConfig([
+  {
+    entry: {
+      'index': 'src/index.ts',
+      'core': 'src/core.ts',
+      'node': 'src/node/index.ts',
+      'node-worker': 'src/node/entry.ts',
+    },
+    copy: [{ from: 'src/prebuilt/sherpa-onnx-wasm-main-speaker-diarization.wasm', to: 'dist/prebuilt/sherpa-onnx-wasm-main-speaker-diarization.wasm' }],
+    dts: true,
+    ...runtimeAssets,
+  },
+  {
+    entry: { 'worker-entry': 'src/web/entry.ts' },
+    // Keep the client and Node output when tsdown writes the browser worker.
+    clean: false,
+    // Browser consumers cannot load picomatch's CommonJS entry through an unbundled Eventa import.
+    noExternal: [/^@moeru\/eventa(?:\/|$)/, 'picomatch'],
+    platform: 'browser',
+    dts: true,
+    ...runtimeAssets,
+  },
+])
