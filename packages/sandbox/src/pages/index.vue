@@ -27,5 +27,8 @@
     <RouterLink to="/speaker-diarization" text-3xl underline>
       Speaker diarization
     </RouterLink>
+    <RouterLink to="/speaker-tracking" text-3xl underline>
+      Speaker tracking
+    </RouterLink>
   </div>
 </template>

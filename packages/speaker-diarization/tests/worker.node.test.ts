@@ -7,7 +7,7 @@ import type { DiarizationModelPacks, SpeakerSegment } from '../src/types'
 
 // Exercise the published Node entry, its worker script, and its WASM asset.
 // eslint-disable-next-line antfu/no-import-dist
-import { createDiarizer } from '../dist/node.js'
+import { createDiarizer, createSpeakerTracker } from '../dist/node.js'
 
 // Output of the upstream sherpa-onnx example for 0-four-speakers-zh.wav with
 // pyannote-segmentation-3.0, window shift ratio 0.1 and four clusters. CAM++ reproduces it.
@@ -115,5 +115,55 @@ describe('published Node worker', () => {
     diarizer.dispose()
 
     await expect(diarizer.diarize(samples, 16000)).rejects.toThrow('disposed')
+  })
+
+  it('tracks the speakers of consecutive utterances', async () => {
+    const tracker = await createSpeakerTracker({ model: model.embedding })
+    const utterance = ({ start, end }: SpeakerSegment) => samples.subarray(Math.round(start * 16000), Math.round(end * 16000))
+
+    try {
+      expect(await tracker.peek(utterance(reference[0]!), 16000)).toMatchObject({ speaker: null })
+
+      const turns = []
+
+      for (const segment of reference)
+        turns.push(await tracker.track(utterance(segment), 16000))
+
+      // Guesses do not change the session.
+      expect(await tracker.peek(utterance(reference[7]!), 16000)).toMatchObject({ speaker: 3 })
+      expect(await tracker.peek(utterance(reference[7]!), 16000)).not.toHaveProperty('change')
+
+      // 1.5 s of speaker 0 followed by 1.5 s of speaker 2: the guess follows the new speaker.
+      const first = utterance(reference[0]!)
+      const switched = new Float32Array(48000)
+
+      switched.set(first.subarray(first.length - 24000))
+      switched.set(utterance(reference[3]!).subarray(0, 24000), 24000)
+      expect(await tracker.peek(switched, 16000)).toMatchObject({ speaker: 2, change: 1.5 })
+
+      // Speaker 3 first sounds like speaker 0 and borrows its label until it has 4 s of speech.
+      expect(turns.map(turn => turn.speaker)).toEqual([0, 1, 1, 2, 0, 0, 0, 3, 2, 0])
+      expect(turns.map(turn => turn.index)).toEqual(reference.map((_, index) => index))
+
+      // After revisions, both number speakers in order of first appearance.
+      const revised = turns.map(turn => turn.speaker)
+
+      for (const { index, speaker } of turns.flatMap(turn => turn.revisions))
+        revised[index] = speaker
+
+      expect(revised).toEqual(reference.map(segment => segment.speaker))
+
+      // Unclamped samples are rejected, instead of silently keeping the previous label.
+      await expect(tracker.track(utterance(reference[1]!).map(value => value * 8), 16000)).rejects.toThrow('between -1 and 1')
+
+      await tracker.reset()
+
+      expect(await tracker.track(utterance(reference[1]!), 16000)).toMatchObject({ index: 0, speaker: 0 })
+    }
+    finally {
+      tracker.dispose()
+    }
+
+    await expect(tracker.track(samples, 16000)).rejects.toThrow('disposed')
   })
 })

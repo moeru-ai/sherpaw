@@ -65,6 +65,29 @@
         "model": "sherpaw-x-asr-zh-en-480ms-fp32",
         "revision": "f3a06007903a562980abed2f5487b47428faf9b4"
       }
+    },
+    {
+      "id": "zipformer-multilingual",
+      "label": "Zipformer 2025 \u00b7 ar/en/id/ja/ru/th/vi/zh \u00b7 int8",
+      "family": "transducer",
+      "featureDim": 80,
+      "directory": "sherpa-onnx-streaming-zipformer-ar_en_id_ja_ru_th_vi_zh-2025-02-10",
+      "archive": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-ar_en_id_ja_ru_th_vi_zh-2025-02-10.tar.bz2",
+        "bytes": 258999581,
+        "sha256": "28044b67324f7f831689f0a3761473dd2ade380e93aa53f1dbcd479ef71c40d4"
+      },
+      "modelBytes": 338873347,
+      "weights": {
+        "encoder": "encoder-epoch-75-avg-11-chunk-16-left-128.int8.onnx",
+        "decoder": "decoder-epoch-75-avg-11-chunk-16-left-128.onnx",
+        "joiner": "joiner-epoch-75-avg-11-chunk-16-left-128.int8.onnx",
+        "tokens": "tokens.txt"
+      },
+      "pack": {
+        "model": "sherpa-onnx-streaming-zipformer-ar_en_id_ja_ru_th_vi_zh-2025-02-10",
+        "revision": "fce043ac9738950d5cd223955b86656bfaa42311"
+      }
     }
   ]
 }

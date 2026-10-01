@@ -9,6 +9,7 @@ families through its **Model setup** popover, without an external VAD:
 | X-ASR zh-en, punctuation, 480 ms, INT8 | 169 MB | CPU/WASM Worker |
 | X-ASR zh-en, punctuation, 480 ms, FP32 | 615 MB | CPU/WASM Worker; experimental WebGPU encoder |
 | Zipformer Chinese, 2025-06-30, INT8 | 167 MB | CPU/WASM Worker; Chinese only |
+| Zipformer multilingual (ar/en/id/ja/ru/th/vi/zh), 2025-02-10, INT8 | 339 MB | CPU/WASM Worker; the only streaming model here with Japanese |
 
 [`models/asr-catalog.json`](../../models/asr-catalog.json) pins the new variants'
 archive sizes, SHA-256 digests, and explicit weight roles from the official
