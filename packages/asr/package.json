@@ -15,6 +15,7 @@
     ".": "./dist/index.js",
     "./package.json": "./package.json",
     "./module.wasm": "./dist/asr.wasm",
+    "./tokens": "./dist/tokens.js",
     "./webgpu": "./dist/webgpu.js"
   },
   "main": "./dist/index.js",

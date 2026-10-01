@@ -316,10 +316,15 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
         continue
       }
 
+      // Borrow only when the closest established speaker is not enrolled. A new voice gets an enrolled
+      // number only through the rule above, at `enrollThreshold`. A voice closest to an enrolled
+      // speaker stays new, so that it does not take the number of the next closest speaker.
       const cosines = settled.map(j => dot(centers[j]!, centers[i]!))
+      const best = Math.max(...cosines)
+      const lender = assigned[settled[cosines.indexOf(best)]!]!
 
-      if (Math.max(...cosines) >= tuning.borrowThreshold) {
-        assigned[i] = assigned[settled[cosines.indexOf(Math.max(...cosines))]!]
+      if (best >= tuning.borrowThreshold && !anchors.has(lender)) {
+        assigned[i] = lender
         continue
       }
 

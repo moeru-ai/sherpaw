@@ -77,7 +77,7 @@ How it works:
 
 - The tracker embeds each utterance in 1.5-second windows and clusters the recent embeddings again after each utterance, as in 3D-Speaker. Speaker numbers follow the cluster centroids, so a speaker keeps a number when clusters merge or split.
 - Re-clustering can change the labels of earlier utterances. `turn.revisions` reports these changes.
-- A new voice is `pending` until it has 4 seconds of speech. Until then, it can show the number of a similar known speaker. For a voice agent, `tuning: { borrowThreshold: 1 }` turns this off.
+- A new voice is `pending` until it has 4 seconds of speech. Until then, it can show the number of a similar speaker, but never the number of an enrolled person. For a voice agent, `tuning: { borrowThreshold: 1 }` turns this off.
 - A VAD needs a pause to end an utterance, so quick turn-taking puts two people into one utterance. `peek` finds such a speaker change, so that the caller can cut the utterance there.
 
 Optional features:

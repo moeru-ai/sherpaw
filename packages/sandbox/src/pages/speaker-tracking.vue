@@ -29,6 +29,7 @@ import { review, reviewerNames } from '../features/speaker-diarization/review'
 import { cosine } from '../features/speaker-diarization/speaker-map'
 import SpeakerMapView from '../features/speaker-diarization/SpeakerMapView.vue'
 import { segmentationDetector, sileroDetector, speechDetectionOptions } from '../features/speaker-diarization/speech-detectors'
+import { createTokenTimeline } from '../features/speaker-diarization/token-timeline'
 import { changeDetectionDescriptions, embeddingOptions, parameterGroups, presetOptions, presetParameters, presets, speechThresholds, trackerTuning, transcriptDescriptions } from '../features/speaker-diarization/tracker-settings'
 
 interface Utterance {
@@ -42,7 +43,10 @@ interface Utterance {
   /** The label after later revisions. */
   speaker: number | null
   revisions: Array<{ after: number, from: number | null, to: number | null }>
+  /** The words of the tokens that the recognizer heard in this row's audio. */
   transcript?: string
+  /** The recognizer heard the whole utterance, so the transcript is final. */
+  transcribed?: boolean
   /** Why the utterance ended: a pause (VAD) or a detected speaker change. */
   ended: 'pause' | 'change'
   /** Who the reviewer says spoke. */
@@ -72,11 +76,8 @@ interface Part {
 
 const sampleRate = 16000
 // With embeddings, peek compares the last two 1.5 s windows. So a check every 0.75 s finds only a
-// change more than 0.75 s back. With the segmentation model, a check finds changes up to 0.5 s before
-// its end. The recognizer gets audio only up to that point, and no audio after an unconfirmed change.
-// So its text breaks at the same point as the speaker labels.
+// change more than 0.75 s back.
 const checkEvery = 0.75 * sampleRate
-const segmentationLag = checkEvery + 0.5 * sampleRate
 const minEnrollSeconds = 5
 const maxEnrollSeconds = 30
 /** The page keeps at most this much enrollment speech per known person when more speech comes. */
@@ -155,8 +156,9 @@ let source: AudioBufferSourceNode | undefined
 // Tracker and recognizer each take utterances one at a time, in VAD order.
 let labeling = Promise.resolve()
 let transcribing = Promise.resolve()
-/** Text the recognizer has returned so far; each utterance adds its final result to it. */
-let recognized = ''
+// A transducer token comes 0.05-0.5 s after its speech. At the speaker changes of the four-speaker
+// recording, every word went to the right speaker when its time moved back by 0.2 s.
+const timeline = createTokenTimeline(sampleRate, 0.2)
 /** The utterance in progress, from its start or from the last speaker change in it. */
 let part: Part | undefined
 /** The last 0.5 s before speech: Silero VAD reports speech about 0.25 s after it starts. */
@@ -181,7 +183,7 @@ function speakerName(speaker: number | null) {
 
 /** The recognizer found no words: most likely laughter, music or noise that the VAD took for speech. */
 function wordless(item: Utterance) {
-  return !!recognizer && item.transcript !== undefined && !item.transcript.trim()
+  return !!recognizer && !!item.transcribed && !item.transcript?.trim()
 }
 
 const dirty = computed(() => ready.value && applied.value !== JSON.stringify([parameters.value, embeddingModel.value, changeDetection.value, speechDetection.value]))
@@ -568,32 +570,51 @@ function selectUtterance(index: number) {
   void nextTick(() => list.value?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'center' }))
 }
 
-function withoutLeadingMark(text: string) {
-  // Punctuating models emit the previous sentence's final mark at the start of the next result.
-  const mark = text.match(/^[\s,.!?;:，。！？、；：]*/u)![0]
-
-  return { mark, words: text.slice(mark.length).trim() }
-}
-
-/** Triggering workflow: {@link commit} -> {@link transcribe} -> recognizer.accept of 2 s of silence -> final utterance transcript. */
-async function transcribe(item: Utterance, session: number) {
-  // The recognizer's endpoint rule needs 0.8 s of trailing silence. The 480 ms X-ASR chunks also come
-  // late, so 1 s was not always enough. If this silence does not finish an utterance, the next
-  // utterance's first audio finishes it. The recognizer then drops that audio when it resets.
-  const text = await recognizer!.accept(new Float32Array(2 * sampleRate))
-  const { mark, words } = withoutLeadingMark(text.startsWith(recognized) ? text.slice(recognized.length) : text)
-
-  recognized = text
-
-  if (disposed || session !== generation)
+/** Triggering workflow: recognizer reply / new row -> {@link placeTokens} -> the words of the open rows and of the preview. */
+function placeTokens() {
+  if (!recognizer)
     return
 
-  const previous = utterances.value[item.index - 1]
+  const rows = utterances.value
+  const open = rows.findIndex(row => !row.transcribed)
+  // Only open rows change. The row before them can still get the final mark of its sentence.
+  const from = Math.max(0, (open < 0 ? rows.length : open) - 1)
+  const last = rows.at(-1)
+  // A cut commits rows before `part` moves on, so the live words start where the rows end.
+  const liveFrom = part && Math.max(part.start, last ? Math.round((last.start + last.seconds) * sampleRate) : 0)
+  const placed = timeline.place(recognizer.tokens(), rows.slice(from).map(row => Math.round(row.start * sampleRate)), liveFrom)
 
-  if (previous?.transcript !== undefined)
-    previous.transcript += mark.trim()
+  placed.rows.forEach((words, i) => {
+    const row = rows[from + i]!
 
-  item.transcript = words
+    if (row.transcript !== words)
+      row.transcript = words
+  })
+
+  if (preview.value)
+    preview.value.transcript = placed.live
+}
+
+/**
+ * Triggering workflow: {@link endUtterance} -> {@link finishTranscript} -> recognizer.accept of 2 s of
+ * silence -> the last words of the utterance, and its rows marked as transcribed.
+ */
+function finishTranscript(rows: number, session: number) {
+  if (!recognizer)
+    return
+
+  // The recognizer's endpoint rule needs 0.8 s of trailing silence. The 480 ms X-ASR chunks also come
+  // late, so 1 s was not always enough.
+  timeline.pause(2 * sampleRate)
+  transcribing = transcribing.then(async () => {
+    await recognizer!.accept(new Float32Array(2 * sampleRate))
+
+    if (disposed || session !== generation)
+      return
+
+    placeTokens()
+    utterances.value.slice(0, rows).forEach(row => row.transcribed = true)
+  }).catch(reportError)
 }
 
 /** A copy of the samples between two positions of audio that arrived in chunks. */
@@ -621,7 +642,7 @@ function concat(chunks: Float32Array[]) {
   return range(chunks, 0, chunks.reduce((sum, chunk) => sum + chunk.length, 0))
 }
 
-/** Triggering workflow: {@link handle} / {@link commit} -> {@link send} -> recognizer partial text for the part's audio before `to`. */
+/** Triggering workflow: {@link handle} / {@link commit} -> {@link send} -> recognizer tokens for the part's audio before `to`. */
 function send(current: Part, to: number) {
   if (!recognizer || to <= current.sent)
     return
@@ -629,13 +650,13 @@ function send(current: Part, to: number) {
   const audio = range(current.chunks, current.sent, to)
   const session = generation
 
+  timeline.hear(current.start + current.sent, audio.length)
   current.sent = to
   transcribing = transcribing.then(async () => {
-    const text = await recognizer!.accept(audio)
+    await recognizer!.accept(audio)
 
-    // A part that was cut or ended no longer owns the preview.
-    if (preview.value && session === generation && part === current)
-      preview.value.transcript = withoutLeadingMark(text.slice(recognized.length)).words
+    if (!disposed && session === generation)
+      placeTokens()
   }).catch(reportError)
 }
 
@@ -652,16 +673,14 @@ function commit(current: Part, to: number, ended: Utterance['ended']) {
     samples: range(current.chunks, 0, to),
     speaker: null,
     revisions: [],
-    transcript: recognizer ? preview.value?.transcript : undefined,
+    transcript: recognizer ? '' : undefined,
     ended,
   })
   // Mutate through the reactive array so the row updates.
   const item = utterances.value[count - 1]!
 
   labeling = labeling.then(() => label(item, session)).catch(reportError)
-
-  if (recognizer)
-    transcribing = transcribing.then(() => transcribe(item, session)).catch(reportError)
+  placeTokens()
 }
 
 /** Triggering workflow: {@link check} / {@link handle} at an utterance end -> {@link split} -> {@link commit} of the part before `at`. Returns the rest. */
@@ -670,10 +689,6 @@ function split(current: Part, at: number): Part {
 
   const rest = range(current.chunks, at, current.length)
 
-  if (preview.value)
-    preview.value.transcript = ''
-
-  // Audio already sent past the cut stays with the earlier transcript.
   return {
     start: current.start + at,
     chunks: [rest],
@@ -770,6 +785,7 @@ async function endUtterance(segment: SpeechSegment, session: number) {
   part = undefined
   leadIn = []
   preview.value = undefined
+  finishTranscript(utterances.value.length, session)
 
   return true
 }
@@ -841,11 +857,8 @@ async function handle(block: Float32Array | undefined, session: number) {
       part = next
     }
 
-    // With embeddings, the next check can cut 1.5 s before its own end. That point is at least 0.75 s
-    // before the last checked end, and the page never cuts a part in its first 1.5 s.
-    send(part, segmenting.value
-      ? Math.min(part.length, Math.max(0, part.checked - segmentationLag), ...part.candidates)
-      : Math.min(part.length, Math.max(2 * checkEvery, part.checked - checkEvery)))
+    // The token times put the words of a later cut into the right row.
+    send(part, part.length)
   }
   else if (!part) {
     leadIn.push(block)
@@ -931,6 +944,7 @@ async function newSession() {
   leadIn = []
   recent = []
   fed = 0
+  timeline.reset()
   preview.value = undefined
   speakerMap.value = undefined
   await tracker?.reset()
@@ -1242,7 +1256,7 @@ onBeforeUnmount(dispose)
                       No words recognized (laughter, music or noise?)
                     </p>
                     <p v-else grow-1 text-base>
-                      {{ item.transcript ?? (recognizer ? '…' : '') }}
+                      {{ item.transcript || (recognizer && !item.transcribed ? '…' : '') }}
                     </p>
                     <span shrink-0 text-xs text-neutral-500 tabular-nums>{{ time(item.start) }}</span>
                   </div>

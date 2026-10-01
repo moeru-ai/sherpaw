@@ -1,6 +1,7 @@
 import type { WebAssemblyModule } from '@sherpaw/shared'
 
 import type { OnlineRecognizer, OnlineRecognizerConfig, OnlineRecognizerType, OnlineStream } from './asr'
+import type { TimedToken } from './tokens'
 
 import { createOnlineRecognizer, OnlineRecognizerTypes } from './asr'
 
@@ -14,7 +15,18 @@ export interface StreamingRecognizer {
   /** Mono PCM at the configured sample rate. Keep samples unchanged until this promise resolves. */
   accept: (samples: Float32Array) => Promise<string>
   finish: () => Promise<string>
+  /**
+   * The tokens of the text after the last `accept` or `finish`, in order. Empty for models without
+   * timestamps, such as Paraformer.
+   */
+  tokens: () => readonly TimedToken[]
   dispose: () => Promise<void>
+}
+
+/** Tokens of one result with times from the first accepted sample. Results without timestamps give none. */
+function timedTokens(result: { tokens?: string[], timestamps?: number[], start_time?: number }): TimedToken[] {
+  const { tokens = [], timestamps = [], start_time: start = 0 } = result
+  return timestamps.length === tokens.length ? tokens.map((text, i) => ({ text, time: start + timestamps[i]! })) : []
 }
 
 /**
@@ -43,6 +55,8 @@ export async function createStreamingRecognizer(
   const native = recognizer
   const sampleRate = native.config.featConfig?.sampleRate ?? 16000
   const completed: string[] = []
+  const completedTokens: TimedToken[] = []
+  let partialTokens: TimedToken[] = []
   let text = ''
   let finished = false
   let failure: unknown
@@ -70,11 +84,16 @@ export async function createStreamingRecognizer(
       else
         native.decode(stream)
     }
-    const partial = native.getResult(stream).text as string
+    const result = native.getResult(stream)
+    const partial = result.text as string
+    partialTokens = timedTokens(result)
     text = [...completed, partial].filter(Boolean).join(' ')
     if (!finished && native.isEndpoint(stream)) {
-      if (partial)
+      if (partial) {
         completed.push(partial)
+        completedTokens.push(...partialTokens)
+      }
+      partialTokens = []
       native.reset(stream)
     }
     return text
@@ -100,6 +119,7 @@ export async function createStreamingRecognizer(
       stream.inputFinished()
       return drain()
     }),
+    tokens: () => [...completedTokens, ...partialTokens],
     /** Triggering workflow: recording release -> pending inference completes -> native and backend cleanup. */
     dispose() {
       disposal ??= pending.then(async () => {
