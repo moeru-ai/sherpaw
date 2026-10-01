@@ -18,7 +18,12 @@ Open `/speaker-identification` at the URL printed by Vite. Load a model, registe
 
 Open `/speaker-diarization`, choose **Model setup** and select **Initialize**, then choose an audio file. Set a known number of speakers or a distance threshold under **Clustering**, and select **Analyze again** to rerun without reloading the models. Select a segment to play it. In development the page first uses the local segmentation model from `models/sherpa-onnx-pyannote-segmentation-3-0/download.sh` and the local CAM++ pack, then falls back to Hugging Face.
 
-Open `/speaker-tracking`, choose **Model setup**, pick a transcription model (or none), and select **Initialize**. Then select **Start microphone** or **Test audio file**. Each utterance gets a speaker label and a transcript when it ends; while someone speaks, the last row shows a live guess. Select a row, or use ↑/↓, to see its details and play it. Press A–L to label who actually spoke; **Review** compares your labels with the tracker's.
+Open `/speaker-tracking`, pick a **Preset** in the left panel (**Conversation** for voice agents and meetings, **Films and TV** for media), and select **Initialize**. Then select **Start microphone** or **Test audio file**.
+
+- Each utterance gets a speaker label and a transcript when it ends. While someone speaks, the last row shows a live guess.
+- **Known speakers**: record a person, or enroll a selected row, to show their name from their first utterance.
+- Changing a model or slider switches the preset to **Custom**; **Apply** restarts the session with the new settings.
+- Select a row to play it, and press A–L to note who spoke. The right panel shows how similar the voices are (**Speaker map**) and compares your notes with the labels (**Review**).
 
 ## Keyword spotting playground
 
