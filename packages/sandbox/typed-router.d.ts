@@ -58,6 +58,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/speaker-tracking': RouteRecordInfo<
+      '/speaker-tracking',
+      '/speaker-tracking',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
   }
 
   /**
@@ -98,6 +105,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/speaker-identification.vue': {
       routes:
         | '/speaker-identification'
+      views:
+        | never
+    }
+    'src/pages/speaker-tracking.vue': {
+      routes:
+        | '/speaker-tracking'
       views:
         | never
     }

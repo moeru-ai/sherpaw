@@ -64,3 +64,69 @@ export interface Diarizer {
   /** Terminates the Worker and rejects pending operations. Safe to repeat. */
   dispose: () => void
 }
+
+export interface SpeakerTrackerConfig {
+  /** Speaker embedding model pack: the same pack as `DiarizationModelPacks.embedding`. */
+  model: ModelPack
+  /** Path of the model in the pack. Default: speaker-embedding.onnx. */
+  path?: string
+  /** Re-cluster at most this many recent embeddings after each utterance, to bound the cost. Default: 300. */
+  historyLimit?: number
+  /** Aborting cancels initialization or disposes the initialized tracker. */
+  signal?: AbortSignal
+}
+
+/** `high`: estimated probability at least 0.9; `medium`: at least 0.7; `low`: below. */
+export type SpeakerConfidence = 'high' | 'medium' | 'low'
+
+export interface SpeakerRevision {
+  /** `index` of an earlier utterance. */
+  index: number
+  speaker: number | null
+}
+
+export interface SpeakerTurn {
+  /** Zero-based position of the utterance in the session. */
+  index: number
+  /** Speaker number in order of first appearance, or null before any speaker is known. */
+  speaker: number | null
+  /** Estimated probability that `speaker` is right, from a model fitted on meeting audio (AMI). Recalibrate it for other audio. */
+  score: number
+  confidence: SpeakerConfidence
+  /** The speaker has less than 4 s of speech so far. Its number may never appear again. */
+  pending: boolean
+  /** Another speaker holds at least 20% of the utterance. */
+  mixed: boolean
+  /** Earlier utterances whose speaker changed after re-clustering. */
+  revisions: SpeakerRevision[]
+}
+
+/** A read-only guess for an utterance that is still in progress. */
+export interface SpeakerGuess {
+  /** The nearest established speaker that `track` has already reported, or null when none is close. */
+  speaker: number | null
+  /** Estimated probability that `speaker` is right. Rougher than for `track`: the model was fitted on whole utterances. */
+  score: number
+  confidence: SpeakerConfidence
+  /**
+   * Seconds from the start of the samples where the speaker seems to change: set when the samples
+   * last at least 3 s and their last 1.5 s sound unlike the 1.5 s before. The guess then covers only
+   * the last 1.5 s.
+   */
+  change?: number
+}
+
+/** All operations execute in call order on the tracker's dedicated Worker. */
+export interface SpeakerTracker {
+  /** Labels one utterance of mono PCM, for example a VAD segment. Call in time order. Copies the samples. */
+  track: (samples: Float32Array, sampleRate: number) => Promise<SpeakerTurn>
+  /**
+   * Guesses who is speaking from part of an unfinished utterance, for example its last few seconds.
+   * Changes nothing: a speaker with less than 4 s of tracked speech cannot be recognized yet. Copies the samples.
+   */
+  peek: (samples: Float32Array, sampleRate: number) => Promise<SpeakerGuess>
+  /** Forgets every speaker and starts a new session. */
+  reset: () => Promise<void>
+  /** Terminates the Worker and rejects pending operations. Safe to repeat. */
+  dispose: () => void
+}

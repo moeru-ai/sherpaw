@@ -1,6 +1,6 @@
 # Sherpaw sandbox
 
-The Vue sandbox exposes ASR at `/asr`, speaker identification at `/speaker-identification`, speaker diarization at `/speaker-diarization`, and keyword spotting at `/kws`. All routes are linked from the home page.
+The Vue sandbox exposes ASR at `/asr`, speaker identification at `/speaker-identification`, speaker diarization at `/speaker-diarization`, streaming speaker tracking at `/speaker-tracking`, and keyword spotting at `/kws`. All routes are linked from the home page.
 
 ## Run
 
@@ -17,6 +17,8 @@ pnpm dev
 Open `/speaker-identification` at the URL printed by Vite. Load a model, register speakers with multiple recordings, and compare manually recorded identification results. Speakers and individual samples can be renamed or deleted as appropriate. Leaving the route releases its microphone and Worker; returning creates an empty session.
 
 Open `/speaker-diarization`, choose **Model setup** and select **Initialize**, then choose an audio file. Set a known number of speakers or a distance threshold under **Clustering**, and select **Analyze again** to rerun without reloading the models. Select a segment to play it. In development the page first uses the local segmentation model from `models/sherpa-onnx-pyannote-segmentation-3-0/download.sh` and the local CAM++ pack, then falls back to Hugging Face.
+
+Open `/speaker-tracking`, choose **Model setup**, pick a transcription model (or none), and select **Initialize**. Then select **Start microphone** or **Test audio file**. Each utterance gets a speaker label and a transcript when it ends; while someone speaks, the last row shows a live guess. Select a row, or use ↑/↓, to see its details and play it. Press A–L to label who actually spoke; **Review** compares your labels with the tracker's.
 
 ## Keyword spotting playground
 
@@ -43,7 +45,7 @@ To build model packs yourself, use the scripts in `models/<model-name>/`.
 - `tests/speaker-identification/`: UI/recorder regressions and a separate harness used by `testing-audio`.
 - `../speaker-identification`: the public extractor/database API and library tests.
 - `../testing-audio/cases/speaker-identification`: the fixed, reviewed audio corpus.
-- `src/pages/speaker-diarization.vue` and `src/features/speaker-diarization/models.ts`: the diarization route and its model loading.
+- `src/pages/speaker-diarization.vue`, `src/pages/speaker-tracking.vue` and `src/features/speaker-diarization/`: the diarization and speaker tracking routes, their model loading and the review of manual labels. The tracking route reuses the ASR route's recognizer Worker for transcripts.
 
 The page and tests load unchanged ONNX bytes from the pinned Hugging Face model submodules. The speaker page still bundles its model/WASM assets and excludes the test harness. Prepare the model submodules before building.
 

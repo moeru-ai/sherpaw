@@ -1,6 +1,6 @@
 # @sherpaw/speaker-diarization
 
-Local offline speaker diarization with Sherpa-ONNX WASM. Runs in a Worker by default. You supply a segmentation model, a speaker embedding model and one complete recording of mono PCM; the diarizer returns who spoke when.
+Local speaker diarization with Sherpa-ONNX WASM. Runs in a Worker by default. The offline diarizer takes a segmentation model, a speaker embedding model and one complete recording of mono PCM, and returns who spoke when. The [streaming speaker tracker](#streaming-speaker-tracking) labels utterances as they arrive.
 
 A pyannote segmentation model finds local speaker activity in 10-second windows, a speaker embedding model computes one embedding for each local speaker, and agglomerative clustering groups the embeddings into speakers.
 
@@ -60,15 +60,42 @@ diarizer.dispose()
 
 The native API treats 0 as "unset", so numeric options must be greater than 0. Model files default to `speaker-segmentation.onnx` and `speaker-embedding.onnx`; set `model.paths` for packs with other file names. See the [types](src/types.ts) for details.
 
+## Streaming speaker tracking
+
+`createSpeakerTracker` labels each utterance with a speaker number as soon as the utterance ends, for example each VAD segment of a voice agent. It needs only the speaker embedding pack:
+
+```ts
+import { createSpeakerTracker } from '@sherpaw/speaker-diarization'
+
+const tracker = await createSpeakerTracker({ model: { data: await data.arrayBuffer(), metadata: await metadata.json() } })
+
+const turn = await tracker.track(utterance, 16000) // after each utterance, in time order
+const guess = await tracker.peek(lastSeconds, 16000) // while someone is still speaking
+```
+
+How it works:
+
+- The tracker embeds each utterance in 1.5-second windows and clusters the recent embeddings again after each utterance, as in 3D-Speaker. Speaker numbers follow the cluster centroids, so a speaker keeps a number when clusters merge or split.
+- Re-clustering can change the labels of earlier utterances. `turn.revisions` reports these changes.
+- A new voice is `pending` until it has 4 seconds of speech. Until then, it can show the number of a similar known speaker.
+- A VAD needs a pause to end an utterance, so quick turn-taking puts two people into one utterance. `peek` finds such a speaker change, so that the caller can cut the utterance there.
+
+Limits:
+
+- Each utterance gets one label, the label of its main speaker.
+- Labels are hints. Each label has a confidence estimate; confirm before an action that depends on who spoke.
+- On AMI and AliMeeting test meetings, 89%–91% of utterances got the right label, and 98.5%–98.7% of the `high` confidence labels were right.
+
 ## Other entrypoints
 
 - `@sherpaw/speaker-diarization/node`: the same async interface using Node worker threads.
-- `@sherpaw/speaker-diarization/worker`: import inside a custom Worker entry, then pass that Worker as `createDiarizer(config, { worker })`. The diarizer owns and terminates it.
-- `@sherpaw/speaker-diarization/core`: `initSpeakerDiarizationModule()` initializes WASM asynchronously; `createDiarizer(module, config)` creates a diarizer with synchronous processing for use with `@sherpaw/preloader`.
+- `@sherpaw/speaker-diarization/worker`: import inside a custom Worker entry, then pass that Worker as `createDiarizer(config, { worker })` or `createSpeakerTracker(config, { worker })`. The diarizer or tracker owns and terminates it.
+- `@sherpaw/speaker-diarization/core`: `initSpeakerDiarizationModule()` initializes WASM asynchronously; `createDiarizer(module, config)` creates a diarizer with synchronous processing for use with `@sherpaw/preloader`. `createSpeakerTracker(extractor, config)` creates a synchronous tracker from an `@sherpaw/speaker-identification` extractor.
 
 ## Performance and limits
 
 - Diarization is offline: each call processes a whole recording. On an Apple M4 with one thread, the 56.9-second four-speaker test recording takes about 20 seconds.
+- The tracker uses the `@sherpaw/speaker-identification` runtime for embeddings. On an Apple M4 with one thread, it takes 0.03–0.05 seconds per second of audio.
 - A call cannot be cancelled except by disposing the diarizer, which terminates its Worker. There is no progress callback: the JavaScript glue does not include `addFunction`.
 - The runtime is sherpa-onnx v1.13.7. It lacks the upstream fix in [k2-fsa/sherpa-onnx#3826](https://github.com/k2-fsa/sherpa-onnx/pull/3826) for a heap use-after-free with non-finite embeddings. C++ exceptions cannot be caught in this build; `diarize` rejects, and you should create a new diarizer.
 
@@ -81,4 +108,4 @@ The native API treats 0 as "unset", so numeric options must be greater than 0. M
 
 `models/sherpa-onnx-pyannote-segmentation-3-0/download.sh` downloads the ONNX export and checks its SHA-256. Any embedding pack that `@sherpaw/speaker-identification` supports also works.
 
-Try file upload and clustering in the [sandbox playground](../sandbox/README.md).
+Try file upload and clustering, and live speaker tracking from the microphone, in the [sandbox playground](../sandbox/README.md).
