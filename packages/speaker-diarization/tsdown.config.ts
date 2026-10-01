@@ -1,6 +1,11 @@
 import type { Options } from 'tsdown'
 
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'tsdown'
+
+// onnxruntime-web runtime for the optional segmentation model, loaded by the browser Worker entry.
+const ortAssets = ['ort-wasm-simd-threaded.mjs', 'ort-wasm-simd-threaded.wasm']
+  .map(file => ({ from: fileURLToPath(import.meta.resolve(`onnxruntime-web/${file}`)), to: `dist/prebuilt/${file}` }))
 
 const runtimeAssets = {
   plugins: [{
@@ -29,7 +34,7 @@ export default defineConfig([
       'node': 'src/node/index.ts',
       'node-worker': 'src/node/entry.ts',
     },
-    copy: [{ from: 'src/prebuilt/sherpa-onnx-wasm-main-speaker-diarization.wasm', to: 'dist/prebuilt/sherpa-onnx-wasm-main-speaker-diarization.wasm' }],
+    copy: [{ from: 'src/prebuilt/sherpa-onnx-wasm-main-speaker-diarization.wasm', to: 'dist/prebuilt/sherpa-onnx-wasm-main-speaker-diarization.wasm' }, ...ortAssets],
     dts: true,
     ...runtimeAssets,
   },

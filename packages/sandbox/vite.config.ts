@@ -16,6 +16,7 @@ export default defineConfig({
     '@moeru/eventa',
     '@moeru/eventa/adapters/webworkers',
     '@moeru/eventa/adapters/webworkers/worker',
+    'onnxruntime-web/wasm',
     'onnxruntime-web/webgpu',
   ] },
   worker: {

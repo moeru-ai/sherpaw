@@ -7,12 +7,16 @@ import type { Diarizer, DiarizerConfig, ModelPack, SpeakerTracker, SpeakerTracke
 
 import * as events from './events'
 
-function snapshot(pack: ModelPack, name: string): ModelPack & { data: Uint8Array } {
-  if (!(pack?.data instanceof ArrayBuffer) && !(pack?.data instanceof Uint8Array))
+function copyBytes(data: unknown, name: string): Uint8Array {
+  if (!(data instanceof ArrayBuffer) && !(data instanceof Uint8Array))
     throw new TypeError(`${name} model data must be an ArrayBuffer or Uint8Array`)
 
-  // Own the snapshot, including views backed by shared memory. Caller bytes stay usable.
-  return { ...pack, data: new Uint8Array(pack.data instanceof ArrayBuffer ? new Uint8Array(pack.data) : pack.data) }
+  // Own the copy, including views backed by shared memory. Caller bytes stay usable.
+  return new Uint8Array(data instanceof ArrayBuffer ? new Uint8Array(data) : data)
+}
+
+function snapshot(pack: ModelPack, name: string): ModelPack & { data: Uint8Array } {
+  return { ...pack, data: copyBytes(pack?.data, name) }
 }
 
 /** Ties the Worker to the Eventa context and the caller's signal. Returns the public dispose. */
@@ -93,14 +97,21 @@ export async function createWorkerSpeakerTracker<Options>(context: EventContext<
   const track = defineInvoke(context, events.track)
   const peek = defineInvoke(context, events.peek)
   const reset = defineInvoke(context, events.resetTracker)
+  const enroll = defineInvoke(context, events.enroll)
+  const inspect = defineInvoke(context, events.inspect)
+  const speech = defineInvoke(context, events.speech)
   const dispose = bindLifetime(context, config.signal, terminate, 'Speaker tracker')
 
   try {
     config.signal?.throwIfAborted()
 
     const model = snapshot(config.model, 'Embedding')
+    const segmentation = config.segmentation && { data: copyBytes(config.segmentation.data, 'Segmentation') }
 
-    await initialize({ model, path: config.path, historyLimit: config.historyLimit }, { transfer: [model.data.buffer] })
+    await initialize(
+      { model, path: config.path, historyLimit: config.historyLimit, segmentation, tuning: config.tuning },
+      { transfer: [model.data.buffer, ...(segmentation ? [segmentation.data.buffer] : [])] },
+    )
     context.signal.throwIfAborted()
   }
   catch (error) {
@@ -118,18 +129,40 @@ export async function createWorkerSpeakerTracker<Options>(context: EventContext<
       return track({ samples: copy, sampleRate }, { transfer: [copy.buffer] })
     },
 
-    async peek(samples, sampleRate) {
+    async peek(samples, sampleRate, options) {
       context.signal.throwIfAborted()
 
       const copy = copySamples(samples)
 
-      return peek({ samples: copy, sampleRate }, { transfer: [copy.buffer] })
+      return peek({ samples: copy, sampleRate, final: options?.final }, { transfer: [copy.buffer] })
     },
 
-    async reset() {
+    async enroll(samples, sampleRate) {
       context.signal.throwIfAborted()
 
-      return reset()
+      const copy = copySamples(samples)
+
+      return enroll({ samples: copy, sampleRate }, { transfer: [copy.buffer] })
+    },
+
+    async inspect() {
+      context.signal.throwIfAborted()
+
+      return inspect(undefined)
+    },
+
+    async speech(samples, sampleRate) {
+      context.signal.throwIfAborted()
+
+      const copy = copySamples(samples)
+
+      return speech({ samples: copy, sampleRate }, { transfer: [copy.buffer] })
+    },
+
+    async reset(options) {
+      context.signal.throwIfAborted()
+
+      return reset(options)
     },
 
     dispose,

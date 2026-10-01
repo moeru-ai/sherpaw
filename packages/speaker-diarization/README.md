@@ -77,12 +77,19 @@ How it works:
 
 - The tracker embeds each utterance in 1.5-second windows and clusters the recent embeddings again after each utterance, as in 3D-Speaker. Speaker numbers follow the cluster centroids, so a speaker keeps a number when clusters merge or split.
 - Re-clustering can change the labels of earlier utterances. `turn.revisions` reports these changes.
-- A new voice is `pending` until it has 4 seconds of speech. Until then, it can show the number of a similar known speaker.
+- A new voice is `pending` until it has 4 seconds of speech. Until then, it can show the number of a similar known speaker. For a voice agent, `tuning: { borrowThreshold: 1 }` turns this off.
 - A VAD needs a pause to end an utterance, so quick turn-taking puts two people into one utterance. `peek` finds such a speaker change, so that the caller can cut the utterance there.
+
+Optional features:
+
+- **Known speakers.** `enroll(speech, 16000)` adds a person, for example the owner of a device, from at least 5 seconds of their speech. Their utterances get that number from the first one. `enroll` rejects audio with more than one voice. In meetings and conversations, enrolled people got their number in 78%–93% of their utterances.
+- **Segmentation model.** Pass pyannote segmentation-3.0 as `segmentation` and install the optional peer dependency `onnxruntime-web`. For 16 kHz audio, `peek` then finds speaker changes frame by frame, so more short turns get their own label. `track` also flags utterances where two people talk at once (`overlap`). The runtime and the model add a 19.5 MB download.
+- **Speech detection.** With the segmentation model, `createSpeechDetector` finds utterances in place of a VAD. Use it where Silero VAD misses speech, such as films with music. On films, it found 80%–83% of the speech instead of 61%–70%, with about the same false alarms. Utterances end 0.5–1.25 seconds later than with a VAD.
+- **Tuning and inspection.** `tuning` changes the thresholds that `defaultSpeakerTrackerTuning` lists. `inspect` returns the embeddings that the tracker compares, for example to plot them.
 
 Limits:
 
-- Each utterance gets one label, the label of its main speaker.
+- Each utterance gets one label, the label of its main speaker, also when two people talk at once.
 - Labels are hints. Each label has a confidence estimate; confirm before an action that depends on who spoke.
 - On AMI and AliMeeting test meetings, 89%–91% of utterances got the right label, and 98.5%–98.7% of the `high` confidence labels were right.
 
@@ -90,7 +97,7 @@ Limits:
 
 - `@sherpaw/speaker-diarization/node`: the same async interface using Node worker threads.
 - `@sherpaw/speaker-diarization/worker`: import inside a custom Worker entry, then pass that Worker as `createDiarizer(config, { worker })` or `createSpeakerTracker(config, { worker })`. The diarizer or tracker owns and terminates it.
-- `@sherpaw/speaker-diarization/core`: `initSpeakerDiarizationModule()` initializes WASM asynchronously; `createDiarizer(module, config)` creates a diarizer with synchronous processing for use with `@sherpaw/preloader`. `createSpeakerTracker(extractor, config)` creates a synchronous tracker from an `@sherpaw/speaker-identification` extractor.
+- `@sherpaw/speaker-diarization/core`: `initSpeakerDiarizationModule()` initializes WASM asynchronously. `createDiarizer(module, config)` creates a diarizer with synchronous processing for use with `@sherpaw/preloader`. `createSpeakerTracker(extractor, config)` creates a tracker in the current thread from an `@sherpaw/speaker-identification` extractor. `config.segment` takes a function that runs the segmentation model and returns its scores.
 
 ## Performance and limits
 

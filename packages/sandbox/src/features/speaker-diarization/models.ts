@@ -3,8 +3,13 @@ import type { DiarizationModelPacks, ModelPack } from '@sherpaw/speaker-diarizat
 
 import { fetchLocalModel } from 'virtual:local-models'
 
-const embedding = 'sherpaw-campplus-zh-en-advanced'
-const embeddingRemote = `https://huggingface.co/moeru-ai/${embedding}/resolve/5fc23543ac94200ae77514cf1c40596c5d70f6e8/install/bin/wasm/`
+// Speaker embedding packs, pinned to the revisions of the models/huggingface submodules.
+const embeddingPacks = {
+  campplus: { pack: 'sherpaw-campplus-zh-en-advanced', revision: '5fc23543ac94200ae77514cf1c40596c5d70f6e8' },
+  eres2netv2: { pack: 'sherpaw-eres2netv2-zh-cn', revision: 'f835806fb35ad2a8987826b8dd3c87429b02afa9' },
+}
+
+export type EmbeddingModel = keyof typeof embeddingPacks
 const segmentationRemote = 'https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0/resolve/9403a6902bb58e3d5ae8c7e77c3422de279db2e0/model.onnx'
 // Same file as the silero_vad_v5.onnx that the VAD tests download (SHA-256 6b99cbfd…).
 const vadRemote = 'https://huggingface.co/csukuangfj/vad/resolve/fba88cd2e921609e7675c3aaf51e0b9b295da4bc/silero_vad_v5.onnx'
@@ -30,25 +35,35 @@ async function fetchOnnx(fetchModel: () => Promise<Response>, filename: string, 
   return { data, metadata: { files: [{ filename, start: 0, end: data.length }], remote_package_size: data.length } }
 }
 
-function fetchEmbedding(): Promise<ModelPack> {
-  return fetchPack(file => fetchLocalModel(`huggingface/${embedding}/install/bin/wasm/${file}`))
-    .catch(() => fetchPack(file => fetch(`${embeddingRemote}${file}`)))
+function fetchEmbedding(model: EmbeddingModel = 'campplus'): Promise<ModelPack> {
+  const { pack, revision } = embeddingPacks[model]
+
+  return fetchPack(file => fetchLocalModel(`huggingface/${pack}/install/bin/wasm/${file}`))
+    .catch(() => fetchPack(file => fetch(`https://huggingface.co/moeru-ai/${pack}/resolve/${revision}/install/bin/wasm/${file}`)))
+}
+
+function fetchSegmentation(): Promise<ModelPack> {
+  return fetchOnnx(() => fetchLocalModel('sherpa-onnx-pyannote-segmentation-3-0/model/normalized/speaker-segmentation.onnx'), '/speaker-segmentation.onnx', 'segmentation')
+    .catch(() => fetchOnnx(() => fetch(segmentationRemote), '/speaker-segmentation.onnx', 'segmentation'))
 }
 
 /** Sandbox policy: try local models in dev, then download the pinned HF models. */
 export async function loadDiarizationModel(): Promise<DiarizationModelPacks> {
-  const [segmentation, embeddingPack] = await Promise.all([
-    fetchOnnx(() => fetchLocalModel('sherpa-onnx-pyannote-segmentation-3-0/model/normalized/speaker-segmentation.onnx'), '/speaker-segmentation.onnx', 'segmentation')
-      .catch(() => fetchOnnx(() => fetch(segmentationRemote), '/speaker-segmentation.onnx', 'segmentation')),
-    fetchEmbedding(),
-  ])
+  const [segmentation, embeddingPack] = await Promise.all([fetchSegmentation(), fetchEmbedding()])
 
   return { segmentation, embedding: embeddingPack }
 }
 
-/** The speaker tracker needs the embedding pack; the page segments speech with Silero VAD v5. */
-export async function loadTrackerModels(): Promise<{ embedding: ModelPack, vad: ModelPack }> {
-  const [embeddingPack, vad] = await Promise.all([fetchEmbedding(), fetchOnnx(() => fetch(vadRemote), '/silero-vad.onnx', 'VAD')])
+/**
+ * The speaker tracker needs the embedding pack. To find speaker changes frame by frame, it also
+ * needs the segmentation model. The page finds utterances with Silero VAD v5.
+ */
+export async function loadTrackerModels(options: { segmentation: boolean, embedding: EmbeddingModel }): Promise<{ embedding: ModelPack, vad: ModelPack, segmentation?: ModelPack }> {
+  const [embeddingPack, vad, segmentation] = await Promise.all([
+    fetchEmbedding(options.embedding),
+    fetchOnnx(() => fetch(vadRemote), '/silero-vad.onnx', 'VAD'),
+    options.segmentation ? fetchSegmentation() : undefined,
+  ])
 
-  return { embedding: embeddingPack, vad }
+  return { embedding: embeddingPack, vad, segmentation }
 }

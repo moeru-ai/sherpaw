@@ -32,6 +32,14 @@
     "test:run": "vitest run --config vitest.node.config.ts",
     "test:prepare": "bash tests/scripts/prepare.sh"
   },
+  "peerDependencies": {
+    "onnxruntime-web": "1.27.0"
+  },
+  "peerDependenciesMeta": {
+    "onnxruntime-web": {
+      "optional": true
+    }
+  },
   "dependencies": {
     "@moeru/eventa": "1.0.1",
     "@sherpaw/preloader": "workspace:^",
@@ -41,6 +49,7 @@
   "devDependencies": {
     "@types/emscripten": "^1.41.5",
     "@types/node": "^24.6.0",
+    "onnxruntime-web": "1.27.0",
     "tsdown": "^0.15.12",
     "typescript": "^5.9.3",
     "vitest": "^4.1.9"
