@@ -107,6 +107,9 @@ const applied = ref<string>()
 /** Known speakers. The page keeps their enrollment audio to enroll them again in a new tracker. */
 const known = ref<KnownSpeaker[]>([])
 const enrollName = ref('Owner')
+/** The known speaker whose words the page transcribes, or 'everyone'. */
+const transcribeOnly = ref('everyone')
+const transcribeOptions = computed(() => [{ value: 'everyone', label: 'Everyone' }, ...known.value.map(entry => ({ value: entry.name, label: `Only ${entry.name}` }))])
 /** Seconds recorded so far while enrolling from the microphone. */
 const enrolling = ref<number>()
 const listening = ref(false)
@@ -160,7 +163,14 @@ function speakerName(speaker: number | null) {
 
 /** The recognizer found no words: most likely laughter, music or noise that the VAD took for speech. */
 function wordless(item: Utterance) {
-  return !!recognizer && !!item.transcribed && !item.transcript?.trim()
+  return !!recognizer && !!item.transcribed && !item.transcript?.trim() && !notTranscribed(item)
+}
+
+/** With "Transcribe: Only <name>", the recognizer does not hear the other speakers. */
+function notTranscribed(item: Utterance) {
+  const focus = known.value.findIndex(entry => entry.name === transcribeOnly.value)
+
+  return focus >= 0 && !!item.transcribed && !item.transcript?.trim() && item.speaker !== focus
 }
 
 const dirty = computed(() => ready.value && applied.value !== JSON.stringify([parameters.value, embeddingModel.value, changeDetection.value, speechDetection.value]))
@@ -500,6 +510,7 @@ async function finishEnrollment() {
 /** Triggering workflow: "Forget known speakers" button -> {@link forgetKnown} -> tracker.reset without enrollments. */
 async function forgetKnown() {
   known.value = []
+  transcribeOnly.value = 'everyone'
 
   try {
     await tracker?.reset({ forgetEnrolled: true })
@@ -516,11 +527,15 @@ async function forgetKnown() {
  * recognizer, the transcript adds the words of the rows and of the preview.
  */
 function startConversation() {
+  // A new session numbers the known speakers 0, 1, ... in list order.
+  const focus = known.value.findIndex(entry => entry.name === transcribeOnly.value)
+
   transcript?.dispose()
   void diarizer?.dispose()
   diarizer = createStreamingDiarizer({
     tracker: tracker!,
     speech: speech!,
+    ...(focus >= 0 ? { focus: { speaker: focus } } : {}),
     confirmSeconds: active.confirmSeconds,
     minCutGapSeconds: active.minPieceSeconds,
     leadInSeconds: active.leadInSeconds,
@@ -541,6 +556,16 @@ function startConversation() {
     error: reportError,
   })
 }
+
+/** Triggering workflow: "Transcribe" select `update` -> watch -> {@link startConversation} and a new session. */
+watch(transcribeOnly, async () => {
+  if (!ready.value || !diarizer)
+    return
+
+  startConversation()
+  await newSession()
+  message.value = transcribeOnly.value === 'everyone' ? 'Transcribing everyone. A new session started.' : `Transcribing only ${transcribeOnly.value}. A new session started.`
+})
 
 /** Triggering workflow: diarizer `turn-update` -> {@link showTurn} -> the turn's row, the revision log and the speaker map. */
 function showTurn(turn: ConversationTurn, changed: readonly TurnChange[]) {
@@ -929,6 +954,11 @@ onBeforeUnmount(dispose)
                     {{ entry.name }} · {{ (entry.samples.length / sampleRate).toFixed(0) }} s
                   </span>
                 </div>
+                <SelectField
+                  v-if="asrModel !== 'none'" v-model="transcribeOnly" label="Transcribe" :options="transcribeOptions"
+                  :disabled="!ready || !!busy || listening || !known.length"
+                  description="With one known speaker, the recognizer hears silence in place of other voices, such as a TV. Their words come about 1 s later."
+                />
                 <label flex="~ col gap-1.5">
                   <span text-sm font-semibold>Name of the next known speaker</span>
                   <input
@@ -1020,6 +1050,9 @@ onBeforeUnmount(dispose)
                     </span>
                     <p v-if="wordless(item)" grow-1 text-base text-neutral-400 italic>
                       No words recognized (laughter, music or noise?)
+                    </p>
+                    <p v-else-if="notTranscribed(item)" grow-1 text-base text-neutral-400 italic>
+                      Not transcribed
                     </p>
                     <p v-else grow-1 text-base>
                       {{ item.transcript || (recognizer && !item.transcribed ? '…' : '') }}

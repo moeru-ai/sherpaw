@@ -100,6 +100,7 @@ export async function createWorkerSpeakerTracker<Options>(context: EventContext<
   const enroll = defineInvoke(context, events.enroll)
   const inspect = defineInvoke(context, events.inspect)
   const speech = defineInvoke(context, events.speech)
+  const similarity = defineInvoke(context, events.similarity)
   const dispose = bindLifetime(context, config.signal, terminate, 'Speaker tracker')
 
   try {
@@ -159,6 +160,14 @@ export async function createWorkerSpeakerTracker<Options>(context: EventContext<
       const copy = copySamples(samples)
 
       return speech({ samples: copy, sampleRate }, { transfer: [copy.buffer] })
+    },
+
+    async similarity(samples, sampleRate, speaker, options) {
+      context.signal.throwIfAborted()
+
+      const copy = copySamples(samples)
+
+      return similarity({ samples: copy, sampleRate, speaker, ...(options ? { options } : {}) }, { transfer: [copy.buffer] })
     },
 
     async reset(options) {

@@ -2,7 +2,7 @@ import type { Extractor } from '@sherpaw/speaker-identification'
 
 import type { ClusteringOptions } from './clustering'
 import type { Segment } from './segmentation'
-import type { SpeakerConfidence, SpeakerGuess, SpeakerMap, SpeakerRevision, SpeakerTrackerResetOptions, SpeakerTrackerTuning, SpeakerTurn } from './types'
+import type { SimilarityOptions, SpeakerConfidence, SpeakerGuess, SpeakerMap, SpeakerRevision, SpeakerTrackerResetOptions, SpeakerTrackerTuning, SpeakerTurn } from './types'
 
 import { centroid, clusterEmbeddings, dot, maximumAssignment, normalize } from './clustering'
 import { decode, findChanges, MIN_SEGMENTATION_SAMPLES, overlapSeconds, SEGMENTATION_SAMPLE_RATE } from './segmentation'
@@ -30,6 +30,8 @@ export interface NativeSpeakerTracker {
   inspect: () => SpeakerMap
   /** Per segmentation frame of at most 10 s of 16 kHz audio: the probability that anyone speaks. Needs `segment`. */
   speech: (samples: Float32Array, sampleRate: number) => Promise<Float32Array>
+  /** The cosine between a speaker's voice and each window of the samples. NaN for windows without an embedding. */
+  similarity: (samples: Float32Array, sampleRate: number, speaker: number, options?: SimilarityOptions) => Float32Array
   /** Forgets tracked speakers and starts a new session. Enrolled speakers stay unless `forgetEnrolled` is true. */
   reset: (options?: SpeakerTrackerResetOptions) => void
   /** Idempotent. Track throws after disposal. The extractor stays with its owner. */
@@ -97,6 +99,8 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
 
   let units: Unit[] = []
   let labels: number[] = []
+  /** Per utterance: the indexes of its units, in order. */
+  let unitsOf: number[][] = []
   /** Established speakers by id; ids are internal until first reported. */
   let profiles = new Map<number, Float32Array>()
   /** Pending clusters by id with their member units, in creation order. */
@@ -116,6 +120,7 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
   function reset(forgetEnrolled = false) {
     units = []
     labels = []
+    unitsOf = []
     pendingClusters = new Map()
     reported = []
     candidates = []
@@ -258,7 +263,8 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
 
     clusters.forEach((cluster, i) => members[ids.indexOf(cluster)]!.add(first + i))
 
-    const centers = members.map(set => centroid(units.map(unit => unit.embedding), set))
+    const embeddings = units.map(unit => unit.embedding)
+    const centers = members.map(set => centroid(embeddings, set))
     const sizes = members.map(set => [...set].reduce((sum, i) => sum + units[i]!.seconds, 0))
     const established = sizes.map(size => size >= tuning.establishedSeconds)
 
@@ -345,10 +351,8 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
   function vote(turn: number): { id: number, share: number, count: number } {
     const votes = new Map<number, number>()
 
-    units.forEach((unit, i) => {
-      if (unit.turn === turn)
-        votes.set(labels[i]!, (votes.get(labels[i]!) ?? 0) + unit.seconds)
-    })
+    for (const i of unitsOf[turn] ?? [])
+      votes.set(labels[i]!, (votes.get(labels[i]!) ?? 0) + units[i]!.seconds)
 
     let id = -1
     let most = -Infinity
@@ -423,9 +427,13 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
     return seconds >= tuning.overlapSeconds
   }
 
-  function validate(samples: Float32Array, sampleRate: number) {
+  function live() {
     if (disposed)
       throw new Error('Speaker tracker has been disposed')
+  }
+
+  function validate(samples: Float32Array, sampleRate: number) {
+    live()
 
     if (!(samples instanceof Float32Array))
       throw new TypeError('samples must be a Float32Array')
@@ -451,7 +459,7 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
       // Segmentation runs before any state changes, so the rest of the call cannot interleave with another.
       const overlap = run !== undefined && seconds >= MIN_WINDOWED_SECONDS && await overlapping(run, samples)
 
-      validate(samples, sampleRate)
+      live()
 
       const index = reported.length
 
@@ -474,14 +482,14 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
       if (!added.length)
         return { index, speaker: number(previous), score: 0, confidence: 'low', pending: false, mixed: false, overlap, revisions: [] }
 
+      unitsOf[index] = added.map((_, i) => units.length + i)
       units.push(...added)
       labels.push(...added.map(() => -1))
 
       const first = clusterRecent()
       const { id, share, count } = vote(index)
-      const mine = units.flatMap((unit, i) => (unit.turn === index ? [i] : []))
       const pending = !profiles.has(id)
-      const match = nearest(centroid(units.map(unit => unit.embedding), mine))
+      const match = nearest(centroid(added.map(unit => unit.embedding), added.keys()))
       const value = score({ short: false, seconds, match, share, pending, split: count > 1, consistency })
 
       // Earlier utterances in the clustered range may have moved to another speaker.
@@ -521,7 +529,7 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
       const run = segmented(sampleRate)
       const changes = run ? await segmentChanges(run, samples, options.final ?? false) : []
 
-      validate(samples, sampleRate)
+      live()
 
       let before: Float32Array | undefined
       let after: Float32Array | undefined
@@ -626,6 +634,33 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
         throw new RangeError(`speech takes at most ${SEGMENT_WINDOW_SECONDS} s of audio`)
 
       return samples.length < MIN_SEGMENTATION_SAMPLES ? new Float32Array(0) : decode(await run(samples)).speech
+    },
+
+    similarity(samples, sampleRate, speaker, options = {}) {
+      validate(samples, sampleRate)
+
+      const id = [...numbers].find(([, value]) => value === speaker)?.[0]
+
+      if (id === undefined || !profiles.has(id))
+        throw new RangeError(`Speaker ${speaker} has no voice to compare with yet`)
+
+      const window = Math.round((options.windowSeconds ?? 1) * sampleRate)
+      const step = Math.round((options.stepSeconds ?? 0.25) * sampleRate)
+
+      if (!(window >= MIN_EMBEDDED_SECONDS * sampleRate) || !(step > 0))
+        throw new RangeError(`windowSeconds must be at least ${MIN_EMBEDDED_SECONDS}, and stepSeconds must be positive`)
+
+      const voice = reference(id)
+      const count = samples.length < window ? 0 : Math.floor((samples.length - window) / step) + 1
+      const cosines = new Float32Array(count)
+
+      for (let i = 0; i < count; i++) {
+        const embedding = embed(samples.subarray(i * step, i * step + window), sampleRate)
+
+        cosines[i] = embedding ? dot(embedding, voice) : Number.NaN
+      }
+
+      return cosines
     },
 
     inspect() {
