@@ -30,13 +30,14 @@ export const transcriptDescriptions: Record<string, string> = {
 export interface PageParameters {
   vadThreshold: number
   vadSilence: number
+  leadInSeconds: number
   confirmSeconds: number
   minPieceSeconds: number
 }
 
 export type TrackingParameters = PageParameters & SpeakerTrackerTuning
 
-export const defaultPageParameters: Readonly<PageParameters> = Object.freeze({ vadThreshold: 0.5, vadSilence: 0.5, confirmSeconds: 0.25, minPieceSeconds: 0.5 })
+export const defaultPageParameters: Readonly<PageParameters> = Object.freeze({ vadThreshold: 0.5, vadSilence: 0.5, leadInSeconds: 1, confirmSeconds: 0.25, minPieceSeconds: 0.5 })
 
 /** The tracker's part of the parameters. */
 export function trackerTuning(parameters: TrackingParameters): SpeakerTrackerTuning {
@@ -90,6 +91,8 @@ export interface ParameterField {
   unit?: string
   /** The parameter has an effect only with the segmentation model. */
   segmentation?: boolean
+  /** The parameter has an effect only when Silero VAD finds the speech. */
+  silero?: boolean
 }
 
 // Similarities are cosines between speaker embeddings. The library accepts -1 to 1; the sliders
@@ -100,6 +103,7 @@ export const parameterGroups: Array<{ title: string, fields: ParameterField[] }>
     fields: [
       { key: 'vadThreshold', label: 'Speech threshold', help: 'Raise it if music or noise starts utterances. Lower it if the page misses quiet speech.', step: 0.05, min: 0.05, max: 0.95 },
       { key: 'vadSilence', label: 'Silence to end an utterance', help: 'Shorter values split quick exchanges into more utterances.', step: 0.05, min: 0.1, max: 2, unit: ' s' },
+      { key: 'leadInSeconds', label: 'Audio before speech', help: 'Silero VAD reports speech up to about 1 s late. Each turn keeps this much audio from before that point. Lower values can drop the first words.', step: 0.05, min: 0, max: 2, unit: ' s', silero: true },
     ],
   },
   {

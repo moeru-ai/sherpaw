@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import type { SpeakerGuess, SpeakerMap, SpeakerTracker, SpeakerTurn, SpeechSegment } from '@sherpaw/speaker-diarization'
+import type { SpeakerMap, SpeakerTracker, SpeakerTurn } from '@sherpaw/speaker-diarization'
+import type { ConversationPartial, ConversationTurn, SileroVad, StreamingDiarizer, TurnChange, UtteranceDetector } from '@sherpaw/speaker-diarization/conversation'
 
 import type { Recognizer } from '../features/asr/protocol'
 
 import type { EmbeddingModel } from '../features/speaker-diarization/models'
-import type { SpeechDetection, UtteranceDetector } from '../features/speaker-diarization/speech-detectors'
+import type { SpeechDetection } from '../features/speaker-diarization/speech-detectors'
 import type { Preset, TrackingParameters } from '../features/speaker-diarization/tracker-settings'
+import type { TurnTranscript } from '../features/speaker-diarization/transcript'
 import { loadData } from '@sherpaw/preloader'
 import { createSpeakerTracker } from '@sherpaw/speaker-diarization'
+import { createStreamingDiarizer, segmentationUtterances, sileroUtterances } from '@sherpaw/speaker-diarization/conversation'
 import { createVad, initVADModule } from '@sherpaw/vad'
 import { useLocalStorage } from '@vueuse/core'
 
@@ -28,9 +31,9 @@ import { loadTrackerModels } from '../features/speaker-diarization/models'
 import { review, reviewerNames } from '../features/speaker-diarization/review'
 import { cosine } from '../features/speaker-diarization/speaker-map'
 import SpeakerMapView from '../features/speaker-diarization/SpeakerMapView.vue'
-import { segmentationDetector, sileroDetector, speechDetectionOptions } from '../features/speaker-diarization/speech-detectors'
-import { createTokenTimeline } from '../features/speaker-diarization/token-timeline'
+import { speechDetectionOptions } from '../features/speaker-diarization/speech-detectors'
 import { changeDetectionDescriptions, embeddingOptions, parameterGroups, presetOptions, presetParameters, presets, speechThresholds, trackerTuning, transcriptDescriptions } from '../features/speaker-diarization/tracker-settings'
+import { transcribeTurns } from '../features/speaker-diarization/transcript'
 
 interface Utterance {
   index: number
@@ -61,23 +64,7 @@ interface KnownSpeaker {
   samples: Float32Array
 }
 
-interface Part {
-  /** Samples fed to the VAD before the part starts. */
-  start: number
-  chunks: Float32Array[]
-  length: number
-  /** Samples already sent to the recognizer. */
-  sent: number
-  /** Length at the last speaker check. */
-  checked: number
-  /** Segmentation changes that the last check found but did not confirm, in samples from the part start. */
-  candidates: number[]
-}
-
 const sampleRate = 16000
-// With embeddings, peek compares the last two 1.5 s windows. So a check every 0.75 s finds only a
-// change more than 0.75 s back.
-const checkEvery = 0.75 * sampleRate
 const minEnrollSeconds = 5
 const maxEnrollSeconds = 30
 /** The page keeps at most this much enrollment speech per known person when more speech comes. */
@@ -129,7 +116,7 @@ const selected = ref<number>()
 // The list follows new utterances while it is scrolled to the bottom.
 const following = ref(true)
 /** The utterance in progress while the microphone is on: a guess of the speaker and the partial transcript. */
-const preview = ref<{ guess?: SpeakerGuess, transcript: string }>()
+const preview = ref<{ guess?: ConversationPartial['guess'], transcript: string }>()
 /** Which side panels are open. This browser keeps the choice. The right panel starts closed on narrow screens. */
 const settingsOpen = useLocalStorage('sherpaw:speaker-tracking:settings-open', true)
 const insightsOpen = useLocalStorage('sherpaw:speaker-tracking:insights-open', typeof window === 'undefined' || window.innerWidth >= 1280)
@@ -142,7 +129,12 @@ const running = shallowRef<TrackingParameters>({ ...parameters.value })
 
 let tracker: SpeakerTracker | undefined
 let recognizer: Recognizer | undefined
-let detector: UtteranceDetector | undefined
+/** The Silero VAD behind `speech`, when that detection runs. */
+let vad: (SileroVad & { free: () => void }) | undefined
+let speech: UtteranceDetector | undefined
+let diarizer: StreamingDiarizer | undefined
+/** Words for the diarizer's turns, while a recognizer runs. */
+let transcript: TurnTranscript | undefined
 /** The speech detection that the running session uses. */
 let activeDetection: SpeechDetection = 'silero'
 let vadModule: Awaited<ReturnType<typeof initVADModule>> | undefined
@@ -153,23 +145,8 @@ let microphone: AbortController | undefined
 let enrollment: { controller: AbortController, chunks: Float32Array[] } | undefined
 let playback: AudioContext | undefined
 let source: AudioBufferSourceNode | undefined
-// Tracker and recognizer each take utterances one at a time, in VAD order.
-let labeling = Promise.resolve()
-let transcribing = Promise.resolve()
-// A transducer token comes 0.05-0.5 s after its speech. At the speaker changes of the four-speaker
-// recording, every word went to the right speaker when its time moved back by 0.2 s.
-const timeline = createTokenTimeline(sampleRate, 0.2)
-/** The utterance in progress, from its start or from the last speaker change in it. */
-let part: Part | undefined
-/** The last 0.5 s before speech: Silero VAD reports speech about 0.25 s after it starts. */
-let leadIn: Float32Array[] = []
-/** The last 4 s of audio: the segmentation model reports an utterance 0.5-1.5 s after it starts. */
-let recent: Float32Array[] = []
-/** Samples fed to the VAD in this session. */
-let fed = 0
-// Audio blocks are handled one at a time, because speaker checks are asynchronous.
-let pipeline = Promise.resolve()
 let disposed = false
+/** Counts the sessions: a speaker map from an earlier session is dropped. */
 let generation = 0
 
 const lifetime = new AbortController()
@@ -288,6 +265,7 @@ async function loadModel() {
       asrModel.value !== 'none' ? createRecognizer({ modelId: asrModel.value, backend: 'cpu' }, status => message.value = status) : undefined,
       setupTracking(),
     ])
+    startConversation()
     ready.value = true
     message.value = 'Models ready. Start the microphone or test an audio file.'
   }
@@ -324,14 +302,25 @@ async function setupTracking() {
     vadModelLoaded = true
   }
 
-  detector?.free()
-  detector = undefined
+  transcript?.dispose()
+  transcript = undefined
+  void diarizer?.dispose()
+  diarizer = undefined
+  speech = undefined
+  vad?.free()
+  vad = undefined
   tracker?.dispose()
   tracker = undefined
   tracker = await createSpeakerTracker({ model: models.embedding, segmentation: models.segmentation && { data: models.segmentation.data }, tuning: trackerTuning(active), signal: lifetime.signal })
-  detector = speechDetection.value === 'segmentation' && models.segmentation
-    ? segmentationDetector(tracker, { threshold: active.vadThreshold, minSilenceSeconds: active.vadSilence })
-    : sileroDetector(createUtteranceVad(vadModule!, active.vadThreshold))
+
+  if (speechDetection.value === 'segmentation' && models.segmentation) {
+    speech = segmentationUtterances(tracker, { threshold: active.vadThreshold, minSilenceSeconds: active.vadSilence })
+  }
+  else {
+    vad = createUtteranceVad(vadModule!, active.vadThreshold)
+    speech = sileroUtterances(vad)
+  }
+
   activeDetection = speechDetection.value === 'segmentation' && models.segmentation ? 'segmentation' : 'silero'
 
   for (const entry of known.value)
@@ -349,6 +338,7 @@ async function applyParameters() {
   try {
     message.value = 'Applying the parameters…'
     await setupTracking()
+    startConversation()
     await newSession()
     message.value = 'Parameters applied. A new session started.'
   }
@@ -520,29 +510,82 @@ async function forgetKnown() {
   }
 }
 
-/** Triggering workflow: {@link feed} -> {@link label} -> tracker.track -> utterance label, revised earlier utterances and revision log. */
-async function label(item: Utterance, session: number) {
-  const { revisions, index, ...turn } = await tracker!.track(item.samples, sampleRate)
-
-  if (disposed || session !== generation)
-    return
-
-  for (const revision of revisions) {
-    const earlier = utterances.value[revision.index]
-
-    if (earlier) {
-      earlier.revisions.push({ after: index, from: earlier.speaker, to: revision.speaker })
-      revisionLog.value.unshift({ after: index, index: revision.index, from: earlier.speaker, to: revision.speaker })
-      earlier.speaker = revision.speaker
-    }
-  }
-
-  item.emitted = turn
-  item.speaker = turn.speaker
-  void refreshMap()
+/**
+ * Triggering workflow: {@link loadModel} / {@link applyParameters} -> {@link startConversation} ->
+ * a diarizer whose events fill the rows, the preview, the revision log and the speaker map. With a
+ * recognizer, the transcript adds the words of the rows and of the preview.
+ */
+function startConversation() {
+  transcript?.dispose()
+  void diarizer?.dispose()
+  diarizer = createStreamingDiarizer({
+    tracker: tracker!,
+    speech: speech!,
+    confirmSeconds: active.confirmSeconds,
+    minCutGapSeconds: active.minPieceSeconds,
+    leadInSeconds: active.leadInSeconds,
+    keepAudio: true,
+    signal: lifetime.signal,
+  })
+  diarizer.on('speech-start', () => preview.value = { transcript: '' })
+  diarizer.on('partial', ({ partial }) => preview.value = { guess: partial.guess, transcript: preview.value?.transcript ?? '' })
+  diarizer.on('speech-end', () => preview.value = undefined)
+  diarizer.on('turn-update', ({ turn, changed }) => showTurn(turn, changed))
+  diarizer.on('error', ({ error }) => reportError(error))
+  transcript = recognizer && transcribeTurns(diarizer, recognizer, {
+    turn: showWords,
+    live: (text) => {
+      if (preview.value)
+        preview.value.transcript = text
+    },
+    error: reportError,
+  })
 }
 
-/** Triggering workflow: {@link label} / speaker map tab / {@link newSession} -> {@link refreshMap} -> tracker.inspect -> speaker map. */
+/** Triggering workflow: diarizer `turn-update` -> {@link showTurn} -> the turn's row, the revision log and the speaker map. */
+function showTurn(turn: ConversationTurn, changed: readonly TurnChange[]) {
+  const row: Omit<Utterance, 'truth' | 'transcript' | 'transcribed'> = {
+    index: turn.index,
+    start: turn.start,
+    seconds: turn.end - turn.start,
+    samples: turn.samples!,
+    ...(turn.label ? { emitted: turn.label } : {}),
+    speaker: turn.speaker,
+    revisions: turn.revisions,
+    ended: turn.cause,
+  }
+  const existing = utterances.value[turn.index]
+
+  if (!existing) {
+    // Without a recognizer, the row has no words to wait for.
+    utterances.value.push({ ...row, transcript: '', transcribed: !recognizer })
+
+    return
+  }
+
+  if (changed.includes('speaker')) {
+    const revision = turn.revisions.at(-1)!
+
+    revisionLog.value.unshift({ after: revision.after, index: turn.index, from: revision.from, to: revision.to })
+  }
+
+  Object.assign(existing, row)
+
+  if (changed.includes('label'))
+    void refreshMap()
+}
+
+/** Triggering workflow: transcript words -> {@link showWords} -> the row's transcript. */
+function showWords(index: number, text: string, final: boolean) {
+  const row = utterances.value[index]
+
+  if (row) {
+    row.transcript = text
+    row.transcribed = final
+  }
+}
+
+/** Triggering workflow: {@link showTurn} / speaker map tab / {@link newSession} -> {@link refreshMap} -> tracker.inspect -> speaker map. */
 async function refreshMap() {
   if (!insightsOpen.value || insightTab.value !== 'map' || !tracker)
     return
@@ -570,53 +613,6 @@ function selectUtterance(index: number) {
   void nextTick(() => list.value?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'center' }))
 }
 
-/** Triggering workflow: recognizer reply / new row -> {@link placeTokens} -> the words of the open rows and of the preview. */
-function placeTokens() {
-  if (!recognizer)
-    return
-
-  const rows = utterances.value
-  const open = rows.findIndex(row => !row.transcribed)
-  // Only open rows change. The row before them can still get the final mark of its sentence.
-  const from = Math.max(0, (open < 0 ? rows.length : open) - 1)
-  const last = rows.at(-1)
-  // A cut commits rows before `part` moves on, so the live words start where the rows end.
-  const liveFrom = part && Math.max(part.start, last ? Math.round((last.start + last.seconds) * sampleRate) : 0)
-  const placed = timeline.place(recognizer.tokens(), rows.slice(from).map(row => Math.round(row.start * sampleRate)), liveFrom)
-
-  placed.rows.forEach((words, i) => {
-    const row = rows[from + i]!
-
-    if (row.transcript !== words)
-      row.transcript = words
-  })
-
-  if (preview.value)
-    preview.value.transcript = placed.live
-}
-
-/**
- * Triggering workflow: {@link endUtterance} -> {@link finishTranscript} -> recognizer.accept of 2 s of
- * silence -> the last words of the utterance, and its rows marked as transcribed.
- */
-function finishTranscript(rows: number, session: number) {
-  if (!recognizer)
-    return
-
-  // The recognizer's endpoint rule needs 0.8 s of trailing silence. The 480 ms X-ASR chunks also come
-  // late, so 1 s was not always enough.
-  timeline.pause(2 * sampleRate)
-  transcribing = transcribing.then(async () => {
-    await recognizer!.accept(new Float32Array(2 * sampleRate))
-
-    if (disposed || session !== generation)
-      return
-
-    placeTokens()
-    utterances.value.slice(0, rows).forEach(row => row.transcribed = true)
-  }).catch(reportError)
-}
-
 /** A copy of the samples between two positions of audio that arrived in chunks. */
 function range(chunks: Float32Array[], from: number, to: number) {
   const audio = new Float32Array(Math.max(0, to - from))
@@ -642,239 +638,9 @@ function concat(chunks: Float32Array[]) {
   return range(chunks, 0, chunks.reduce((sum, chunk) => sum + chunk.length, 0))
 }
 
-/** Triggering workflow: {@link handle} / {@link commit} -> {@link send} -> recognizer tokens for the part's audio before `to`. */
-function send(current: Part, to: number) {
-  if (!recognizer || to <= current.sent)
-    return
-
-  const audio = range(current.chunks, current.sent, to)
-  const session = generation
-
-  timeline.hear(current.start + current.sent, audio.length)
-  current.sent = to
-  transcribing = transcribing.then(async () => {
-    await recognizer!.accept(audio)
-
-    if (!disposed && session === generation)
-      placeTokens()
-  }).catch(reportError)
-}
-
-/** Triggering workflow: speaker change or VAD utterance end -> {@link commit} -> queued {@link label} and {@link transcribe} for the part's audio before `to`. */
-function commit(current: Part, to: number, ended: Utterance['ended']) {
-  const session = generation
-
-  send(current, to)
-
-  const count = utterances.value.push({
-    index: utterances.value.length,
-    start: current.start / sampleRate,
-    seconds: to / sampleRate,
-    samples: range(current.chunks, 0, to),
-    speaker: null,
-    revisions: [],
-    transcript: recognizer ? '' : undefined,
-    ended,
-  })
-  // Mutate through the reactive array so the row updates.
-  const item = utterances.value[count - 1]!
-
-  labeling = labeling.then(() => label(item, session)).catch(reportError)
-  placeTokens()
-}
-
-/** Triggering workflow: {@link check} / {@link handle} at an utterance end -> {@link split} -> {@link commit} of the part before `at`. Returns the rest. */
-function split(current: Part, at: number): Part {
-  commit(current, at, 'change')
-
-  const rest = range(current.chunks, at, current.length)
-
-  return {
-    start: current.start + at,
-    chunks: [rest],
-    length: rest.length,
-    sent: Math.max(0, current.sent - at),
-    checked: Math.max(0, current.checked - at),
-    candidates: current.candidates.filter(position => position > at).map(position => position - at),
-  }
-}
-
-/** Cuts the part at each change, given in samples from the part start. */
-function splitAll(current: Part, changes: number[], minBefore: number): Part {
-  let rest = current
-  let done = 0
-
-  for (const at of changes) {
-    if (at - done < minBefore)
-      continue
-
-    rest = split(rest, at - done)
-    done = at
-  }
-
-  return rest
-}
-
-/** Segmentation cuts plus a window change, in samples from the part start, in order. */
-function cutsOf(segmentation: number[], windowChange: number | undefined, from: number): number[] {
-  const cuts = windowChange === undefined ? segmentation : [...segmentation, from + Math.round(windowChange * sampleRate)]
-
-  return cuts.sort((a, b) => a - b)
-}
-
-/** Triggering workflow: {@link handle} every 0.75 s of speech -> {@link check} -> tracker.peek -> speaker guess, and cuts at speaker changes. */
-async function check(current: Part, session: number) {
-  // The segmentation model looks at the audio since the last cut. The embedding check looks at its last 3 s.
-  const from = segmenting.value ? 0 : Math.max(0, current.length - 3 * sampleRate)
-
-  current.checked = current.length
-
-  const guess = await tracker!.peek(range(current.chunks, from, current.length), sampleRate)
-
-  if (session !== generation)
-    return current
-
-  // Cut at both kinds of change. Cut at a change between the last two 1.5 s windows immediately. Cut
-  // at a segmentation change when two consecutive checks find it within `confirmSeconds` (0.25 s by
-  // default). On fast turn-taking (VoxConverse talk shows), cutting at both labeled 83.0% of the
-  // speech correctly. Confirmed segmentation changes alone gave 79.7%, and window changes alone 80.6%.
-  // Near the end of a window, the model's output changes from check to check. On AliMeeting, AMI and
-  // MagicData conversations, the confirmation removed 35%-41% of the cuts inside one speaker's speech.
-  // It also cut out 4-7 percentage points fewer short interjections. The page drops a cut closer than
-  // `minPieceSeconds` to the previous cut or to the start of the part.
-  const found = guess.changes.map(change => from + Math.round(change * sampleRate))
-  const confirmed = found.filter(at => current.candidates.some(position => Math.abs(at - position) <= active.confirmSeconds * sampleRate))
-
-  current.candidates = found.filter(at => at > (confirmed.at(-1) ?? -1))
-
-  const rest = splitAll(current, cutsOf(confirmed, guess.windowChange, from), active.minPieceSeconds * sampleRate)
-
-  preview.value = { transcript: preview.value?.transcript ?? '', guess }
-
-  return rest
-}
-
-/** Audio between two sample positions from the last 4 s. Positions count the samples fed since the session start. */
-function recentAudio(from: number, to: number) {
-  const offset = fed - recent.reduce((sum, chunk) => sum + chunk.length, 0)
-
-  return range(recent, Math.max(0, from - offset), Math.max(0, to - offset))
-}
-
-/** Triggering workflow: {@link handle} -> {@link endUtterance} -> final speaker check and commit of the part up to the segment end. */
-async function endUtterance(segment: SpeechSegment, session: number) {
-  // Normally the part holds the segment. It also holds the trailing silence that ended it.
-  const current = part ?? { start: segment.start, chunks: [segment.samples], length: segment.samples.length, sent: 0, checked: 0, candidates: [] }
-  const end = Math.min(current.length, segment.start + segment.samples.length - current.start)
-
-  if (end > 0 && segmenting.value) {
-    // The utterance is complete: changes near its end count now, without confirmation.
-    const guess = await tracker!.peek(range(current.chunks, 0, end), sampleRate, { final: true })
-
-    if (session !== generation)
-      return false
-
-    const rest = splitAll(current, cutsOf(guess.changes.map(change => Math.round(change * sampleRate)), guess.windowChange, 0), active.minPieceSeconds * sampleRate)
-
-    commit(rest, end - (current.length - rest.length), 'pause')
-  }
-  else if (end > 0) {
-    commit(current, end, 'pause')
-  }
-
-  part = undefined
-  leadIn = []
-  preview.value = undefined
-  finishTranscript(utterances.value.length, session)
-
-  return true
-}
-
-/** Triggering workflow: {@link feed} -> {@link handle} -> speech detector, speaker checks, recognizer audio and utterance commits. */
-async function handle(block: Float32Array | undefined, session: number) {
-  const speech = detector
-
-  if (disposed || !speech || session !== generation)
-    return
-
-  const ended = block ? await speech.accept(block) : await speech.flush()
-
-  if (session !== generation)
-    return
-
-  if (block) {
-    fed += block.length
-    recent.push(block)
-
-    while (recent.length * block.length > 4 * sampleRate)
-      recent.shift()
-  }
-
-  // A late detector (the segmentation model) can end one utterance and start the next in one block:
-  // the ended one goes first.
-  for (const segment of ended) {
-    if (!await endUtterance(segment, session))
-      return
-  }
-
-  if (!block)
-    return
-
-  if (speech.speaking()) {
-    // The part holds decided audio only: speaker checks never look past a possible utterance end.
-    const until = speech.decided()
-
-    if (!part) {
-      const start = speech.speechStart()
-
-      if (start === undefined) {
-        const lead = leadIn.splice(0)
-        const length = lead.reduce((sum, chunk) => sum + chunk.length, 0)
-
-        part = { start: until - block.length - length, chunks: lead, length, sent: 0, checked: 0, candidates: [] }
-      }
-      else {
-        // The detector found the start late: the audio since then is in the last 4 s.
-        const oldest = fed - recent.reduce((sum, chunk) => sum + chunk.length, 0)
-
-        part = { start: Math.max(start, oldest), chunks: [], length: 0, sent: 0, checked: 0, candidates: [] }
-      }
-
-      preview.value = { transcript: '' }
-    }
-
-    const piece = recentAudio(part.start + part.length, until)
-
-    part.chunks.push(piece)
-    part.length += piece.length
-
-    if (part.length - part.checked >= checkEvery) {
-      const next = await check(part, session)
-
-      if (session !== generation)
-        return
-
-      part = next
-    }
-
-    // The token times put the words of a later cut into the right row.
-    send(part, part.length)
-  }
-  else if (!part) {
-    leadIn.push(block)
-
-    while (leadIn.length * block.length > sampleRate / 2)
-      leadIn.shift()
-  }
-}
-
-/** Triggering workflow: microphone or file audio / flush -> {@link feed} -> {@link handle} in order. */
-function feed(block?: Float32Array) {
-  const session = generation
-
-  pipeline = pipeline.then(() => handle(block, session)).catch(reportError)
-
-  return pipeline
+/** Triggering workflow: microphone or file audio -> {@link feed} -> the diarizer, one block at a time. */
+function feed(block: Float32Array) {
+  void diarizer?.push(block).catch(reportError)
 }
 
 /** Triggering workflow: speaker-tracking.vue stop button / capture failure / {@link dispose} -> {@link stopMicrophone} -> VAD flush and capture abort. */
@@ -883,7 +649,7 @@ function stopMicrophone() {
   microphone = undefined
 
   if (listening.value)
-    void feed()
+    void diarizer?.flush()
 
   listening.value = false
   message.value = 'Microphone stopped. Select an utterance to review it.'
@@ -913,7 +679,7 @@ async function listen() {
         block[offset++] = Math.max(-1, Math.min(1, value))
 
         if (offset === block.length) {
-          void feed(block)
+          feed(block)
           block = new Float32Array(block.length)
           offset = 0
         }
@@ -935,19 +701,17 @@ async function listen() {
 /** Triggering workflow: speaker-tracking.vue new session button / {@link testFile} -> {@link newSession} -> tracker.reset and VAD reset. */
 async function newSession() {
   generation++
-  detector?.reset()
+  // The diarizer and the transcript drop the old session's results from here on.
+  const resetting = diarizer?.reset()
+
+  transcript?.reset()
   utterances.value = []
   revisionLog.value = []
   selected.value = undefined
   following.value = true
-  part = undefined
-  leadIn = []
-  recent = []
-  fed = 0
-  timeline.reset()
   preview.value = undefined
   speakerMap.value = undefined
-  await tracker?.reset()
+  await resetting
   // The tracker numbers known speakers 0, 1, ... in enrollment order in every new session.
   known.value.forEach((entry, i) => entry.speaker = i)
   await refreshMap()
@@ -988,10 +752,10 @@ async function testFile(event: Event) {
     message.value = `Processing ${file.name}…`
 
     for (let offset = 0; offset < samples.length; offset += sampleRate / 10)
-      void feed(samples.subarray(offset, offset + sampleRate / 10).map(value => Math.max(-1, Math.min(1, value))))
+      feed(samples.subarray(offset, offset + sampleRate / 10).map(value => Math.max(-1, Math.min(1, value))))
 
-    await feed()
-    await Promise.all([labeling, transcribing])
+    await diarizer?.flush()
+    await transcript?.flush()
     message.value = `${file.name}: ${utterances.value.length} utterances. Select one to review it.`
   }
   catch (cause) {
@@ -1089,8 +853,10 @@ function dispose() {
   enrollment?.controller.abort()
   lifetime.abort()
   tracker?.dispose()
+  transcript?.dispose()
+  void diarizer?.dispose()
   void recognizer?.dispose().catch(() => {})
-  detector?.free()
+  vad?.free()
   source?.stop()
   void playback?.close()
 }
@@ -1146,8 +912,8 @@ onBeforeUnmount(dispose)
                   v-for="field in group.fields" :key="field.key" v-model="parameters[field.key]"
                   :label="field.label" :help="field.help" :min="field.min" :max="field.max" :step="field.step" :unit="field.unit"
                   :default-value="defaults[field.key]"
-                  :disabled="!!busy || listening || (field.segmentation && !useSegmentation)"
-                  :disabled-reason="field.segmentation && !useSegmentation ? 'Needs the segmentation model.' : undefined"
+                  :disabled="!!busy || listening || (field.segmentation && !useSegmentation) || (field.silero && speechDetection !== 'silero')"
+                  :disabled-reason="field.segmentation && !useSegmentation ? 'Needs the segmentation model.' : field.silero && speechDetection !== 'silero' ? 'Only Silero VAD uses it.' : undefined"
                 />
               </section>
               <section flex="~ col gap-3" aria-labelledby="known-heading">

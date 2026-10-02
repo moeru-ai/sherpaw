@@ -60,3 +60,101 @@ export function joinTokens(tokens: readonly string[]): string {
     return !((isCjk(previous) && isCjk(next)) || isPunctuation(next))
   }).join('').trim()
 }
+
+/** Recognizer samples [from, to) hold the session audio from position `at` on. */
+interface Span {
+  from: number
+  to: number
+  at: number
+}
+
+/** Puts timed tokens back on the timeline of a session that the recognizer heard in parts. */
+export interface TokenTimeline {
+  /**
+   * The recognizer heard `length` samples of session audio from position `at` on, as its samples
+   * from `from` on. Call in the recognizer's order. Silence between the calls has no position.
+   */
+  hear: (at: number, from: number, length: number) => void
+  /** Starts a new session. Tokens of earlier sessions go to no row. */
+  reset: () => void
+  /**
+   * The words of each row, and the words from `liveFrom` on. `rowStarts` holds the session position
+   * where each row starts, in order. Tokens before the first row are left out.
+   */
+  place: (tokens: readonly TimedToken[], rowStarts: readonly number[], liveFrom?: number) => { rows: string[], live: string }
+}
+
+/** The index of the last item whose key is at or before `value`, or -1. The keys must not decrease. */
+function lastAtOrBefore(count: number, key: (index: number) => number, value: number) {
+  let low = 0
+  let high = count
+  while (low < high) {
+    const middle = (low + high) >> 1
+    if (key(middle) <= value)
+      low = middle + 1
+    else
+      high = middle
+  }
+  return low - 1
+}
+
+/**
+ * Maps the recognizer's time back to session positions, so that each token goes to the row whose
+ * audio produced it. Use it when the recognizer hears only parts of a session, for example the
+ * speech of a conversation. A row can be a speaker turn. Positions and lengths count samples.
+ *
+ * A token comes after its speech. The timeline moves each token's time back by `lagSeconds`. The
+ * value 0.2 s fits X-ASR. Measure the delay for another model. A token in the silence after a span
+ * belongs to that span. A pause therefore keeps a late token in its row. Inside a span, a token
+ * that comes more than `lagSeconds` after its speech can go to the next row. Each token goes to a
+ * row by its own time. A cut inside a word of several tokens therefore splits the word between two
+ * rows.
+ */
+export function createTokenTimeline(sampleRate: number, lagSeconds: number): TokenTimeline {
+  const lag = Math.round(lagSeconds * sampleRate)
+  let spans: Span[] = []
+
+  /** The session position of a token's audio, or undefined for audio before this session. */
+  function positionOf(token: TimedToken) {
+    const time = Math.round(token.time * sampleRate)
+    // The last span that starts at or before the audio. A token in silence after a span belongs to it.
+    const span = spans[lastAtOrBefore(spans.length, i => spans[i]!.from, time - lag)]
+    if (span)
+      return span.at + Math.min(time - lag - span.from, span.to - span.from - 1)
+    // A token from the first moments of the session: without the lag, it falls inside the first span.
+    return spans[0] && time >= spans[0].from ? spans[0].at : undefined
+  }
+
+  return {
+    hear(at, from, length) {
+      const last = spans.at(-1)
+      // Audio that continues the previous span extends it.
+      if (last && last.to === from && last.at + last.to - last.from === at)
+        last.to += length
+      else
+        spans.push({ from, to: from + length, at })
+    },
+    reset() {
+      spans = []
+    },
+    place(tokens, rowStarts, liveFrom) {
+      const rows = rowStarts.map((): string[] => [])
+      const live: string[] = []
+      const start = rowStarts[0] ?? liveFrom
+      if (start === undefined)
+        return { rows: [], live: '' }
+      // Token times do not decrease, so neither do their positions: skip the tokens before `start`.
+      const first = lastAtOrBefore(tokens.length, i => positionOf(tokens[i]!) ?? Number.NEGATIVE_INFINITY, start - 1) + 1
+      let target: string[] | undefined
+      for (const token of tokens.slice(first)) {
+        // A punctuation mark goes with the word before it.
+        if (!isPunctuationToken(token.text)) {
+          const position = positionOf(token)!
+          target = liveFrom !== undefined && position >= liveFrom ? live : rows[lastAtOrBefore(rowStarts.length, i => rowStarts[i]!, position)]
+        }
+        target?.push(token.text)
+      }
+      return { rows: rows.map(words => joinTokens(words)), live: joinTokens(live) }
+    },
+  }
+}

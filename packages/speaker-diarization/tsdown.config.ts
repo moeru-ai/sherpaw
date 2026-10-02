@@ -31,6 +31,7 @@ export default defineConfig([
     entry: {
       'index': 'src/index.ts',
       'core': 'src/core.ts',
+      'conversation': 'src/conversation.ts',
       'node': 'src/node/index.ts',
       'node-worker': 'src/node/entry.ts',
     },

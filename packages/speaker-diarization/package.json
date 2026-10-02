@@ -15,6 +15,7 @@
   "exports": {
     ".": "./dist/index.js",
     "./core": "./dist/core.js",
+    "./conversation": "./dist/conversation.js",
     "./worker": "./dist/worker-entry.js",
     "./node": "./dist/node.js",
     "./package.json": "./package.json",
