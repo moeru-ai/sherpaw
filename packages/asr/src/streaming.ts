@@ -20,6 +20,11 @@ export interface StreamingRecognizer {
    * timestamps, such as Paraformer.
    */
   tokens: () => readonly TimedToken[]
+  /**
+   * Samples taken so far at the configured sample rate, including the silence that `finish` adds.
+   * Token times count from the first of them.
+   */
+  received: () => number
   dispose: () => Promise<void>
 }
 
@@ -57,6 +62,7 @@ export async function createStreamingRecognizer(
   const completed: string[] = []
   const completedTokens: TimedToken[] = []
   let partialTokens: TimedToken[] = []
+  let received = 0
   let text = ''
   let finished = false
   let failure: unknown
@@ -105,6 +111,7 @@ export async function createStreamingRecognizer(
       if (finished)
         throw new Error('Input is already finished')
       stream.acceptWaveform(sampleRate, samples)
+      received += samples.length
       return drain()
     }),
     /** Triggering workflow: recording Stop -> family-specific final context -> final transcript. */
@@ -112,14 +119,18 @@ export async function createStreamingRecognizer(
       if (finished)
         return text
       finished = true
-      if (config?.type === OnlineRecognizerTypes.Paraformer)
+      if (config?.type === OnlineRecognizerTypes.Paraformer) {
         stream.setOption('is_final', '1')
-      else
+      }
+      else {
         stream.acceptWaveform(sampleRate, new Float32Array(sampleRate))
+        received += sampleRate
+      }
       stream.inputFinished()
       return drain()
     }),
     tokens: () => [...completedTokens, ...partialTokens],
+    received: () => received,
     /** Triggering workflow: recording release -> pending inference completes -> native and backend cleanup. */
     dispose() {
       disposal ??= pending.then(async () => {

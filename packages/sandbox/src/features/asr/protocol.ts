@@ -24,6 +24,8 @@ export interface RecognizerReply {
   text: string
   from: number
   tokens: TimedToken[]
+  /** Samples that the recognizer has taken so far. */
+  received: number
 }
 
 export const operation = defineInvokeEventa<RecognizerReply, RecognizerRequest>('sherpaw:asr:operation')

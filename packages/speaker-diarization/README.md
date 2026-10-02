@@ -93,6 +93,34 @@ Limits:
 - Labels are hints. Each label has a confidence estimate; confirm before an action that depends on who spoke.
 - On AMI and AliMeeting test meetings, 89%–91% of utterances got the right label, and 98.5%–98.7% of the `high` confidence labels were right.
 
+## Streaming diarization
+
+`createStreamingDiarizer` turns a stream of 16 kHz mono audio into speaker turns. It finds utterances, cuts them where the speaker changes, and labels each turn with the tracker.
+
+```ts
+import { createSpeakerTracker } from '@sherpaw/speaker-diarization'
+import { createStreamingDiarizer, sileroUtterances } from '@sherpaw/speaker-diarization/conversation'
+
+const tracker = await createSpeakerTracker({ model, segmentation })
+
+await using diarizer = createStreamingDiarizer({ tracker, speech: sileroUtterances(vad) })
+microphone.pipeTo(diarizer.writable)
+
+for await (const event of diarizer) {
+  if (event.type === 'speech-start')
+    agent.stopTalking() // someone started to speak
+  if (event.type === 'turn')
+    agent.hear(event.turn.speaker) // the turn has its label
+}
+```
+
+- `vad` is a Silero VAD from `@sherpaw/vad`. `segmentationUtterances(tracker)` finds utterances with the segmentation model instead, for audio such as films.
+- The events are `speech-start`, `audio` (the audio of the turns), `partial` (a live guess of the speaker), `turn-update` (for displays), `turn` (once per turn, when it has its label), `speech-end` and `error`. Read them with `for await`, `on(type, handler)` or the `readable` stream. `audio.pipeThrough(diarizer)` writes the audio and returns that stream. When the audio stream ends, the diarizer flushes, and the events end.
+- The diarizer coordinates on the calling thread, and the tracker works in its Worker. The caller keeps the tracker and the VAD.
+- Background speech, such as a TV, can fill the pauses between turns. Then the cuts are less precise.
+
+The diarizer does not transcribe. For the words of each turn, send the `audio` events to a streaming recognizer from `@sherpaw/asr`. After each `speech-end`, also send about 2 seconds of silence. `createTokenTimeline` from `@sherpaw/asr/tokens` then puts each word into the turn whose audio produced it. The speaker tracking demo does this in `packages/sandbox/src/features/speaker-diarization/transcript.ts`.
+
 ## Other entrypoints
 
 - `@sherpaw/speaker-diarization/node`: the same async interface using Node worker threads.

@@ -29,6 +29,7 @@ export async function createRecognizer(options: RecognizerOptions, report: (stat
 
   /** The tokens so far, updated from each reply. */
   const tokens: TimedToken[] = []
+  let received = 0
   async function send(request: RecognizerRequest, transfer: Transferable[] = []) {
     const timer = setTimeout(() => context.abort(new Error('Model operation exceeded five minutes')), 300000)
     try {
@@ -36,6 +37,7 @@ export async function createRecognizer(options: RecognizerOptions, report: (stat
       tokens.length = reply.from
       for (const token of reply.tokens)
         tokens.push(token)
+      received = reply.received
       return reply.text
     }
     catch (error) {
@@ -56,6 +58,7 @@ export async function createRecognizer(options: RecognizerOptions, report: (stat
     /** Triggering workflow: Stop -> adapter.finish -> trailing context and final text. */
     finish: () => send({ kind: 'finish' }),
     tokens: () => tokens,
+    received: () => received,
     /** Triggering workflow: Stop/model change -> native/ORT cleanup -> abort context and terminate Worker. */
     async dispose() {
       if (context.signal.aborted)

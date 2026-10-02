@@ -40,5 +40,5 @@ defineInvokeHandler(context, operation, async (request) => {
   const tokens = recognizer?.tokens() ?? []
   const from = firstChange(tokens)
   replied = tokens
-  return { text, from, tokens: tokens.slice(from) }
+  return { text, from, tokens: tokens.slice(from), received: recognizer?.received() ?? 0 }
 })

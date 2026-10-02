@@ -228,6 +228,8 @@ export interface PeekOptions {
 
 /** All operations execute in call order on the tracker's dedicated Worker. */
 export interface SpeakerTracker {
+  /** The tracker runs the segmentation model: `peek` finds speaker changes frame by frame in 16 kHz audio. */
+  readonly segmentation: boolean
   /** Labels one utterance of mono PCM, for example a VAD segment. Call in time order. Copies the samples. */
   track: (samples: Float32Array, sampleRate: number) => Promise<SpeakerTurn>
   /**

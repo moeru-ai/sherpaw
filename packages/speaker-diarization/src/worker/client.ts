@@ -121,6 +121,8 @@ export async function createWorkerSpeakerTracker<Options>(context: EventContext<
   }
 
   return {
+    segmentation: !!config.segmentation,
+
     async track(samples, sampleRate) {
       context.signal.throwIfAborted()
 

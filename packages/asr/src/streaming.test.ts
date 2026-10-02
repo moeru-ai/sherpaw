@@ -88,6 +88,8 @@ it('keeps endpoint text and flushes the transducer tail exactly once', async () 
   expect(stream.acceptWaveform.mock.calls.at(-1)).toEqual([16000, new Float32Array(16000)])
   expect(stream.inputFinished).toHaveBeenCalledOnce()
   expect(native.decode).toHaveBeenCalledTimes(2)
+  // 320 samples of audio and the 1 s of silence that `finish` adds.
+  expect(session.received()).toBe(320 + 16000)
   await session.dispose()
 })
 

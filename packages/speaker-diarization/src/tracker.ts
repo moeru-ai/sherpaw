@@ -18,6 +18,8 @@ export interface NativeSpeakerTrackerConfig {
 }
 
 export interface NativeSpeakerTracker {
+  /** The tracker runs the segmentation model (`segment`). */
+  readonly segmentation: boolean
   /** Labels one utterance of mono PCM. Call in time order. */
   track: (samples: Float32Array, sampleRate: number) => Promise<SpeakerTurn>
   /** Guesses the nearest established speaker and finds speaker changes without changing any state. */
@@ -439,6 +441,8 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
   }
 
   return {
+    segmentation: !!segmenter,
+
     async track(samples, sampleRate) {
       validate(samples, sampleRate)
 
