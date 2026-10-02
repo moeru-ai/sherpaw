@@ -88,14 +88,17 @@ export function transcribeTurns(
       // The turn in progress goes on after a cut.
       liveFrom = Math.round(turn.end * SAMPLE_RATE)
     }),
-    diarizer.on('audio', ({ time, samples }) => enqueue(async (session) => {
+    diarizer.on('audio', ({ time, samples, silent }) => enqueue(async (session) => {
       await recognizer.accept(samples)
 
       if (session !== generation)
         return
 
       // The recognizer can hold audio of an earlier conversation, so its own count places this audio.
-      timeline.hear(Math.round(time * SAMPLE_RATE), recognizer.received() - samples.length, samples.length)
+      // Silence in place of other voices gets no position: a late token in it goes with the speech before it.
+      if (!silent)
+        timeline.hear(Math.round(time * SAMPLE_RATE), recognizer.received() - samples.length, samples.length)
+
       place()
     })),
     diarizer.on('speech-end', () => {

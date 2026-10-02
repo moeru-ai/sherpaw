@@ -155,11 +155,11 @@ export interface SpeakerTurn {
   /** Estimated probability that `speaker` is right, from a model fitted on meeting audio (AMI). Recalibrate it for other audio. */
   score: number
   confidence: SpeakerConfidence
-  /** The speaker has less than 4 s of speech so far. Its number may never appear again. */
+  /** The speaker has less speech than `establishedSeconds` (4 s by default) so far. Its number may never appear again. */
   pending: boolean
   /** Another speaker holds at least 20% of the utterance. */
   mixed: boolean
-  /** Two people talk at once for at least 0.5 s. Needs `segmentation`. Without it, always false. */
+  /** Two people talk at once for at least `overlapSeconds` (0.5 s by default). Needs `segmentation`. Without it, always false. */
   overlap: boolean
   /** Earlier utterances whose speaker changed after re-clustering. */
   revisions: SpeakerRevision[]
@@ -178,9 +178,9 @@ export interface SpeakerGuess {
   /**
    * Speaker changes that the segmentation model finds frame by frame, in seconds from the start of
    * the samples, in order. Each change is at least 0.3 s from the start. Without `final`, each change
-   * is also at least 0.5 s before the end. Empty without `segmentation` or at sample rates other than
-   * 16 kHz. Near the end of the samples, the changes vary from call to call. So cut only when two
-   * consecutive calls report a change.
+   * is also at least `segmentationMarginSeconds` (0.5 s by default) before the end. Empty without
+   * `segmentation` or at sample rates other than 16 kHz. Near the end of the samples, the changes vary
+   * from call to call. So cut only when two consecutive calls report a change.
    */
   changes: number[]
   /**
@@ -221,6 +221,13 @@ export interface SpeakerMapSpeaker {
   embedding: Float32Array
 }
 
+export interface SimilarityOptions {
+  /** Length of the compared windows. Shorter windows place a voice more precisely but compare less reliably. Default: 1 second. */
+  windowSeconds?: number
+  /** Time between the starts of two windows. Default: 0.25 seconds. */
+  stepSeconds?: number
+}
+
 export interface PeekOptions {
   /** The samples end the utterance: changes up to 0.3 s before the end count. Needs `segmentation`. */
   final?: boolean
@@ -236,13 +243,13 @@ export interface SpeakerTracker {
    * Guesses who speaks in an unfinished utterance and finds speaker changes in it. Pass the audio
    * since the last change. With `segmentation`, the tracker segments up to the last 10 s of it;
    * otherwise it compares only the last 3 s. Changes nothing. The tracker cannot recognize a speaker
-   * with less than 4 s of tracked speech yet. Copies the samples.
+   * with less than `establishedSeconds` of tracked speech yet. Copies the samples.
    */
   peek: (samples: Float32Array, sampleRate: number, options?: PeekOptions) => Promise<SpeakerGuess>
   /**
    * Adds a known speaker from at least 5 seconds of their speech, for example the owner of a
    * device, and resolves to their speaker number. Utterances that sound like the enrolled
-   * embedding get this number from the start, before the speaker has 4 seconds of tracked speech.
+   * embedding get this number from the start, before the speaker has `establishedSeconds` of tracked speech.
    * Enroll before tracking: a speaker who is already tracked keeps their tracked number until the
    * next `reset`. Pass speech only. Long silence weakens the embedding. Copies the samples.
    */
@@ -256,6 +263,13 @@ export interface SpeakerTracker {
    * the samples.
    */
   speech: (samples: Float32Array, sampleRate: number) => Promise<Float32Array>
+  /**
+   * The cosine between a speaker's voice and each window of the samples, for example to find the
+   * frames of an enrolled owner. Value `i` covers seconds `i * stepSeconds` to `i * stepSeconds +
+   * windowSeconds`. It is NaN for a window without an embedding, such as digital silence. Rejects a
+   * speaker without a voice yet. Changes nothing. Copies the samples.
+   */
+  similarity: (samples: Float32Array, sampleRate: number, speaker: number, options?: SimilarityOptions) => Promise<Float32Array>
   /** Forgets tracked speakers and starts a new session. Enrolled speakers stay, numbered 0, 1, ... in enrollment order, unless `forgetEnrolled`. */
   reset: (options?: SpeakerTrackerResetOptions) => Promise<void>
   /** Terminates the Worker and rejects pending operations. Safe to repeat. */

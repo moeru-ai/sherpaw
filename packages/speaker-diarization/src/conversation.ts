@@ -14,6 +14,10 @@ const SAMPLE_RATE = 16000
 const CHECK = 0.75 * SAMPLE_RATE
 /** Audio kept for a detector that finds the start of speech late, such as the segmentation model. */
 const RECENT = 4 * SAMPLE_RATE
+/** Focus decisions come in steps of this many samples (0.25 s). */
+const STEP = SAMPLE_RATE / 4
+/** With focus, a speaker cut this close to a start or a stop of the focus speaker marks the same change. */
+const NEAR = 0.75 * SAMPLE_RATE
 
 /** The label that `track` reported when the turn ended. */
 export type TurnLabel = Omit<SpeakerTurn, 'index' | 'revisions'>
@@ -61,9 +65,10 @@ export type ConversationEvent
   /**
    * Audio of the turns from `time` on, in order, without gaps inside an utterance. The audio of an
    * utterance comes while it goes on. It can end with some of the silence that ended the utterance.
-   * A recognizer that hears these blocks transcribes every turn.
+   * A recognizer that hears these blocks transcribes every turn. With `focus`, blocks with
+   * `silent: true` hold silence in place of the other voices.
    */
-    | { type: 'audio', time: number, samples: Float32Array }
+    | { type: 'audio', time: number, samples: Float32Array, silent?: true }
   /** The turn in progress has a new speaker guess. */
     | { type: 'partial', partial: ConversationPartial }
   /** A turn began, or its label or speaker changed. For displays. */
@@ -74,6 +79,16 @@ export type ConversationEvent
     | { type: 'speech-end', time: number }
   /** An asynchronous step failed. The diarizer goes on with the next audio. */
     | { type: 'error', error: unknown }
+
+/** Follows one speaker only. */
+export interface FocusOptions {
+  /** The speaker to follow, for example the number that `tracker.enroll` returned. */
+  speaker: number
+  /** A 0.25 s step belongs to the speaker when the windows over it reach this cosine on average. Default: 0.35. */
+  threshold?: number
+  /** Length of the compared windows. Shorter windows place the speaker's speech more precisely but compare less reliably. Default: 1 s. */
+  windowSeconds?: number
+}
 
 export interface StreamingDiarizerOptions {
   /** Labels the turns. The caller keeps it, for example to enroll speakers, and disposes it. */
@@ -91,6 +106,13 @@ export interface StreamingDiarizerOptions {
   confirmSeconds?: number
   /** A cut closer than this to the previous cut or to the start of the utterance is dropped. Default: 0.5 s. */
   minCutGapSeconds?: number
+  /**
+   * Follow one speaker only, for example the enrolled owner of a voice agent. The `audio` events
+   * then hold silence in place of the other voices, so a recognizer that hears them transcribes this
+   * speaker only. A background voice also does not hold the recognizer when the speaker starts.
+   * Turns change where the speaker starts or stops. The audio and the cuts come about 1 s later.
+   */
+  focus?: FocusOptions
   /** Keep each turn's audio in `samples`, for example to play it or to enroll its speaker. Default: false. */
   keepAudio?: boolean
   /** Aborting disposes the diarizer. */
@@ -136,6 +158,32 @@ interface Part {
   candidates: number[]
 }
 
+/** Audio of the utterance in progress since its start, for focus decisions. Cuts do not change it. */
+interface Utterance {
+  /** Samples fed before the utterance starts. */
+  start: number
+  chunks: Float32Array[]
+  length: number
+  /** The cosine of each full window, from the utterance start. */
+  cosines: number[]
+  /** The cosine of a window that ends with the utterance, once it ended. */
+  tail?: number
+  /** Samples already sent in `audio` events. */
+  sent: number
+  /** Length at the last focus update. */
+  updated: number
+  /** Per 0.25 s step: true for the focus speaker, false for another voice, undefined when the windows hold no voice. */
+  decisions: Array<boolean | undefined>
+  /** The next step to look at for a start or a stop of the focus speaker. */
+  examined: number
+  /** The focus speaker speaks, as of the last start or stop. Undefined before the first two equal steps with a voice. */
+  speaking?: boolean
+  /** Session positions where the focus speaker starts or stops speaking for at least two steps. */
+  transitions: number[]
+  /** Session positions of speaker cuts that wait for the focus decisions around them. */
+  held: number[]
+}
+
 interface Turn extends ConversationTurn {
   /** The `turn` event went out. */
   completed: boolean
@@ -167,8 +215,10 @@ function range(chunks: Float32Array[], from: number, to: number) {
  * Its `audio` events carry the audio of the turns, for example for a recognizer.
  */
 export function createStreamingDiarizer(options: StreamingDiarizerOptions): StreamingDiarizer {
-  const { tracker, speech, keepAudio = false, signal } = options
+  const { tracker, speech, focus, keepAudio = false, signal } = options
   const maxLeadIn = Math.round((options.leadInSeconds ?? 1) * SAMPLE_RATE)
+  const focusWindow = Math.round((focus?.windowSeconds ?? 1) * SAMPLE_RATE)
+  const focusThreshold = focus?.threshold ?? 0.35
   const confirm = (options.confirmSeconds ?? 0.25) * SAMPLE_RATE
   const minGap = (options.minCutGapSeconds ?? 0.5) * SAMPLE_RATE
   const hub = createEventHub<ConversationEvent>()
@@ -179,6 +229,8 @@ export function createStreamingDiarizer(options: StreamingDiarizerOptions): Stre
     throw new RangeError('leadInSeconds must be zero or more')
 
   let turns: Turn[] = []
+  /** Turns by the index that `track` returned for them. Revisions use these indexes. */
+  let tracked = new Map<number, Turn>()
   let part: Part | undefined
   /** The last `leadInSeconds` of audio before speech, while no part is open. */
   let leadIn: Float32Array[] = []
@@ -196,6 +248,9 @@ export function createStreamingDiarizer(options: StreamingDiarizerOptions): Stre
   let disposed = false
   let writable: WritableStream<Float32Array> | undefined
   let readable: ReadableStream<ConversationEvent> | undefined
+  let utterance: Utterance | undefined
+  /** The focus speaker has no voice: the `audio` events then hold all voices until the next `reset`. */
+  let unfocused = false
 
   function report(error: unknown) {
     if (!disposed)
@@ -231,13 +286,19 @@ export function createStreamingDiarizer(options: StreamingDiarizerOptions): Stre
 
   /** Triggering workflow: {@link commit} -> {@link label} -> tracker.track -> the turn's label and revised earlier turns. */
   async function label(turn: Turn, session: number) {
+    // A turn of an old conversation must not reach the tracker after its reset.
+    if (disposed || session !== generation)
+      return
+
     const { revisions, index, ...result } = await tracker.track(turn.samples!, SAMPLE_RATE)
 
     if (disposed || session !== generation)
       return
 
+    tracked.set(index, turn)
+
     for (const revision of revisions) {
-      const earlier = turns[revision.index]
+      const earlier = tracked.get(revision.index)
 
       if (earlier) {
         earlier.revisions.push({ after: index, from: earlier.speaker, to: revision.speaker })
@@ -255,9 +316,21 @@ export function createStreamingDiarizer(options: StreamingDiarizerOptions): Stre
     update(turn, ['label'])
   }
 
-  /** Triggering workflow: {@link handle} / {@link commit} -> {@link send} -> an `audio` event with the part's audio before `to`. */
+  /** Triggering workflow: {@link handle} / {@link endUtterance} -> {@link open} -> the part of a new utterance, its `speech-start` event and, with focus, its decisions. */
+  function open(start: number, chunks: Float32Array[], length: number): Part {
+    if (focus)
+      utterance = { start, chunks: [...chunks], length, cosines: [], sent: 0, updated: 0, decisions: [], examined: 0, transitions: [], held: [] }
+
+    partial = { start: start / SAMPLE_RATE }
+    hub.emit({ type: 'speech-start', time: start / SAMPLE_RATE })
+    showPartial()
+
+    return { start, chunks, length, sent: 0, checked: 0, candidates: [] }
+  }
+
+  /** Triggering workflow: {@link handle} / {@link commit} -> {@link send} -> an `audio` event with the part's audio before `to`, without focus. */
   function send(current: Part, to: number) {
-    if (to <= current.sent)
+    if (focus || to <= current.sent)
       return
 
     const samples = range(current.chunks, current.sent, to)
@@ -265,6 +338,117 @@ export function createStreamingDiarizer(options: StreamingDiarizerOptions): Stre
 
     current.sent = to
     hub.emit({ type: 'audio', time, samples })
+  }
+
+  /** The cosines of the focus speaker's voice and windows of the audio, or undefined without a voice to compare with. */
+  async function similarityOf(audio: Float32Array, window: number) {
+    if (unfocused)
+      return undefined
+
+    try {
+      return await tracker.similarity(audio, SAMPLE_RATE, focus!.speaker, { windowSeconds: window / SAMPLE_RATE, stepSeconds: STEP / SAMPLE_RATE })
+    }
+    catch (error) {
+      unfocused = true
+      report(error)
+
+      return undefined
+    }
+  }
+
+  /**
+   * Triggering workflow: {@link handle} every 0.75 s of speech / {@link endUtterance} -> {@link updateFocus} ->
+   * tracker.similarity -> `audio` events with the focus speaker's steps, and the other steps as silence.
+   */
+  async function updateFocus(final: boolean, session: number) {
+    const current = utterance!
+    // The windows whose centers are nearest to a step's center start this many steps before it.
+    const offset = (focusWindow - STEP) / (2 * STEP)
+
+    current.updated = current.length
+
+    // Windows that the audio now covers in full, then one window that ends with the utterance.
+    const last = Math.floor((current.length - focusWindow) / STEP)
+
+    if (last >= current.cosines.length) {
+      const cosines = await similarityOf(range(current.chunks, current.cosines.length * STEP, last * STEP + focusWindow), focusWindow)
+
+      if (session !== generation)
+        return
+
+      current.cosines.push(...(cosines ?? Array.from({ length: last + 1 - current.cosines.length }, () => Number.POSITIVE_INFINITY)))
+    }
+
+    if (final && current.length >= STEP) {
+      const window = Math.min(current.length, focusWindow)
+      const [cosine] = await similarityOf(range(current.chunks, current.length - window, current.length), window) ?? [Number.POSITIVE_INFINITY]
+
+      if (session !== generation)
+        return
+
+      current.tail = cosine ?? Number.NaN
+    }
+
+    const steps = Math.ceil(current.length / STEP)
+
+    // A step is the speaker's when the windows centered nearest to it reach the threshold on average.
+    // Windows over a speaker change hold both voices, so farther windows would move the change.
+    // Windows without an embedding, such as silence, leave the step undecided.
+    function own(step: number): boolean | undefined {
+      const cosines = [...new Set([Math.floor(step - offset), Math.ceil(step - offset)])].flatMap((index) => {
+        if (Math.max(0, index) < current.cosines.length)
+          return [current.cosines[Math.max(0, index)]!]
+
+        return current.tail === undefined ? [] : [current.tail]
+      })
+      const valid = cosines.filter(cosine => !Number.isNaN(cosine))
+
+      return valid.length ? valid.reduce((sum, cosine) => sum + cosine, 0) / valid.length >= focusThreshold : undefined
+    }
+
+    // Without the utterance end, a step waits until its centered windows exist: no step before the first window.
+    const decided = final ? steps : current.cosines.length ? Math.min(steps, Math.floor(current.cosines.length - 1 + offset) + 1) : 0
+    const from = current.sent
+
+    if (decided * STEP <= from && !final)
+      return
+
+    const to = final ? current.length : decided * STEP
+
+    for (let step = Math.floor(from / STEP); step * STEP < to; step++)
+      current.decisions[step] = own(step)
+
+    // The focus speaker starts or stops where a new state lasts two steps. A single step does not count.
+    // A step without a voice does not count either: silence before the speaker is not another voice.
+    for (let step = current.examined; step + 1 < current.decisions.length; step++) {
+      const now = current.decisions[step]
+
+      if (now !== undefined && now !== current.speaking && now === current.decisions[step + 1]) {
+        if (current.speaking !== undefined)
+          current.transitions.push(current.start + step * STEP)
+
+        current.speaking = now
+      }
+
+      current.examined = step + 1
+    }
+
+    // The focus speaker's steps go out as they are, and the other steps as silence, in runs of equal
+    // steps. A recognizer that hears them transcribes the focus speaker only.
+    for (let start = from; start < to;) {
+      const kept = !!current.decisions[Math.floor(start / STEP)]
+      let end = start
+
+      while (end < to && !!current.decisions[Math.floor(end / STEP)] === kept)
+        end = Math.min(to, (Math.floor(end / STEP) + 1) * STEP)
+
+      const time = (current.start + start) / SAMPLE_RATE
+
+      hub.emit(kept ? { type: 'audio', time, samples: range(current.chunks, start, end) } : { type: 'audio', time, samples: new Float32Array(end - start), silent: true })
+      start = end
+    }
+
+    current.sent = to
   }
 
   /** Triggering workflow: speaker change or utterance end -> {@link commit} -> a new turn for the part's audio before `to`. */
@@ -319,6 +503,26 @@ export function createStreamingDiarizer(options: StreamingDiarizerOptions): Stre
     return rest
   }
 
+  /**
+   * Triggering workflow: {@link check} / {@link handle} / {@link endUtterance} -> {@link settle} -> the cuts to make now,
+   * in samples from the part start. With focus, a speaker cut waits until the focus decisions around it are known.
+   * A start or a stop of the focus speaker near it replaces it: the decisions place a change within 0.25 s.
+   */
+  function settle(current: Part, cuts: number[], final: boolean): number[] {
+    if (!utterance)
+      return cuts
+
+    const { start, decisions, transitions } = utterance
+    // A transition at a step is known once the next step is decided.
+    const known = final ? Number.POSITIVE_INFINITY : start + (decisions.length - 1) * STEP
+    const held = [...utterance.held, ...cuts.map(at => current.start + at)]
+    const ready = held.filter(at => at + NEAR <= known && !transitions.some(transition => Math.abs(transition - at) <= NEAR))
+
+    utterance.held = held.filter(at => at + NEAR > known)
+
+    return [...transitions, ...ready].filter(at => at > current.start).map(at => at - current.start).sort((a, b) => a - b)
+  }
+
   /** Segmentation cuts plus a window change, in samples from the part start, in order. */
   function cutsOf(segmentation: number[], windowChange: number | undefined, from: number): number[] {
     const cuts = windowChange === undefined ? segmentation : [...segmentation, from + Math.round(windowChange * SAMPLE_RATE)]
@@ -346,7 +550,7 @@ export function createStreamingDiarizer(options: StreamingDiarizerOptions): Stre
 
     current.candidates = found.filter(at => at > (confirmed.at(-1) ?? -1))
 
-    const rest = splitAll(current, cutsOf(confirmed, guess.windowChange, from))
+    const rest = splitAll(current, settle(current, cutsOf(confirmed, guess.windowChange, from), false))
 
     partial = { start: rest.start / SAMPLE_RATE, guess: { speaker: guess.speaker, score: guess.score, confidence: guess.confidence } }
 
@@ -362,9 +566,21 @@ export function createStreamingDiarizer(options: StreamingDiarizerOptions): Stre
 
   /** Triggering workflow: {@link handle} -> {@link endUtterance} -> a final speaker check and the last turn of the utterance. */
   async function endUtterance(segment: SpeechSegment, session: number) {
-    // Normally the part holds the segment. It also holds the trailing silence that ended it.
-    const current = part ?? { start: segment.start, chunks: [segment.samples], length: segment.samples.length, sent: 0, checked: 0, candidates: [] }
+    // Normally the part holds the segment. It also holds the trailing silence that ended it. A
+    // detector can also report an utterance only when it ends.
+    const current = part ?? open(segment.start, [segment.samples], segment.samples.length)
     const end = Math.min(current.length, segment.start + segment.samples.length - current.start)
+
+    let cuts: number[] = []
+
+    if (utterance) {
+      // The utterance ends here: audio after `end` is the silence that ended it.
+      utterance.length = Math.min(utterance.length, segment.start + segment.samples.length - utterance.start)
+      await updateFocus(true, session)
+
+      if (session !== generation)
+        return false
+    }
 
     if (end > 0 && tracker.segmentation) {
       // The utterance is complete: changes near its end count now, without confirmation.
@@ -373,15 +589,17 @@ export function createStreamingDiarizer(options: StreamingDiarizerOptions): Stre
       if (session !== generation)
         return false
 
-      const rest = splitAll(current, cutsOf(guess.changes.map(change => Math.round(change * SAMPLE_RATE)), guess.windowChange, 0))
+      cuts = cutsOf(guess.changes.map(change => Math.round(change * SAMPLE_RATE)), guess.windowChange, 0)
+    }
+
+    if (end > 0) {
+      const rest = splitAll(current, settle(current, cuts, true).filter(at => at < end))
 
       commit(rest, end - (current.length - rest.length), 'pause')
     }
-    else if (end > 0) {
-      commit(current, end, 'pause')
-    }
 
     part = undefined
+    utterance = undefined
     leadIn = []
     leadInLength = 0
     partial = undefined
@@ -427,24 +645,25 @@ export function createStreamingDiarizer(options: StreamingDiarizerOptions): Stre
         const start = speech.speechStart()
 
         if (start === undefined) {
-          part = { start: until - block.length - leadInLength, chunks: leadIn, length: leadInLength, sent: 0, checked: 0, candidates: [] }
+          part = open(until - block.length - leadInLength, leadIn, leadInLength)
           leadIn = []
           leadInLength = 0
         }
         else {
           // The detector found the start late: the audio since then is in the last 4 s.
-          part = { start: Math.max(start, fed - recentLength), chunks: [], length: 0, sent: 0, checked: 0, candidates: [] }
+          part = open(Math.max(start, fed - recentLength), [], 0)
         }
-
-        partial = { start: part.start / SAMPLE_RATE }
-        hub.emit({ type: 'speech-start', time: part.start / SAMPLE_RATE })
-        showPartial()
       }
 
       const piece = recentAudio(part.start + part.length, until)
 
       part.chunks.push(piece)
       part.length += piece.length
+
+      if (utterance) {
+        utterance.chunks.push(piece)
+        utterance.length += piece.length
+      }
 
       if (part.length - part.checked >= CHECK) {
         const next = await check(part, session)
@@ -458,6 +677,15 @@ export function createStreamingDiarizer(options: StreamingDiarizerOptions): Stre
 
       // The audio goes out while the utterance goes on, for example for live words.
       send(part, part.length)
+
+      if (utterance && utterance.length - utterance.updated >= CHECK) {
+        await updateFocus(false, session)
+
+        if (session !== generation)
+          return
+
+        part = splitAll(part, settle(part, [], false))
+      }
     }
     else if (!part) {
       leadIn.push(block)
@@ -542,6 +770,7 @@ export function createStreamingDiarizer(options: StreamingDiarizerOptions): Stre
       generation++
       await enqueue(async () => {
         turns = []
+        tracked = new Map()
         part = undefined
         leadIn = []
         leadInLength = 0
@@ -549,6 +778,9 @@ export function createStreamingDiarizer(options: StreamingDiarizerOptions): Stre
         recentLength = 0
         fed = 0
         partial = undefined
+        utterance = undefined
+        // The focus speaker can have a voice in the new conversation, for example after `enroll`.
+        unfocused = false
         speech.reset()
         await tracker.reset()
       })

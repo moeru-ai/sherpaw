@@ -118,26 +118,45 @@ function fakeTracker(): SpeakerTracker {
     async speech() {
       return new Float32Array(0)
     },
+    // Cosine 1 for a window of the speaker's voice, 0 for another voice, NaN for silence.
+    async similarity(samples, sampleRate, speaker, options = {}) {
+      const size = Math.round((options.windowSeconds ?? 1) * sampleRate)
+      const step = Math.round((options.stepSeconds ?? 0.25) * sampleRate)
+      const count = samples.length < size ? 0 : Math.floor((samples.length - size) / step) + 1
+
+      return Float32Array.from({ length: count }, (_, i) => {
+        const level = levelOf(samples.subarray(i * step, i * step + size))
+
+        return level === null ? Number.NaN : level === speaker ? 1 : 0
+      })
+    },
     dispose() {},
   }
 }
 
-/** Emits one token per 0.1 s of speech, named after its voice, 0.1 s after the audio. Replies come in a later task. */
-function fakeRecognizer() {
+/** Emits one token per 0.1 s of speech, named after its voice, `lag` seconds after the audio. Replies come in a later task. */
+function fakeRecognizer(lag = 0.1) {
   const tokens: TimedToken[] = []
   let heard = 0
+  // Audio of an unfinished 0.1 s block: like a real recognizer, it waits for the rest.
+  let carry = new Float32Array(0)
 
   return {
     async accept(samples: Float32Array) {
       await new Promise(resolve => setTimeout(resolve, 0))
 
-      for (let at = 0; at + block <= samples.length; at += block) {
-        const level = levelOf(samples.subarray(at, at + block))
+      const audio = join(carry, samples)
+      const start = heard - carry.length
+      let at = 0
+
+      for (; at + block <= audio.length; at += block) {
+        const level = levelOf(audio.subarray(at, at + block))
 
         if (level !== null)
-          tokens.push({ text: ` w${level}`, time: (heard + at) / rate + 0.1 })
+          tokens.push({ text: ` w${level}`, time: (start + at) / rate + lag })
       }
 
+      carry = audio.slice(at)
       heard += samples.length
 
       return ''
@@ -152,8 +171,8 @@ interface Row {
   final: boolean
 }
 
-function setUp(recognizer = fakeRecognizer()) {
-  const diarizer = createStreamingDiarizer({ tracker: fakeTracker(), speech: fakeDetector() })
+function setUp(recognizer = fakeRecognizer(), { focus }: { focus?: number } = {}) {
+  const diarizer = createStreamingDiarizer({ tracker: fakeTracker(), speech: fakeDetector(), ...(focus === undefined ? {} : { focus: { speaker: focus } }) })
   const rows: Row[] = []
   const live: string[] = []
   const transcript = transcribeTurns(diarizer, recognizer, {
@@ -249,5 +268,38 @@ describe('turn transcript', () => {
     await transcript.flush()
 
     expect(rows.map(voicesOf)).toEqual([Array.from({ length: 20 }, () => 2)])
+  })
+
+  it('transcribes only the focus speaker, also right after another voice without a pause', async () => {
+    const { diarizer, transcript, rows } = setUp(fakeRecognizer(0.2), { focus: 1 })
+    const speakers: Array<number | null> = []
+
+    diarizer.on('turn', ({ turn }) => speakers[turn.index] = turn.speaker)
+    // Voice 2 talks, voice 1 follows at once, voice 2 answers after a pause.
+    await feed(diarizer, join(voice(0, 1), voice(2, 2), voice(1, 3), voice(0, 1), voice(2, 2), voice(0, 1)))
+    await diarizer.flush()
+    await transcript.flush()
+
+    const words = rows.flatMap(voicesOf)
+
+    expect(words.every(voice => voice === 1)).toBe(true)
+    // The focus speaker's 3 s give 30 words.
+    expect(words.length).toBeGreaterThanOrEqual(28)
+    expect(rows.filter((_, i) => speakers[i] === 2).every(row => row.text === '')).toBe(true)
+  })
+
+  it('keeps late words in the focus speaker\'s turn', async () => {
+    // The tokens come 0.5 s after their audio, 0.3 s later than the transcript expects.
+    const { diarizer, transcript, rows } = setUp(fakeRecognizer(0.5), { focus: 1 })
+    const speakers: Array<number | null> = []
+
+    diarizer.on('turn', ({ turn }) => speakers[turn.index] = turn.speaker)
+    await feed(diarizer, join(voice(0, 1), voice(1, 2), voice(2, 2), voice(1, 2), voice(0, 1)))
+    await diarizer.flush()
+    await transcript.flush()
+
+    expect(speakers).toEqual([1, 2, 1])
+    expect(rows[1]!.text).toBe('')
+    expect(rows.flatMap(voicesOf).filter(voice => voice === 1)).toHaveLength(40)
   })
 })

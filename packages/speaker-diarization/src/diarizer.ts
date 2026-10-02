@@ -107,6 +107,13 @@ export function createDiarizer(module: SpeakerDiarizationModule, config: NativeD
     if (!diarizer)
       throw new Error('Unable to create speaker diarizer; check that both model files are loaded')
   }
+  catch (error) {
+    // C++ exceptions cannot be caught in this build and reach JavaScript as a pointer.
+    if (typeof error === 'number')
+      throw new Error('Native speaker diarization threw a C++ exception while loading the models')
+
+    throw error
+  }
   finally {
     for (const ptr of pointers)
       module._free(ptr)

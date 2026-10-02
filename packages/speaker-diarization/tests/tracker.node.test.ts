@@ -47,6 +47,23 @@ describe('speaker tracker', () => {
     expect(await tracker.track(audio('betweenOwnerAndOther', 2), 16000)).toMatchObject({ speaker: owner + 2, pending: true })
   })
 
+  it('compares windows of audio with a speaker\'s voice', async () => {
+    const tracker = createSpeakerTracker(extractor)
+    const owner = tracker.enroll(audio('owner', 6), 16000)
+    const samples = new Float32Array(4 * 16000)
+
+    // 2 s of the owner, then 2 s of a voice at cosine 0.35 to the owner.
+    samples.set(audio('owner', 2))
+    samples.set(audio('nearOwner', 2), 2 * 16000)
+
+    const cosines = tracker.similarity(samples, 16000, owner, { windowSeconds: 1, stepSeconds: 0.5 })
+
+    // A window takes the voice of its first sample in the fake extractor.
+    expect([...cosines].map(cosine => Number(cosine.toFixed(2)))).toEqual([1, 1, 1, 1, 0.35, 0.35, 0.35])
+    expect(() => tracker.similarity(samples, 16000, owner + 1)).toThrow('no voice')
+    expect(() => tracker.similarity(samples, 16000, owner, { windowSeconds: 0.1 })).toThrow('windowSeconds')
+  })
+
   it('lets a new voice borrow the number of a similar speaker who is not enrolled', async () => {
     const tracker = createSpeakerTracker(extractor)
 
