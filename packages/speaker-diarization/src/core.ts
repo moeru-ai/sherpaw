@@ -2,7 +2,7 @@ export type { NativeDiarizer as Diarizer, NativeDiarizerConfig as DiarizerConfig
 export type { Segment } from './segmentation'
 export type { SpeechDetector, SpeechDetectorOptions, SpeechSegment, SpeechSource } from './speech-detector'
 export type { NativeSpeakerTracker as SpeakerTracker, NativeSpeakerTrackerConfig as SpeakerTrackerConfig } from './tracker'
-export type { Clustering, DiarizationModel, PeekOptions, SegmentationOptions, SimilarityOptions, SpeakerConfidence, SpeakerGuess, SpeakerMap, SpeakerMapSpeaker, SpeakerMapUnit, SpeakerRevision, SpeakerSegment, SpeakerTrackerResetOptions, SpeakerTrackerTuning, SpeakerTurn } from './types'
+export type { Clustering, DiarizationModel, EnrollOptions, PeekOptions, SegmentationOptions, SimilarityOptions, SpeakerConfidence, SpeakerGuess, SpeakerMap, SpeakerMapSpeaker, SpeakerMapUnit, SpeakerRevision, SpeakerSegment, SpeakerTrackerResetOptions, SpeakerTrackerTuning, SpeakerTurn } from './types'
 export type { SpeakerDiarizationModule } from './wasm'
 
 export { createDiarizer } from './diarizer'

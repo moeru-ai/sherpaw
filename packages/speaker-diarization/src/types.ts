@@ -215,10 +215,18 @@ export interface SpeakerMapUnit {
 
 export interface SpeakerMapSpeaker {
   speaker: number
-  /** The reference is the enrolled embedding, which never moves. */
+  /** The reference is the enrolled embedding. Tracking does not move it; only `enroll` with this speaker does. */
   enrolled: boolean
   /** Unit-length speaker embedding. Clusters take this speaker's number at a cosine of at least `matchThreshold` (`enrollThreshold` when enrolled). */
   embedding: Float32Array
+}
+
+export interface EnrollOptions {
+  /**
+   * Adds the speech to this enrolled speaker instead of enrolling a new person. Their embedding
+   * then comes from all of their enrollment speech. Rejects speech below `enrollThreshold` to them.
+   */
+  speaker?: number
 }
 
 export interface SimilarityOptions {
@@ -253,7 +261,7 @@ export interface SpeakerTracker {
    * Enroll before tracking: a speaker who is already tracked keeps their tracked number until the
    * next `reset`. Pass speech only. Long silence weakens the embedding. Copies the samples.
    */
-  enroll: (samples: Float32Array, sampleRate: number) => Promise<number>
+  enroll: (samples: Float32Array, sampleRate: number, options?: EnrollOptions) => Promise<number>
   /** Copies of the embeddings that the tracker clusters and compares, for example to plot them. Changes nothing. */
   inspect: () => Promise<SpeakerMap>
   /**

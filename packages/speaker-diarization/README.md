@@ -82,7 +82,7 @@ How it works:
 
 Optional features:
 
-- **Known speakers.** `enroll(speech, 16000)` adds a person, for example the owner of a device, from at least 5 seconds of their speech. Their utterances get that number from the first one. `enroll` rejects audio with more than one voice. In meetings and conversations, enrolled people got their number in 78%–93% of their utterances.
+- **Known speakers.** `enroll(speech, 16000)` adds a person, for example the owner of a device, from at least 5 seconds of their speech. Their utterances get that number from the first one. `enroll` rejects audio with more than one voice. `enroll(speech, 16000, { speaker })` adds more speech to an enrolled person, and rejects speech that does not sound like them. In meetings and conversations, enrolled people got their number in 78%–93% of their utterances.
 - **Voice similarity.** `similarity(speech, 16000, speaker)` compares each 1-second window of the audio with a known speaker's voice. The streaming diarizer uses it for `focus`.
 - **Segmentation model.** Pass pyannote segmentation-3.0 as `segmentation` and install the optional peer dependency `onnxruntime-web`. For 16 kHz audio, `peek` then finds speaker changes frame by frame, so more short turns get their own label. `track` also flags utterances where two people talk at once (`overlap`). The runtime and the model add a 19.5 MB download.
 - **Speech detection.** With the segmentation model, `createSpeechDetector` finds utterances in place of a VAD. Use it where Silero VAD misses speech, such as films with music. On films, it found 80%–83% of the speech instead of 61%–70%, with about the same false alarms. Utterances end 0.5–1.25 seconds later than with a VAD.

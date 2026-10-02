@@ -29,7 +29,6 @@ import { startMicrophone } from '../features/audio/microphone'
 
 import { loadTrackerModels } from '../features/speaker-diarization/models'
 import { review, reviewerNames } from '../features/speaker-diarization/review'
-import { cosine } from '../features/speaker-diarization/speaker-map'
 import SpeakerMapView from '../features/speaker-diarization/SpeakerMapView.vue'
 import { speechDetectionOptions } from '../features/speaker-diarization/speech-detectors'
 import { changeDetectionDescriptions, embeddingOptions, parameterGroups, presetOptions, presetParameters, presets, speechThresholds, trackerTuning, transcriptDescriptions } from '../features/speaker-diarization/tracker-settings'
@@ -60,14 +59,14 @@ interface Utterance {
 interface KnownSpeaker {
   speaker: number
   name: string
-  /** The enrolled speech, kept to enroll the person again after a reset. */
-  samples: Float32Array
+  /** The enrollment recordings, in order, kept to enroll the person again in a new tracker. */
+  recordings: Float32Array[]
 }
 
 const sampleRate = 16000
 const minEnrollSeconds = 5
 const maxEnrollSeconds = 30
-/** The page keeps at most this much enrollment speech per known person when more speech comes. */
+/** For a new tracker, the page keeps the latest recordings of a known person up to this much speech. */
 const maxKeptSeconds = 60
 const colors = ['#2f6f9f', '#c2410c', '#15803d', '#7e22ce', '#b45309', '#0e7490', '#be123c', '#4d7c0f']
 // Streaming transducers with endpoint detection. Each utterance ends with a final result. `none` turns
@@ -333,8 +332,12 @@ async function setupTracking() {
 
   activeDetection = speechDetection.value === 'segmentation' && models.segmentation ? 'segmentation' : 'silero'
 
-  for (const entry of known.value)
-    entry.speaker = await tracker.enroll(entry.samples, sampleRate)
+  for (const entry of known.value) {
+    entry.speaker = await tracker.enroll(entry.recordings[0]!, sampleRate)
+
+    for (const recording of entry.recordings.slice(1))
+      await tracker.enroll(recording, sampleRate, { speaker: entry.speaker })
+  }
 
   segmenting.value = !!models.segmentation
   applied.value = JSON.stringify([parameters.value, embeddingModel.value, changeDetection.value, speechDetection.value])
@@ -400,15 +403,23 @@ async function enroll(samples: Float32Array) {
 
   try {
     if (existing) {
-      await addToKnown(existing, samples)
-      message.value = `Added this voice to ${name}. A new session started, so that the tracker recognizes ${name} from the start.`
+      // The tracker rejects speech that does not sound like the person.
+      await tracker!.enroll(samples, sampleRate, { speaker: existing.speaker }).catch((cause: unknown) => {
+        throw new Error(`Not added to ${name}. ${cause instanceof Error ? cause.message : String(cause)}`)
+      })
+      existing.recordings.push(samples)
+
+      while (existing.recordings.length > 1 && seconds(existing) > maxKeptSeconds)
+        existing.recordings.shift()
+
+      message.value = `Added this voice to ${name}. Later utterances use it.`
 
       return
     }
 
     const speaker = await tracker!.enroll(samples, sampleRate)
 
-    known.value.push({ speaker, name: name || `Speaker ${speaker + 1}`, samples })
+    known.value.push({ speaker, name: name || `Speaker ${speaker + 1}`, recordings: [samples] })
     message.value = `Enrolled ${name || `Speaker ${speaker + 1}`}. Rows already shown keep their labels. Start a new session to use the name from the start.`
   }
   catch (cause) {
@@ -416,50 +427,9 @@ async function enroll(samples: Float32Array) {
   }
 }
 
-/**
- * More speech of a known person: one enrollment from all of their audio, instead of a second person
- * with the same name. The tracker enrolls everyone again, so the session restarts.
- */
-async function addToKnown(entry: KnownSpeaker, samples: Float32Array) {
-  // A trial enrollment of the new audio alone, to compare it with the person. The combined audio keeps
-  // only its main voice. So the enrollment would drop another voice, or use it instead if it is longer.
-  const trial = await tracker!.enroll(samples, sampleRate)
-  const earlier = entry.samples
-  let similarity = 0
-
-  try {
-    const { speakers } = await tracker!.inspect()
-    const embedding = (speaker: number) => speakers.find(item => item.speaker === speaker)!.embedding
-
-    similarity = cosine(embedding(entry.speaker), embedding(trial))
-
-    if (similarity >= active.enrollThreshold)
-      entry.samples = concat([earlier, samples]).slice(-maxKeptSeconds * sampleRate)
-
-    // Enrolling everyone again also removes the trial enrollment.
-    await enrollKnown()
-  }
-  catch (cause) {
-    entry.samples = earlier
-    await enrollKnown()
-    throw cause
-  }
-  finally {
-    await newSession()
-    // The caller replaces this message when the new audio becomes part of the enrollment.
-    message.value = `${entry.name} keeps the earlier enrollment. A new session started.`
-  }
-
-  if (entry.samples === earlier)
-    throw new Error(`This voice does not sound like ${entry.name}: the similarity is ${similarity.toFixed(2)}, below the known speaker threshold ${active.enrollThreshold}. Enroll it under another name.`)
-}
-
-/** Enrolls every known person again, numbered 0, 1, ... in list order. */
-async function enrollKnown() {
-  await tracker!.reset({ forgetEnrolled: true })
-
-  for (const entry of known.value)
-    entry.speaker = await tracker!.enroll(entry.samples, sampleRate)
+/** Seconds of enrollment speech that the page keeps for a known person. */
+function seconds(entry: KnownSpeaker) {
+  return entry.recordings.reduce((sum, recording) => sum + recording.length, 0) / sampleRate
 }
 
 /** The enrollment buttons add to a known person when a known person already has the name. */
@@ -951,7 +921,7 @@ onBeforeUnmount(dispose)
                 <div flex="~ wrap gap-1.5" text-sm>
                   <span v-if="!known.length" text-neutral-500>None yet.</span>
                   <span v-for="entry in known" :key="entry.speaker" rounded-full px-2 py-0.5 text-white :style="{ background: color(entry.speaker) }">
-                    {{ entry.name }} · {{ (entry.samples.length / sampleRate).toFixed(0) }} s
+                    {{ entry.name }} · {{ seconds(entry).toFixed(0) }} s
                   </span>
                 </div>
                 <SelectField

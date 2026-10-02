@@ -2,7 +2,7 @@ import type { Extractor } from '@sherpaw/speaker-identification'
 
 import type { ClusteringOptions } from './clustering'
 import type { Segment } from './segmentation'
-import type { SimilarityOptions, SpeakerConfidence, SpeakerGuess, SpeakerMap, SpeakerRevision, SpeakerTrackerResetOptions, SpeakerTrackerTuning, SpeakerTurn } from './types'
+import type { EnrollOptions, SimilarityOptions, SpeakerConfidence, SpeakerGuess, SpeakerMap, SpeakerRevision, SpeakerTrackerResetOptions, SpeakerTrackerTuning, SpeakerTurn } from './types'
 
 import { centroid, clusterEmbeddings, dot, maximumAssignment, normalize } from './clustering'
 import { decode, findChanges, MIN_SEGMENTATION_SAMPLES, overlapSeconds, SEGMENTATION_SAMPLE_RATE } from './segmentation'
@@ -24,8 +24,8 @@ export interface NativeSpeakerTracker {
   track: (samples: Float32Array, sampleRate: number) => Promise<SpeakerTurn>
   /** Guesses the nearest established speaker and finds speaker changes without changing any state. */
   peek: (samples: Float32Array, sampleRate: number, options?: { final?: boolean }) => Promise<SpeakerGuess>
-  /** Adds a known speaker from at least 5 s of their speech and returns their speaker number. */
-  enroll: (samples: Float32Array, sampleRate: number) => number
+  /** Adds a known speaker from at least 5 s of their speech, or adds the speech to `options.speaker`, and returns their speaker number. */
+  enroll: (samples: Float32Array, sampleRate: number, options?: EnrollOptions) => number
   /** Copies of the recently clustered units and the numbered speakers' references. Changes nothing. */
   inspect: () => SpeakerMap
   /** Per segmentation frame of at most 10 s of 16 kHz audio: the probability that anyone speaks. Needs `segment`. */
@@ -107,8 +107,10 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
   let pendingClusters = new Map<number, Set<number>>()
   let numbers = new Map<number, number>()
   let nextNumber = 0
-  /** Enrolled speakers by id. The tracker compares clusters with this embedding, which never changes. */
+  /** Enrolled speakers by id. The tracker compares clusters with this embedding. Only `enroll` changes it. */
   let anchors = new Map<number, Float32Array>()
+  /** Seconds of enrollment speech behind each enrolled embedding. */
+  let enrolledSeconds = new Map<number, number>()
   /** Per utterance: the id last reported, or undefined for utterances without units. */
   let reported: Array<number | undefined> = []
   /** Per utterance: a different id seen in consecutive clustering runs, and how many times. */
@@ -126,8 +128,10 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
     candidates = []
     previous = -1
 
-    if (forgetEnrolled)
+    if (forgetEnrolled) {
       anchors = new Map()
+      enrolledSeconds = new Map()
+    }
 
     // Enrolled speakers start the new session from their enrolled embedding, numbered 0, 1, ... in
     // enrollment order. Other speakers follow them.
@@ -570,11 +574,16 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
       return { speaker: numbers.get(id) ?? null, score: value, confidence: level(value), changes, ...(windowChange === undefined ? {} : { windowChange }) }
     },
 
-    enroll(samples, sampleRate) {
+    enroll(samples, sampleRate, options = {}) {
       validate(samples, sampleRate)
 
       if (samples.length < MIN_ENROLL_SECONDS * sampleRate)
         throw new RangeError(`Enrollment needs at least ${MIN_ENROLL_SECONDS} s of speech`)
+
+      const id = options.speaker === undefined ? undefined : [...numbers].find(([, value]) => value === options.speaker)?.[0]
+
+      if (options.speaker !== undefined && (id === undefined || !anchors.has(id)))
+        throw new RangeError(`Speaker ${options.speaker} is not enrolled`)
 
       // Group the 1.5 s windows by voice. The largest group makes the enrolled embedding.
       const length = Math.round(WINDOW_SECONDS * sampleRate)
@@ -613,13 +622,36 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
 
       const main = samples.filter((_, i) => kept[i] === 1)
       const embedding = embed(main, sampleRate) ?? centroid(windows, [...groups.keys()].filter(i => groups[i] === largest))
+      const seconds = main.length / sampleRate
 
-      const id = nextId++
+      if (id === undefined) {
+        const added = nextId++
 
-      anchors.set(id, embedding)
-      profiles.set(id, embedding)
+        anchors.set(added, embedding)
+        enrolledSeconds.set(added, seconds)
+        profiles.set(added, embedding)
 
-      return number(id)!
+        return number(added)!
+      }
+
+      const earlier = anchors.get(id)!
+      const cosine = dot(earlier, embedding)
+
+      if (cosine < tuning.enrollThreshold)
+        throw new Error(`The speech does not sound like speaker ${options.speaker}: the cosine is ${cosine.toFixed(2)}, below enrollThreshold ${tuning.enrollThreshold}.`)
+
+      // The mean of the enrollment embeddings, weighted by seconds of speech, as with several
+      // enrollment recordings in speaker verification.
+      const total = enrolledSeconds.get(id)! + seconds
+      const combined = normalize(earlier.map((value, i) => (value * (total - seconds) + embedding[i]! * seconds) / total))
+
+      anchors.set(id, combined)
+      enrolledSeconds.set(id, total)
+
+      if (profiles.get(id) === earlier)
+        profiles.set(id, combined)
+
+      return options.speaker!
     },
 
     async speech(samples, sampleRate) {

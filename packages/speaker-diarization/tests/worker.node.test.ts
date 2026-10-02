@@ -205,6 +205,16 @@ describe('published Node worker', () => {
       enrollment.set(b, a.length)
       expect(await tracker.enroll(enrollment, 16000)).toBe(0)
 
+      // More speech joins an enrollment only when it sounds like the person. The same speech again changes nothing.
+      const [c, d, e] = [5, 6, 7].map(index => utterance(reference[index]!))
+      const other = new Float32Array(c!.length + d!.length + e!.length)
+
+      other.set(c!)
+      other.set(d!, c!.length)
+      other.set(e!, c!.length + d!.length)
+      await expect(tracker.enroll(other, 16000, { speaker: 0 })).rejects.toThrow('does not sound like speaker 0')
+      expect(await tracker.enroll(enrollment, 16000, { speaker: 0 })).toBe(0)
+
       const turns = []
 
       for (const segment of reference)
