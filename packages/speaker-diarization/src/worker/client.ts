@@ -140,12 +140,12 @@ export async function createWorkerSpeakerTracker<Options>(context: EventContext<
       return peek({ samples: copy, sampleRate, final: options?.final }, { transfer: [copy.buffer] })
     },
 
-    async enroll(samples, sampleRate) {
+    async enroll(samples, sampleRate, options) {
       context.signal.throwIfAborted()
 
       const copy = copySamples(samples)
 
-      return enroll({ samples: copy, sampleRate }, { transfer: [copy.buffer] })
+      return enroll({ samples: copy, sampleRate, ...(options ? { options } : {}) }, { transfer: [copy.buffer] })
     },
 
     async inspect() {

@@ -47,6 +47,31 @@ describe('speaker tracker', () => {
     expect(await tracker.track(audio('betweenOwnerAndOther', 2), 16000)).toMatchObject({ speaker: owner + 2, pending: true })
   })
 
+  it('adds speech to an enrolled speaker only when it sounds like them', async () => {
+    const tracker = createSpeakerTracker(extractor)
+    const owner = tracker.enroll(audio('owner', 6), 16000)
+
+    // Cosine 0.35, below `enrollThreshold` (0.4).
+    expect(() => tracker.enroll(audio('nearOwner', 6), 16000, { speaker: owner })).toThrow('does not sound like speaker 0')
+    expect(() => tracker.enroll(audio('owner', 6), 16000, { speaker: owner + 1 })).toThrow('not enrolled')
+    expect(tracker.enroll(audio('owner', 6), 16000, { speaker: owner })).toBe(owner)
+    expect(tracker.inspect().speakers).toHaveLength(1)
+    expect(tracker.inspect().speakers[0]!.embedding[0]).toBeCloseTo(1, 5)
+  })
+
+  it('weights the enrollment speech by its seconds', async () => {
+    const tracker = createSpeakerTracker(extractor, { tuning: { enrollThreshold: 0.3 } })
+    const owner = tracker.enroll(audio('owner', 12), 16000)
+
+    tracker.enroll(audio('nearOwner', 6), 16000, { speaker: owner })
+
+    // 12 s of [1, 0, 0, 0] and 6 s of [0.35, 0.94, 0, 0].
+    const [x, y] = tracker.inspect().speakers[0]!.embedding
+    const mean = [(12 + 6 * 0.35) / 18, (6 * Math.sqrt(1 - 0.35 ** 2)) / 18]
+
+    expect(x! / y!).toBeCloseTo(mean[0]! / mean[1]!, 4)
+  })
+
   it('compares windows of audio with a speaker\'s voice', async () => {
     const tracker = createSpeakerTracker(extractor)
     const owner = tracker.enroll(audio('owner', 6), 16000)
