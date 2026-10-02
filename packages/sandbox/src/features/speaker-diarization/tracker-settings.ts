@@ -121,7 +121,7 @@ export const parameterGroups: Array<{ title: string, fields: ParameterField[] }>
       { key: 'matchThreshold', label: 'Match threshold', help: 'How similar a voice must be to keep a speaker\'s number.', step: 0.05, min: 0, max: 1 },
       { key: 'enrollThreshold', label: 'Known speaker threshold', help: 'Raise it if a new person gets a known speaker\'s name.', step: 0.05, min: 0, max: 1 },
       { key: 'establishedSeconds', label: 'Speech to establish a speaker', help: 'Until then, a new voice shows "new speaker?".', step: 0.5, min: 0, max: 30, unit: ' s' },
-      { key: 'borrowThreshold', label: 'Borrow threshold', help: 'A new voice this similar to a speaker shows that speaker at first. Raise it to see new numbers sooner. A value of 1 turns it off.', step: 0.05, min: 0, max: 1 },
+      { key: 'borrowThreshold', label: 'Borrow threshold', help: 'A new voice this similar to a speaker shows that speaker at first, but never a known speaker. Raise it to see new numbers sooner. A value of 1 turns it off.', step: 0.05, min: 0, max: 1 },
       { key: 'nearestThreshold', label: 'Nearest-speaker threshold', help: 'Utterances under 1 s take the nearest speaker if at least this similar.', step: 0.05, min: 0, max: 1 },
       { key: 'maxSpeakers', label: 'Maximum speakers', help: 'The most speakers that the tracker looks for in the recent audio.', step: 1, min: 1, max: 30 },
     ],

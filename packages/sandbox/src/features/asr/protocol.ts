@@ -1,4 +1,4 @@
-import type { StreamingRecognizer } from '@sherpaw/asr'
+import type { StreamingRecognizer, TimedToken } from '@sherpaw/asr'
 
 import { defineEventa, defineInvokeEventa } from '@moeru/eventa'
 
@@ -16,5 +16,15 @@ export type RecognizerRequest
     | { kind: 'accept', samples: Float32Array }
     | { kind: 'finish' | 'dispose' }
 
-export const operation = defineInvokeEventa<string, RecognizerRequest>('sherpaw:asr:operation')
+/**
+ * The text after a request, and the tokens from index `from` on. Tokens before `from` did not change
+ * since the previous reply, so the reply leaves them out.
+ */
+export interface RecognizerReply {
+  text: string
+  from: number
+  tokens: TimedToken[]
+}
+
+export const operation = defineInvokeEventa<RecognizerReply, RecognizerRequest>('sherpaw:asr:operation')
 export const progress = defineEventa<string>('sherpaw:asr:progress')

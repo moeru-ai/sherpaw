@@ -13,7 +13,7 @@ vi.mock('./asr', async original => ({
 const module = {} as WebAssemblyModule
 function nativeFixture() {
   let ready = false
-  let partial = ''
+  let result: Record<string, unknown> = { text: '' }
   const stream = {
     handle: 1,
     acceptWaveform: vi.fn((_rate: number, _samples: Float32Array) => { ready = true }),
@@ -26,14 +26,16 @@ function nativeFixture() {
     createStream: () => stream,
     isReady: () => ready,
     decode: vi.fn(() => { ready = false }),
-    getResult: () => ({ text: partial }),
+    getResult: () => result,
     isEndpoint: vi.fn(() => false),
     reset: vi.fn(),
     free: vi.fn(),
   }
   vi.mocked(createOnlineRecognizer).mockReturnValue(native as unknown as ReturnType<typeof createOnlineRecognizer>)
   return { native, stream, setText: (text: string) => {
-    partial = text
+    result = { text }
+  }, setResult: (next: Record<string, unknown>) => {
+    result = next
   } }
 }
 
@@ -113,4 +115,20 @@ it('cleans up the recognizer and backend when native stream creation fails', asy
   await expect(createStreamingRecognizer(module, undefined, backend)).rejects.toThrow('Failed to create the online stream')
   expect(native.free).toHaveBeenCalledOnce()
   expect(backend.dispose).toHaveBeenCalledOnce()
+})
+
+it('keeps token times across endpoints and reports none without timestamps', async () => {
+  const { native, setResult } = nativeFixture()
+  const session = await createStreamingRecognizer(module)
+  // Times count from the stream start: start_time is where the current segment begins.
+  setResult({ text: '你好', tokens: [' 你', ' 好'], timestamps: [0.4, 0.6], start_time: 0 })
+  native.isEndpoint.mockReturnValueOnce(true)
+  await session.accept(new Float32Array(320))
+  setResult({ text: 'hello', tokens: [' hel', 'lo'], timestamps: [0.2, 0.32], start_time: 3 })
+  await session.accept(new Float32Array(320))
+  expect(session.tokens()).toEqual([{ text: ' 你', time: 0.4 }, { text: ' 好', time: 0.6 }, { text: ' hel', time: 3.2 }, { text: 'lo', time: 3.32 }])
+  setResult({ text: 'hello' })
+  await session.accept(new Float32Array(320))
+  expect(session.tokens()).toEqual([{ text: ' 你', time: 0.4 }, { text: ' 好', time: 0.6 }])
+  await session.dispose()
 })

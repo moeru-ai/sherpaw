@@ -13,7 +13,7 @@ const ortAssets = gpuAssets.length
   : []
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/webgpu.ts'],
+  entry: ['src/index.ts', 'src/tokens.ts', 'src/webgpu.ts'],
   copy: [
     'src/asr.d.ts',
     { from: 'src/prebuilt/asr.wasm', to: 'dist/prebuilt/asr.wasm' },

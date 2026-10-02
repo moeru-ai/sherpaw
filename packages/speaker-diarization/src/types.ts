@@ -107,8 +107,9 @@ export interface SpeakerTrackerTuning {
   establishedSeconds: number
   /**
    * A pending cluster this close to an established speaker shows that speaker instead of a new
-   * number. Default: 0.3. On AMI utterances cut at speaker changes, this value reduced the extra
-   * speaker numbers per recording from 4.6 to 2.7. On AliMeeting, it reduced them from 3.8 to 0.9.
+   * number. It never shows an enrolled speaker. Default: 0.3. On AMI utterances cut at speaker
+   * changes, this value reduced the extra speaker numbers per recording from 4.6 to 2.7. On
+   * AliMeeting, it reduced them from 3.8 to 0.9.
    */
   borrowThreshold: number
   /** Utterances shorter than 1 second and `peek` guesses take the nearest speaker at this cosine. Default: 0.3. */
