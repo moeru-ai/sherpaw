@@ -31,7 +31,7 @@ import { loadTrackerModels } from '../features/speaker-diarization/models'
 import { review, reviewerNames } from '../features/speaker-diarization/review'
 import SpeakerMapView from '../features/speaker-diarization/SpeakerMapView.vue'
 import { speechDetectionOptions } from '../features/speaker-diarization/speech-detectors'
-import { changeDetectionDescriptions, embeddingOptions, parameterGroups, presetOptions, presetParameters, presets, speechThresholds, trackerTuning, transcriptDescriptions } from '../features/speaker-diarization/tracker-settings'
+import { basicFields, changeDetectionDescriptions, embeddingOptions, parameterGroups, presetOptions, presetParameters, presets, speechThresholds, trackerTuning, transcriptDescriptions } from '../features/speaker-diarization/tracker-settings'
 import { transcribeTurns } from '../features/speaker-diarization/transcript'
 
 interface Utterance {
@@ -122,6 +122,8 @@ const preview = ref<{ guess?: ConversationPartial['guess'], transcript: string }
 /** Which side panels are open. This browser keeps the choice. The right panel starts closed on narrow screens. */
 const settingsOpen = useLocalStorage('sherpaw:speaker-tracking:settings-open', true)
 const insightsOpen = useLocalStorage('sherpaw:speaker-tracking:insights-open', typeof window === 'undefined' || window.innerWidth >= 1280)
+/** Whether the advanced settings are open. This browser keeps the choice. */
+const advancedOpen = useLocalStorage('sherpaw:speaker-tracking:advanced-open', false)
 /** The tab of the right panel. The page gets the speaker map from the tracker only while the map shows. */
 const insightTab = ref<'map' | 'review'>('map')
 const insightTabs = [{ value: 'map', label: 'Speaker map' }, { value: 'review', label: 'Review' }]
@@ -874,43 +876,60 @@ onBeforeUnmount(dispose)
                 </h2>
                 <RadioCards v-model="preset" label="Use case" :options="presetOptions" :disabled="!!busy || listening" description="A preset sets the models and parameters below. Changing any of them switches to Custom." />
               </section>
-              <section flex="~ col gap-4" aria-labelledby="models-heading">
-                <h2 id="models-heading" text-xs font-bold uppercase tracking-wider text-neutral-500>
-                  Models
+              <section flex="~ col gap-4" aria-labelledby="basic-heading">
+                <h2 id="basic-heading" text-xs font-bold uppercase tracking-wider text-neutral-500>
+                  Settings
                 </h2>
                 <SelectField
                   v-model="asrModel" label="Transcripts" :options="transcriptOptions" :disabled="ready || !!busy"
                   :description="`${transcriptDescriptions[asrModel] ?? ''} To change it later, reload the page.`"
                 />
-                <RadioCards
-                  v-model="embeddingModel" label="Speaker embedding" :options="embeddingOptions" :disabled="!!busy || listening"
-                  description="Changing the model resets the parameters below to the preset's values for it."
-                />
-                <SwitchField
-                  v-model="useSegmentation" label="Segmentation model" :disabled="!!busy || listening"
-                  :description="changeDetectionDescriptions[changeDetection]"
-                />
-                <RadioCards
-                  :model-value="speechDetection" label="Speech detection" :options="speechDetectionOptions" :disabled="!!busy || listening || !useSegmentation"
-                  :description="useSegmentation ? undefined : 'Turn on the segmentation model to use it.'"
-                  @update:model-value="chooseDetection"
-                />
-                <p text-xs text-neutral-500>
-                  Downloads: VAD 2.3 MB · speaker embedding {{ embeddingModel === 'campplus' ? 28 : 71 }} MB{{ useSegmentation ? ' · segmentation 20 MB' : '' }}.
-                </p>
-              </section>
-              <section v-for="group in parameterGroups" :key="group.title" flex="~ col gap-4" :aria-label="group.title">
-                <h2 text-xs font-bold uppercase tracking-wider text-neutral-500>
-                  {{ group.title }}
-                </h2>
                 <ParameterSlider
-                  v-for="field in group.fields" :key="field.key" v-model="parameters[field.key]"
+                  v-for="field in basicFields" :key="field.key" v-model="parameters[field.key]"
                   :label="field.label" :help="field.help" :min="field.min" :max="field.max" :step="field.step" :unit="field.unit"
-                  :default-value="defaults[field.key]"
-                  :disabled="!!busy || listening || (field.segmentation && !useSegmentation) || (field.silero && speechDetection !== 'silero')"
-                  :disabled-reason="field.segmentation && !useSegmentation ? 'Needs the segmentation model.' : field.silero && speechDetection !== 'silero' ? 'Only Silero VAD uses it.' : undefined"
+                  :default-value="defaults[field.key]" :disabled="!!busy || listening"
                 />
               </section>
+              <details :open="advancedOpen" @toggle="advancedOpen = ($event.target as HTMLDetailsElement).open">
+                <summary cursor-pointer text-xs font-bold uppercase tracking-wider text-neutral-500>
+                  Advanced settings
+                </summary>
+                <div mt-4 flex="~ col gap-7">
+                  <section flex="~ col gap-4" aria-labelledby="models-heading">
+                    <h2 id="models-heading" text-xs font-bold uppercase tracking-wider text-neutral-500>
+                      Models
+                    </h2>
+                    <RadioCards
+                      v-model="embeddingModel" label="Speaker embedding" :options="embeddingOptions" :disabled="!!busy || listening"
+                      description="Changing the model resets the parameters to the preset's values for it."
+                    />
+                    <SwitchField
+                      v-model="useSegmentation" label="Segmentation model" :disabled="!!busy || listening"
+                      :description="changeDetectionDescriptions[changeDetection]"
+                    />
+                    <RadioCards
+                      :model-value="speechDetection" label="Speech detection" :options="speechDetectionOptions" :disabled="!!busy || listening || !useSegmentation"
+                      :description="useSegmentation ? undefined : 'Turn on the segmentation model to use it.'"
+                      @update:model-value="chooseDetection"
+                    />
+                    <p text-xs text-neutral-500>
+                      Downloads: VAD 2.3 MB · speaker embedding {{ embeddingModel === 'campplus' ? 28 : 71 }} MB{{ useSegmentation ? ' · segmentation 20 MB' : '' }}.
+                    </p>
+                  </section>
+                  <section v-for="group in parameterGroups" :key="group.title" flex="~ col gap-4" :aria-label="group.title">
+                    <h2 text-xs font-bold uppercase tracking-wider text-neutral-500>
+                      {{ group.title }}
+                    </h2>
+                    <ParameterSlider
+                      v-for="field in group.fields" :key="field.key" v-model="parameters[field.key]"
+                      :label="field.label" :help="field.help" :min="field.min" :max="field.max" :step="field.step" :unit="field.unit"
+                      :default-value="defaults[field.key]"
+                      :disabled="!!busy || listening || (field.segmentation && !useSegmentation) || (field.silero && speechDetection !== 'silero')"
+                      :disabled-reason="field.segmentation && !useSegmentation ? 'Needs the segmentation model.' : field.silero && speechDetection !== 'silero' ? 'Only Silero VAD uses it.' : undefined"
+                    />
+                  </section>
+                </div>
+              </details>
               <section flex="~ col gap-3" aria-labelledby="known-heading">
                 <h2 id="known-heading" text-xs font-bold uppercase tracking-wider text-neutral-500>
                   Known speakers

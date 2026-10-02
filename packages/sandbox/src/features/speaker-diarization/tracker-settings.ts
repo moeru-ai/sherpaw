@@ -70,9 +70,13 @@ export const presetOptions: Array<{ value: Preset | 'custom', title: string, det
  * existing speaker's number 29%–70% of the time, without "new speaker?". Without borrowing, this
  * happened 18%–62% of the time. The cost was 1.5–2.6 more numbers per recording. The speech time
  * with the right label stayed the same (±1 point).
+ *
+ * The Conversation preset ends an utterance after 0.3 s of silence instead of 0.5 s. In two-person
+ * meetings, a turn boundary then marked 60% instead of 55% of the speaker changes with gaps under
+ * 0.5 s, and there were 12 instead of 23 false cuts in 15 minutes.
  */
 export const presets: Record<Preset, { speechDetection: SpeechDetection, useSegmentation: boolean, overrides: Partial<TrackingParameters> }> = {
-  conversation: { speechDetection: 'silero', useSegmentation: true, overrides: { borrowThreshold: 1 } },
+  conversation: { speechDetection: 'silero', useSegmentation: true, overrides: { borrowThreshold: 1, vadSilence: 0.3 } },
   media: { speechDetection: 'segmentation', useSegmentation: true, overrides: { borrowThreshold: 1 } },
 }
 
@@ -97,19 +101,26 @@ export interface ParameterField {
 
 // Similarities are cosines between speaker embeddings. The library accepts -1 to 1; the sliders
 // cover 0 to 1, where all useful values are.
+
+/** The settings that change the results the most in conversations. The page always shows them. */
+export const basicFields: ParameterField[] = [
+  { key: 'vadSilence', label: 'Silence to end an utterance', help: 'Shorter values end utterances at shorter pauses, so quick exchanges split between the speakers. Very short values also split one person\'s sentences.', step: 0.05, min: 0.1, max: 2, unit: ' s' },
+  { key: 'changeThreshold', label: 'Speaker change sensitivity', help: 'Higher values find more quick speaker changes inside an utterance, but also cut one person\'s speech more often.', step: 0.05, min: 0, max: 1 },
+  { key: 'clusterThreshold', label: 'Similar voice separation', help: 'Higher values keep similar voices apart, but can give one person two numbers.', step: 0.05, min: 0, max: 1 },
+]
+
+/** The other settings, under "Advanced settings". */
 export const parameterGroups: Array<{ title: string, fields: ParameterField[] }> = [
   {
     title: 'Speech detection',
     fields: [
       { key: 'vadThreshold', label: 'Speech threshold', help: 'Raise it if music or noise starts utterances. Lower it if the page misses quiet speech.', step: 0.05, min: 0.05, max: 0.95 },
-      { key: 'vadSilence', label: 'Silence to end an utterance', help: 'Shorter values split quick exchanges into more utterances.', step: 0.05, min: 0.1, max: 2, unit: ' s' },
       { key: 'leadInSeconds', label: 'Audio before speech', help: 'Silero VAD reports speech up to about 1 s late. Each turn keeps this much audio from before that point. Lower values can drop the first words.', step: 0.05, min: 0, max: 2, unit: ' s', silero: true },
     ],
   },
   {
     title: 'Speaker changes',
     fields: [
-      { key: 'changeThreshold', label: 'Window change threshold', help: 'Raise it to find more changes. Lower it to cut less often.', step: 0.05, min: 0, max: 1 },
       { key: 'minPieceSeconds', label: 'Minimum gap between cuts', help: 'The page ignores a cut closer than this to the previous cut.', step: 0.05, min: 0.1, max: 3, unit: ' s' },
       { key: 'segmentationRunSeconds', label: 'Minimum turn', help: 'Lower it to cut out shorter interjections, at the cost of more false cuts.', step: 0.05, min: 0, max: 2, unit: ' s', segmentation: true },
       { key: 'segmentationMarginSeconds', label: 'End margin', help: 'A change this close to the newest audio waits for more audio.', step: 0.05, min: 0, max: 2, unit: ' s', segmentation: true },
@@ -120,7 +131,6 @@ export const parameterGroups: Array<{ title: string, fields: ParameterField[] }>
   {
     title: 'Speaker numbers',
     fields: [
-      { key: 'clusterThreshold', label: 'Cluster threshold', help: 'A higher value keeps similar voices apart. A lower value merges them.', step: 0.05, min: 0, max: 1 },
       { key: 'mergeThreshold', label: 'Merge threshold', help: 'The tracker merges two speakers at least this similar.', step: 0.05, min: 0, max: 1 },
       { key: 'matchThreshold', label: 'Match threshold', help: 'How similar a voice must be to keep a speaker\'s number.', step: 0.05, min: 0, max: 1 },
       { key: 'enrollThreshold', label: 'Known speaker threshold', help: 'Raise it if a new person gets a known speaker\'s name.', step: 0.05, min: 0, max: 1 },
