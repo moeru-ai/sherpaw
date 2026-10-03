@@ -45,6 +45,8 @@ const rows = ref<Row[]>([])
 const audioSamples = ref(0)
 const computeMs = ref(0)
 let computeBaseMs = 0
+/** `?profile` in the address: the worker logs its step times to the console. */
+const profiling = new URLSearchParams(location.search).has('profile')
 
 let diarizer: NemotronClient | undefined
 let recognizer: Recognizer | undefined
@@ -100,7 +102,7 @@ async function initialize() {
     await diarizer?.dispose()
     message.value = 'Loading models…'
     ;[diarizer] = await Promise.all([
-      createNemotronClient(latency.value),
+      createNemotronClient(latency.value, { profiling }),
       createTranscript(),
     ])
     ready.value = true
@@ -326,6 +328,7 @@ onBeforeUnmount(() => void dispose())
         <span>{{ audioSeconds.toFixed(1) }} s audio</span>
         <span>{{ computeMs.toFixed(0) }} ms model compute</span>
         <span>{{ realTimeFactor.toFixed(2) }} real-time factor</span>
+        <span v-if="profiling">Profiling: step times in the console</span>
       </section>
       <section aria-label="Speaker turns" grow>
         <p v-if="!rows.length" text-sm text-neutral-500>

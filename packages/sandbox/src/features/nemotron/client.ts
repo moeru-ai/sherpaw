@@ -15,8 +15,8 @@ export interface NemotronClient {
   dispose: () => Promise<void>
 }
 
-/** Creates a worker-owned Nemotron stream. */
-export async function createNemotronClient(profile: NemotronProfile): Promise<NemotronClient> {
+/** Creates a worker-owned Nemotron stream. With `profiling`, the worker logs a summary of its step times to the console. */
+export async function createNemotronClient(profile: NemotronProfile, { profiling = false }: { profiling?: boolean } = {}): Promise<NemotronClient> {
   const worker = new RuntimeWorker()
   const { context } = createContext(worker)
   const invoke = defineInvoke(context, operation)
@@ -45,7 +45,7 @@ export async function createNemotronClient(profile: NemotronProfile): Promise<Ne
     finally { clearTimeout(timer) }
   }
 
-  await send({ kind: 'load', profile })
+  await send({ kind: 'load', profile, profiling })
 
   return {
     push(samples) {

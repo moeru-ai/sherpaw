@@ -222,8 +222,15 @@ export interface NemotronStream {
   dispose: () => Promise<void>
 }
 
+export interface NemotronStreamOptions {
+  profile?: Profile
+  executionProviders?: string[]
+  /** Records each step's stages as User Timing measures (`nemotron:features`, `nemotron:run`, `nemotron:update`), which DevTools shows in the Performance panel. */
+  profiling?: boolean
+}
+
 /** Creates the streaming diarizer on an ONNX Runtime module and the model bytes. */
-export async function createNemotronStream(ort: typeof Ort, bytes: Uint8Array, { profile = profiles.low, executionProviders = ['webgpu'] }: { profile?: Profile, executionProviders?: string[] } = {}): Promise<NemotronStream> {
+export async function createNemotronStream(ort: typeof Ort, bytes: Uint8Array, { profile = profiles.low, executionProviders = ['webgpu'], profiling = false }: NemotronStreamOptions = {}): Promise<NemotronStream> {
   const metadata = onnxMetadata(bytes)
   const silEmb = Float32Array.from((metadata.learnable_sil_emb ?? '').split(',').filter(Boolean).map(Number))
 
@@ -253,6 +260,11 @@ export async function createNemotronStream(ort: typeof Ort, bytes: Uint8Array, {
   let nextFrame = 0
   let chunkStart = 0
   let emitted = 0
+
+  function measure(stage: string, start: number) {
+    if (profiling)
+      performance.measure(`nemotron:${stage}`, { start, end: performance.now() })
+  }
 
   function reset() {
     spkcache = []
@@ -383,7 +395,9 @@ export async function createNemotronStream(ort: typeof Ort, bytes: Uint8Array, {
     })
 
     computeMs += performance.now() - started
+    measure('run', started)
 
+    const updateStarted = performance.now()
     const diar = out.preds_diar!.data as Float32Array
     const hires = out.preds_hires!.data as Float32Array
     const embs = out.chunk_pre_encode_embs!.data as Float32Array
@@ -414,6 +428,8 @@ export async function createNemotronStream(ort: typeof Ort, bytes: Uint8Array, {
         compress()
       }
     }
+
+    measure('update', updateStarted)
 
     return hires.slice(hiresStart * SPEAKERS, (hiresStart + keep * UPSAMPLE) * SPEAKERS)
   }
@@ -502,13 +518,20 @@ export async function createNemotronStream(ort: typeof Ort, bytes: Uint8Array, {
 
       audio = grown
       received += samples.length
+
+      const started = performance.now()
+
       computeFeatures(false)
+      measure('features', started)
 
       return run(false)
     },
 
     async flush() {
+      const started = performance.now()
+
       computeFeatures(true)
+      measure('features', started)
 
       return run(true)
     },

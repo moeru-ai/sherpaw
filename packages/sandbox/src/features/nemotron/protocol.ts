@@ -4,7 +4,7 @@ import { defineInvokeEventa } from '@moeru/eventa'
 export type NemotronProfile = 'low' | 'veryLow'
 
 export type NemotronRequest
-  = | { kind: 'load', profile: NemotronProfile }
+  = | { kind: 'load', profile: NemotronProfile, profiling: boolean }
     | { kind: 'push', samples: Float32Array }
     | { kind: 'flush' | 'reset' | 'dispose' }
 
