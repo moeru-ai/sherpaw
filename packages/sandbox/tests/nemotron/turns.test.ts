@@ -48,6 +48,35 @@ describe('nemotron turns', () => {
     ])
   })
 
+  it('starts a new speaker\'s turn where they rise above the previous speaker, at most 1 s earlier', () => {
+    // Speaker 0 leads, both fall below the threshold, speaker 1 passes speaker 0, then leads.
+    const crossing = new Float32Array(240 * speakers)
+    const set = (from: number, to: number, speaker: number, value: number) => {
+      for (let frame = from; frame < to; frame++)
+        crossing[frame * speakers + speaker] = value
+    }
+
+    set(0, 100, 0, 0.9)
+    set(100, 120, 0, 0.4)
+    set(100, 120, 1, 0.2)
+    set(120, 140, 0, 0.1)
+    set(120, 140, 1, 0.4)
+    set(140, 240, 1, 0.9)
+
+    expect(turnsOf(crossing, 240)).toEqual([
+      { start: 0, end: 1, speaker: 0, overlapSeconds: 0 },
+      { start: 1.2, end: 2.4, speaker: 1, overlapSeconds: 0 },
+    ])
+
+    // Speaker 1 stays above speaker 0 for 1.5 s before leading: the turn starts 1 s before.
+    const slow = new Float32Array(350 * speakers)
+
+    for (let frame = 0; frame < 350; frame++)
+      slow[frame * speakers + (frame < 100 ? 0 : 1)] = frame < 100 || frame >= 250 ? 0.9 : 0.3
+
+    expect(turnsOf(slow, 350).map(turn => turn.start)).toEqual([0, 1.5])
+  })
+
   it('returns all speakers active in the requested recent frames', () => {
     expect(activeSpeakers(probabilities([0, 1, [1, 2]]), 3, 0.02)).toEqual([1, 2])
   })
