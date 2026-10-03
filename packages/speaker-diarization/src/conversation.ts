@@ -4,7 +4,7 @@ import type { UtteranceDetector } from './utterances'
 
 import { createEventHub } from './event-hub'
 
-export type { SileroVad, UtteranceDetector } from './utterances'
+export type { SileroUtteranceOptions, SileroVad, UtteranceDetector } from './utterances'
 
 export { segmentationUtterances, sileroUtterances } from './utterances'
 
@@ -97,9 +97,10 @@ export interface StreamingDiarizerOptions {
   speech: UtteranceDetector
   /**
    * Seconds of audio that a turn keeps from before the speech detector reports speech. Only a
-   * detector that does not know where speech starts, such as Silero VAD, uses it. Silero VAD
-   * reported speech up to about 1 s late in tests. A shorter value can drop the first words. A
-   * longer value adds more background audio before a turn. Default: 1 s.
+   * detector that does not know where speech starts uses it, such as Silero VAD without a tracker
+   * that runs the segmentation model. Silero VAD reported speech up to about 1 s late in tests. A
+   * shorter value can drop the first words. A longer value adds more background audio before a
+   * turn. Default: 1 s.
    */
   leadInSeconds?: number
   /** With the segmentation model, a change counts when the next check finds it again this close. Default: 0.25 s. */
@@ -240,6 +241,8 @@ export function createStreamingDiarizer(options: StreamingDiarizerOptions): Stre
   let recentLength = 0
   /** Samples fed since the start or the last `reset`. */
   let fed = 0
+  /** Samples fed before the end of the last utterance's part. The audio before it went out with that utterance. */
+  let heard = 0
   let partial: ConversationPartial | undefined
   let processing = Promise.resolve()
   // The tracker takes turns one at a time, in order.
@@ -598,6 +601,7 @@ export function createStreamingDiarizer(options: StreamingDiarizerOptions): Stre
       commit(rest, end - (current.length - rest.length), 'pause')
     }
 
+    heard = current.start + current.length
     part = undefined
     utterance = undefined
     leadIn = []
@@ -650,8 +654,9 @@ export function createStreamingDiarizer(options: StreamingDiarizerOptions): Stre
           leadInLength = 0
         }
         else {
-          // The detector found the start late: the audio since then is in the last 4 s.
-          part = open(Math.max(start, fed - recentLength), [], 0)
+          // The detector found the start late: the audio since then is in the last 4 s. A start in
+          // the silence that ended the last utterance moves to the end of its audio, which went out.
+          part = open(Math.max(start, fed - recentLength, heard), [], 0)
         }
       }
 
@@ -777,6 +782,7 @@ export function createStreamingDiarizer(options: StreamingDiarizerOptions): Stre
         recent = []
         recentLength = 0
         fed = 0
+        heard = 0
         partial = undefined
         utterance = undefined
         // The focus speaker can have a voice in the new conversation, for example after `enroll`.

@@ -37,8 +37,11 @@ function levelOf(samples: Float32Array): number | null {
   return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
 }
 
-/** Like Silero VAD: an utterance ends after 0.5 s of silence, and speech is known in the block that holds it. */
-function fakeDetector(): UtteranceDetector {
+/**
+ * Like Silero VAD: an utterance ends after 0.5 s of silence, and speech is known in the block that
+ * holds it. With `startBefore`, the detector gives a start that many seconds before the voice.
+ */
+function fakeDetector({ startBefore }: { startBefore?: number } = {}): UtteranceDetector {
   let received = 0
   let speaking = false
   let start = 0
@@ -78,7 +81,7 @@ function fakeDetector(): UtteranceDetector {
     },
     flush: async () => (speaking ? end() : []),
     speaking: () => speaking,
-    speechStart: () => undefined,
+    speechStart: () => (speaking && startBefore !== undefined ? Math.max(0, start - Math.round(startBefore * rate)) : undefined),
     decided: () => received,
     reset() {
       received = 0
@@ -216,6 +219,28 @@ describe('streaming diarizer', () => {
     expect(second!.time).toBeCloseTo(turns[1]!.start, 5)
     expect(second!.time).toBeGreaterThanOrEqual(first!.time + first!.samples.length / rate - 1e-9)
     expect([first, second].map(run => levelOf(run!.samples))).toEqual([1, 2])
+  })
+
+  it('does not send audio again for a start in the silence that ended the last utterance', async () => {
+    const diarizer = createStreamingDiarizer({ tracker: fakeTracker(), speech: fakeDetector({ startBefore: 0.3 }) })
+    const turns: ConversationTurn[] = []
+    const sent: AudioEvent[] = []
+
+    diarizer.on('turn', event => turns.push(event.turn))
+    diarizer.on('audio', event => sent.push(event))
+
+    const audio = join(voice(0, 1), voice(1, 2), voice(0, 0.6), voice(2, 1.5), voice(0, 1))
+
+    for (let at = 0; at < audio.length; at += block)
+      await diarizer.push(audio.subarray(at, at + block))
+
+    await diarizer.flush()
+
+    // The first utterance's audio goes out until 3.4 s, when the detector ends it. The second voice
+    // starts at 3.6 s, and the detector places its start at 3.3 s.
+    expect(turns.map(turn => turn.start)).toEqual([expect.closeTo(0.7, 5), expect.closeTo(3.4, 5)])
+    sent.slice(1).forEach((event, i) => expect(event.time).toBeGreaterThanOrEqual(sent[i]!.time + sent[i]!.samples.length / rate - 1e-9))
+    expect(voiceSamples(sent, 2)).toBe(1.5 * rate)
   })
 
   it('cuts an utterance where the speaker changes', async () => {

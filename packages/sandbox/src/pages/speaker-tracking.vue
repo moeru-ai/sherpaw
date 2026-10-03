@@ -329,7 +329,7 @@ async function setupTracking() {
   }
   else {
     vad = createUtteranceVad(vadModule!, active.vadThreshold)
-    speech = sileroUtterances(vad)
+    speech = sileroUtterances(vad, models.segmentation ? { tracker } : {})
   }
 
   activeDetection = speechDetection.value === 'segmentation' && models.segmentation ? 'segmentation' : 'silero'
@@ -924,8 +924,8 @@ onBeforeUnmount(dispose)
                       v-for="field in group.fields" :key="field.key" v-model="parameters[field.key]"
                       :label="field.label" :help="field.help" :min="field.min" :max="field.max" :step="field.step" :unit="field.unit"
                       :default-value="defaults[field.key]"
-                      :disabled="!!busy || listening || (field.segmentation && !useSegmentation) || (field.silero && speechDetection !== 'silero')"
-                      :disabled-reason="field.segmentation && !useSegmentation ? 'Needs the segmentation model.' : field.silero && speechDetection !== 'silero' ? 'Only Silero VAD uses it.' : undefined"
+                      :disabled="!!busy || listening || (field.segmentation && !useSegmentation) || (field.silero && (speechDetection !== 'silero' || useSegmentation))"
+                      :disabled-reason="field.segmentation && !useSegmentation ? 'Needs the segmentation model.' : field.silero && (speechDetection !== 'silero' || useSegmentation) ? 'Only Silero VAD without the segmentation model uses it.' : undefined"
                     />
                   </section>
                 </div>
