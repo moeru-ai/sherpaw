@@ -23,6 +23,8 @@ interface Row extends NemotronTurn {
 
 const sampleRate = 16000
 const blockSize = sampleRate / 10
+/** The rows update at most this often. Each update reads every frame and token so far, so its cost grows with the session. */
+const rowsIntervalMs = 200
 const colors = ['#2f6f9f', '#c2410c', '#15803d', '#7e22ce', '#b45309', '#0e7490', '#be123c', '#4d7c0f']
 const transcriptOptions = [
   ...asrModels.filter(model => model.id !== 'x-asr-fp32').map(model => ({ value: model.id, label: `${model.label} · ${Math.round(model.modelBytes / 1e6)} MB` })),
@@ -42,7 +44,11 @@ const message = ref('Choose the models and select Initialize.')
 const probabilities = ref(new Float32Array(0))
 const rows = ref<Row[]>([])
 const audioSamples = ref(0)
+/** Samples that the recognizer has heard in this session. */
+const heardSamples = ref(0)
 const computeMs = ref(0)
+/** `performance.now()`, refreshed while the microphone runs. */
+const now = ref(0)
 let computeBaseMs = 0
 /** `?profile` in the address: the worker logs its step times to the console. */
 const profiling = new URLSearchParams(location.search).has('profile')
@@ -55,6 +61,12 @@ let diarizerQueue = Promise.resolve()
 let recognizerQueue = Promise.resolve()
 let disposed = false
 let latencyChanged = false
+let rowsTimer: ReturnType<typeof setTimeout> | undefined
+let clock: ReturnType<typeof setInterval> | undefined
+/** `performance.now()` when the microphone captured the session's first sample. */
+let microphoneOrigin: number | undefined
+/** The profile of the running stream. */
+let startedProfile: ProfileName = 'low'
 /** The diarizer decided the rest of the audio: more audio needs a new session. */
 let flushed = false
 
@@ -62,6 +74,23 @@ const frames = computed(() => probabilities.value.length / SPEAKERS)
 const active = computed(() => activeSpeakers(probabilities.value, frames.value, 0.5))
 const audioSeconds = computed(() => audioSamples.value / sampleRate)
 const realTimeFactor = computed(() => audioSeconds.value ? computeMs.value / 1000 / audioSeconds.value : 0)
+/** The stream decides each frame at most this long after its audio. */
+const modelLatency = computed(() => (profiles[startedProfile].chunk + profiles[startedProfile].right) * 0.08)
+/** While the microphone runs: how far each stage is behind the captured audio, in seconds. */
+const behind = computed(() => {
+  if (!listening.value || microphoneOrigin === undefined)
+    return undefined
+
+  const captured = (now.value - microphoneOrigin) / 1000
+
+  return {
+    input: captured - audioSeconds.value,
+    speakers: captured - frames.value / 100,
+    words: recognizer ? captured - heardSamples.value / sampleRate : undefined,
+  }
+})
+// Lags beyond these limits keep growing when a stage cannot keep up.
+const lagging = computed(() => !!behind.value && (behind.value.input > 0.5 || behind.value.speakers > modelLatency.value + 1 || (behind.value.words ?? 0) > 1))
 const latencyOptions = computed(() => (Object.keys(latencyNames) as ProfileName[]).map((profile) => {
   const speed = speeds.value.find(value => value.profile === profile)
   const label = `${latencyNames[profile]} · ${((profiles[profile].chunk + profiles[profile].right) * 0.08).toFixed(2)} s`
@@ -85,12 +114,23 @@ function time(seconds: number) {
 }
 
 function updateRows() {
+  clearTimeout(rowsTimer)
+  rowsTimer = undefined
+
+  const started = performance.now()
   const turns = turnsOf(probabilities.value, frames.value)
   const words = timeline && recognizer
     ? timeline.place(recognizer.tokens(), turns.map(turn => Math.round(turn.start * sampleRate))).rows
     : []
 
   rows.value = turns.map((turn, index) => ({ ...turn, words: words[index] ?? '' }))
+
+  if (profiling)
+    performance.measure('nemotron:rows', { start: started, end: performance.now() })
+}
+
+function scheduleRows() {
+  rowsTimer ??= setTimeout(updateRows, rowsIntervalMs)
 }
 
 async function createTranscript() {
@@ -128,11 +168,13 @@ async function initialize() {
     }
 
     await diarizer.start(latency.value)
+    startedProfile = latency.value
     ready.value = true
     computeBaseMs = 0
     probabilities.value = new Float32Array(0)
     rows.value = []
     audioSamples.value = 0
+    heardSamples.value = 0
     computeMs.value = 0
     const recommended = recommendProfile(speeds.value)
     const fastest = speeds.value.reduce<ProfileSpeed | undefined>((best, speed) => !best || speed.realTimeFactor < best.realTimeFactor ? speed : best, undefined)
@@ -161,13 +203,19 @@ function feed(block: Float32Array) {
   audioSamples.value += block.length
   diarizerQueue = diarizerQueue.then(async () => {
     const decided = await diarizer!.push(block)
+
+    computeMs.value = diarizer!.computeMs - computeBaseMs
+
+    // Most blocks decide no frame: the model steps once per chunk.
+    if (!decided.length)
+      return
+
     const all = new Float32Array(probabilities.value.length + decided.length)
 
     all.set(probabilities.value)
     all.set(decided, probabilities.value.length)
     probabilities.value = all
-    computeMs.value = diarizer!.computeMs - computeBaseMs
-    updateRows()
+    scheduleRows()
   }).catch(reportError)
 
   if (recognizer && timeline) {
@@ -177,7 +225,8 @@ function feed(block: Float32Array) {
     recognizerQueue = recognizerQueue.then(async () => {
       await currentRecognizer.accept(block)
       currentTimeline.hear(blockStartSample, currentRecognizer.received() - block.length, block.length)
-      updateRows()
+      heardSamples.value += block.length
+      scheduleRows()
     }).catch(reportError)
   }
 }
@@ -202,6 +251,7 @@ async function flush() {
 function stopMicrophone() {
   microphone?.abort()
   microphone = undefined
+  clearInterval(clock)
   listening.value = false
   message.value = 'Microphone stopped. Processing the final audio.'
   void flush().then(() => message.value = 'Microphone stopped.')
@@ -216,7 +266,9 @@ async function listen() {
 
   const controller = new AbortController()
   microphone = controller
+  microphoneOrigin = undefined
   listening.value = true
+  clock = setInterval(() => now.value = performance.now(), 250)
   let block = new Float32Array(blockSize)
   let offset = 0
 
@@ -224,6 +276,8 @@ async function listen() {
     await startMicrophone(controller.signal, (samples, rate) => {
       if (rate !== sampleRate)
         return
+
+      microphoneOrigin ??= performance.now() - samples.length / rate * 1000
 
       for (const value of samples) {
         block[offset++] = Math.max(-1, Math.min(1, value))
@@ -240,6 +294,7 @@ async function listen() {
   catch (cause) {
     if (!controller.signal.aborted) {
       listening.value = false
+      clearInterval(clock)
       reportError(cause)
     }
   }
@@ -258,6 +313,7 @@ async function newSession() {
   probabilities.value = new Float32Array(0)
   rows.value = []
   audioSamples.value = 0
+  heardSamples.value = 0
   computeMs.value = 0
   diarizerQueue = Promise.resolve()
   recognizerQueue = Promise.resolve()
@@ -312,6 +368,8 @@ async function testFile(event: Event) {
 async function dispose() {
   disposed = true
   microphone?.abort()
+  clearInterval(clock)
+  clearTimeout(rowsTimer)
   await Promise.all([diarizer?.dispose(), recognizer?.dispose()])
 }
 
@@ -361,6 +419,9 @@ onBeforeUnmount(() => void dispose())
         <span>{{ computeMs.toFixed(0) }} ms model compute</span>
         <span>{{ realTimeFactor.toFixed(2) }} real-time factor</span>
         <span v-if="profiling">Profiling: step times in the console</span>
+        <span v-if="behind" :class="lagging ? 'text-red-600' : ''">
+          Behind real time: input {{ behind.input.toFixed(1) }} s · speakers {{ behind.speakers.toFixed(1) }} s (the model adds up to {{ modelLatency.toFixed(2) }} s)<template v-if="behind.words !== undefined"> · words {{ behind.words.toFixed(1) }} s</template>
+        </span>
       </section>
       <section aria-label="Speaker turns" grow>
         <p v-if="!rows.length" text-sm text-neutral-500>
