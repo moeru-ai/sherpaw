@@ -49,6 +49,8 @@ const heardSamples = ref(0)
 const computeMs = ref(0)
 /** `performance.now()`, refreshed while the microphone runs. */
 const now = ref(0)
+/** `performance.now()` when the microphone captured the session's first sample. A ref, so that `behind` updates once it is known. */
+const microphoneOrigin = ref<number>()
 let computeBaseMs = 0
 /** `?profile` in the address: the worker logs its step times to the console. */
 const profiling = new URLSearchParams(location.search).has('profile')
@@ -63,8 +65,6 @@ let disposed = false
 let latencyChanged = false
 let rowsTimer: ReturnType<typeof setTimeout> | undefined
 let clock: ReturnType<typeof setInterval> | undefined
-/** `performance.now()` when the microphone captured the session's first sample. */
-let microphoneOrigin: number | undefined
 /** The profile of the running stream. */
 let startedProfile: ProfileName = 'low'
 /** The diarizer decided the rest of the audio: more audio needs a new session. */
@@ -78,10 +78,10 @@ const realTimeFactor = computed(() => audioSeconds.value ? computeMs.value / 100
 const modelLatency = computed(() => (profiles[startedProfile].chunk + profiles[startedProfile].right) * 0.08)
 /** While the microphone runs: how far each stage is behind the captured audio, in seconds. */
 const behind = computed(() => {
-  if (!listening.value || microphoneOrigin === undefined)
+  if (!listening.value || microphoneOrigin.value === undefined)
     return undefined
 
-  const captured = (now.value - microphoneOrigin) / 1000
+  const captured = (now.value - microphoneOrigin.value) / 1000
 
   return {
     input: captured - audioSeconds.value,
@@ -266,7 +266,7 @@ async function listen() {
 
   const controller = new AbortController()
   microphone = controller
-  microphoneOrigin = undefined
+  microphoneOrigin.value = undefined
   listening.value = true
   clock = setInterval(() => now.value = performance.now(), 250)
   let block = new Float32Array(blockSize)
@@ -277,7 +277,7 @@ async function listen() {
       if (rate !== sampleRate)
         return
 
-      microphoneOrigin ??= performance.now() - samples.length / rate * 1000
+      microphoneOrigin.value ??= performance.now() - samples.length / rate * 1000
 
       for (const value of samples) {
         block[offset++] = Math.max(-1, Math.min(1, value))
