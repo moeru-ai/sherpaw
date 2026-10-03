@@ -95,7 +95,7 @@ export interface ParameterField {
   unit?: string
   /** The parameter has an effect only with the segmentation model. */
   segmentation?: boolean
-  /** The parameter has an effect only when Silero VAD finds the speech. */
+  /** The parameter has an effect only with Silero VAD without the segmentation model. */
   silero?: boolean
 }
 
@@ -115,7 +115,7 @@ export const parameterGroups: Array<{ title: string, fields: ParameterField[] }>
     title: 'Speech detection',
     fields: [
       { key: 'vadThreshold', label: 'Speech threshold', help: 'Raise it if music or noise starts utterances. Lower it if the page misses quiet speech.', step: 0.05, min: 0.05, max: 0.95 },
-      { key: 'leadInSeconds', label: 'Audio before speech', help: 'Silero VAD reports speech up to about 1 s late. Each turn keeps this much audio from before that point. Lower values can drop the first words.', step: 0.05, min: 0, max: 2, unit: ' s', silero: true },
+      { key: 'leadInSeconds', label: 'Audio before speech', help: 'Silero VAD reports speech up to about 1 s late. Without the segmentation model, each turn keeps this much audio from before that point. Lower values can drop the first words.', step: 0.05, min: 0, max: 2, unit: ' s', silero: true },
     ],
   },
   {
