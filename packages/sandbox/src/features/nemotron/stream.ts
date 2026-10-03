@@ -1,3 +1,4 @@
+// cspell:ignore bitrev diar embs enorm filterbank freqs hann mels preds preemph sortformer spkcache subsampling varint nemotron
 import type * as Ort from 'onnxruntime-web/webgpu'
 
 /**
