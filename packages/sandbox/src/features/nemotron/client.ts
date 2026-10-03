@@ -2,12 +2,15 @@
 import { defineInvoke } from '@moeru/eventa'
 import { createContext } from '@moeru/eventa/adapters/webworkers'
 
-import type { NemotronProfile, NemotronRequest } from './protocol'
+import type { NemotronRequest } from './protocol'
+import type { ProfileName, ProfileSpeed } from './stream'
 
 import { operation } from './protocol'
 import RuntimeWorker from './runtime.worker?worker'
 
 export interface NemotronClient {
+  benchmark: () => Promise<ProfileSpeed[]>
+  start: (profile: ProfileName) => Promise<void>
   push: (samples: Float32Array) => Promise<Float32Array>
   flush: () => Promise<Float32Array>
   reset: () => Promise<void>
@@ -15,8 +18,8 @@ export interface NemotronClient {
   dispose: () => Promise<void>
 }
 
-/** Creates a worker-owned Nemotron stream. With `profiling`, the worker logs a summary of its step times to the console. */
-export async function createNemotronClient(profile: NemotronProfile, { profiling = false }: { profiling?: boolean } = {}): Promise<NemotronClient> {
+/** Creates a worker-owned Nemotron model. With `profiling`, the worker logs a summary of its step times to the console. */
+export async function createNemotronClient({ profiling = false }: { profiling?: boolean } = {}): Promise<NemotronClient> {
   const worker = new RuntimeWorker()
   const { context } = createContext(worker)
   const invoke = defineInvoke(context, operation)
@@ -36,7 +39,7 @@ export async function createNemotronClient(profile: NemotronProfile, { profiling
       const reply = await invoke(request, { transfer })
 
       computeMs = reply.computeMs
-      return reply.probabilities
+      return reply
     }
     catch (error) {
       context.abort(error)
@@ -45,15 +48,21 @@ export async function createNemotronClient(profile: NemotronProfile, { profiling
     finally { clearTimeout(timer) }
   }
 
-  await send({ kind: 'load', profile, profiling })
+  await send({ kind: 'load', profiling })
 
   return {
+    async benchmark() {
+      return (await send({ kind: 'benchmark' })).speeds ?? []
+    },
+    async start(profile) {
+      await send({ kind: 'start', profile })
+    },
     push(samples) {
       const copy = samples.slice()
 
-      return send({ kind: 'push', samples: copy }, [copy.buffer])
+      return send({ kind: 'push', samples: copy }, [copy.buffer]).then(reply => reply.probabilities)
     },
-    flush: () => send({ kind: 'flush' }),
+    flush: () => send({ kind: 'flush' }).then(reply => reply.probabilities),
     async reset() {
       await send({ kind: 'reset' })
     },

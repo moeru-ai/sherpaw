@@ -32,6 +32,7 @@ export const profiles = {
   veryLow: { chunk: 6, right: 2, fifo: 264, update: 222, cache: 264 },
 }
 
+export type ProfileName = keyof typeof profiles
 export type Profile = typeof profiles.low
 
 const f32 = new Float32Array(1)
@@ -218,7 +219,7 @@ export interface NemotronStream {
   reset: () => void
   /** Milliseconds spent in the model so far. */
   readonly computeMs: number
-  /** Releases the session. */
+  /** Releases stream state. */
   dispose: () => Promise<void>
 }
 
@@ -229,15 +230,20 @@ export interface NemotronStreamOptions {
   profiling?: boolean
 }
 
-/** Creates the streaming diarizer on an ONNX Runtime module and the model bytes. */
-export async function createNemotronStream(ort: typeof Ort, bytes: Uint8Array, { profile = profiles.low, executionProviders = ['webgpu'], profiling = false }: NemotronStreamOptions = {}): Promise<NemotronStream> {
-  const metadata = onnxMetadata(bytes)
-  const silEmb = Float32Array.from((metadata.learnable_sil_emb ?? '').split(',').filter(Boolean).map(Number))
+export interface ProfileSpeed {
+  profile: ProfileName
+  latencySeconds: number
+  stepMs: number
+  realTimeFactor: number
+}
 
-  if (silEmb.length !== EMB)
-    throw new Error(`The model has no learnable_sil_emb metadata (${silEmb.length} values)`)
+export interface NemotronModel {
+  createStream: (options?: { profile?: Profile, profiling?: boolean }) => NemotronStream
+  benchmark: (options?: { warmup?: number, runs?: number }) => Promise<ProfileSpeed[]>
+  dispose: () => Promise<void>
+}
 
-  const session = await ort.InferenceSession.create(bytes, { executionProviders })
+function createStream(ort: typeof Ort, session: Ort.InferenceSession, silEmb: Float32Array, { profile = profiles.low, profiling = false }: { profile?: Profile, profiling?: boolean } = {}): NemotronStream {
   const { chunk: chunkLen, right, fifo: fifoMax, update, cache: cacheMax } = profile
   const stride = chunkLen * SUBSAMPLING
   const feed = (chunkLen + right) * SUBSAMPLING
@@ -543,7 +549,96 @@ export async function createNemotronStream(ort: typeof Ort, bytes: Uint8Array, {
     },
 
     async dispose() {
-      await session.release()
+      // The model owns the shared session.
     },
   }
+}
+
+/**
+ * Measures full-size inputs because each step encodes the cache, FIFO, and chunk again. After about
+ * 40 s of audio, steps cost about the same; earlier steps are faster.
+ */
+async function benchmark(ort: typeof Ort, session: Ort.InferenceSession, { warmup = 2, runs = 3 }: { warmup?: number, runs?: number } = {}) {
+  const speeds: ProfileSpeed[] = []
+
+  for (const [name, profile] of Object.entries(profiles) as Array<[ProfileName, Profile]>) {
+    const length = (profile.chunk + profile.right) * SUBSAMPLING
+    const inputs = {
+      chunk: new ort.Tensor('float32', new Float32Array(length * N_MELS), [1, length, N_MELS]),
+      chunk_lengths: new ort.Tensor('int64', BigInt64Array.from([BigInt(length)]), [1]),
+      spkcache: new ort.Tensor('float32', new Float32Array(profile.cache * EMB), [1, profile.cache, EMB]),
+      spkcache_lengths: new ort.Tensor('int64', BigInt64Array.from([BigInt(profile.cache)]), [1]),
+      fifo: new ort.Tensor('float32', new Float32Array(profile.fifo * EMB), [1, profile.fifo, EMB]),
+      fifo_lengths: new ort.Tensor('int64', BigInt64Array.from([BigInt(profile.fifo)]), [1]),
+    }
+
+    for (let run = 0; run < warmup; run++)
+      await session.run(inputs)
+
+    const times: number[] = []
+
+    for (let run = 0; run < runs; run++) {
+      const started = performance.now()
+
+      await session.run(inputs)
+      times.push(performance.now() - started)
+    }
+
+    times.sort((a, b) => a - b)
+    const stepMs = times[Math.floor(times.length / 2)] ?? 0
+
+    speeds.push({
+      profile: name,
+      latencySeconds: (profile.chunk + profile.right) * 0.08,
+      stepMs,
+      realTimeFactor: stepMs / (profile.chunk * 80),
+    })
+  }
+
+  return speeds
+}
+
+/**
+ * Loads a Nemotron model once. Streams share its session.
+ */
+export async function loadNemotron(ort: typeof Ort, bytes: Uint8Array, { executionProviders = ['webgpu'] }: Pick<NemotronStreamOptions, 'executionProviders'> = {}): Promise<NemotronModel> {
+  const metadata = onnxMetadata(bytes)
+  const silEmb = Float32Array.from((metadata.learnable_sil_emb ?? '').split(',').filter(Boolean).map(Number))
+
+  if (silEmb.length !== EMB)
+    throw new Error(`The model has no learnable_sil_emb metadata (${silEmb.length} values)`)
+
+  const session = await ort.InferenceSession.create(bytes, { executionProviders })
+
+  return {
+    createStream: options => createStream(ort, session, silEmb, options),
+    benchmark: options => benchmark(ort, session, options),
+    dispose: () => session.release(),
+  }
+}
+
+/** Creates a stream that releases its loaded model when disposed. */
+export async function createNemotronStream(ort: typeof Ort, bytes: Uint8Array, options: NemotronStreamOptions = {}): Promise<NemotronStream> {
+  const model = await loadNemotron(ort, bytes, options)
+  const stream = model.createStream(options)
+
+  return {
+    push: stream.push,
+    flush: stream.flush,
+    reset: stream.reset,
+    get computeMs() { return stream.computeMs },
+    dispose: () => model.dispose(),
+  }
+}
+
+/**
+ * Chooses the lowest-latency profile that meets the limit. The margin leaves room for X-ASR on the
+ * same device and slower steps. The value is not tuned.
+ */
+export function recommendProfile(speeds: ProfileSpeed[], maxRealTimeFactor = 0.7): ProfileName | undefined {
+  const eligible = speeds
+    .filter(speed => speed.realTimeFactor <= maxRealTimeFactor)
+    .sort((a, b) => a.latencySeconds - b.latencySeconds)
+
+  return eligible[0]?.profile
 }

@@ -8,13 +8,17 @@ import ortWasm from 'onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url'
 import * as ort from 'onnxruntime-web/webgpu'
 import { fetchLocalModel } from 'virtual:local-models'
 
+import type { NemotronModel, NemotronStream } from './stream'
+
 import { operation } from './protocol'
-import { createNemotronStream, profiles } from './stream'
+import { loadNemotron, profiles } from './stream'
 
 const sampleRate = 16000
 const reportMs = 5000
 const { context } = createContext()
-let stream: Awaited<ReturnType<typeof createNemotronStream>> | undefined
+let model: NemotronModel | undefined
+let stream: NemotronStream | undefined
+let profiling = false
 let queue: Promise<{ probabilities: Float32Array, computeMs: number }> = Promise.resolve({ probabilities: new Float32Array(0), computeMs: 0 })
 /** Samples of push requests that wait in the queue or run now. */
 let waiting = 0
@@ -65,7 +69,7 @@ function startReports() {
   }
 }
 
-async function load(profile: 'low' | 'veryLow', profiling: boolean) {
+async function load(enableProfiling: boolean) {
   const adapter = await navigator.gpu?.requestAdapter()
 
   if (!adapter || adapter.info.isFallbackAdapter)
@@ -74,7 +78,7 @@ async function load(profile: 'low' | 'veryLow', profiling: boolean) {
   ort.env.wasm.numThreads = 1
   ort.env.wasm.wasmPaths = { mjs: ortWasmMjs, wasm: ortWasm }
 
-  if (profiling) {
+  if (enableProfiling) {
     // ONNX Runtime marks its calls with console.timeStamp, which the Performance panel shows.
     ort.env.trace = true
     logAdapter(adapter)
@@ -86,33 +90,46 @@ async function load(profile: 'low' | 'veryLow', profiling: boolean) {
   if (!response.ok)
     throw new Error(`Could not load the Nemotron model (${response.status}). Put nemotron3_diar_v3.w8.onnx in models/nemotron-3-diarization/.`)
 
-  stream = await createNemotronStream(ort, new Uint8Array(await response.arrayBuffer()), {
-    profile: profiles[profile],
+  model = await loadNemotron(ort, new Uint8Array(await response.arrayBuffer()), {
     executionProviders: ['webgpu'],
-    profiling,
   })
+  profiling = enableProfiling
 }
 
 defineInvokeHandler(context, operation, (request) => {
   const run = async () => {
     if (request.kind === 'load') {
-      if (stream)
+      if (model)
         throw new Error('The worker already owns a diarization session')
 
-      await load(request.profile, request.profiling)
+      await load(request.profiling)
       return { probabilities: new Float32Array(0), computeMs: 0 }
     }
 
-    if (!stream)
+    if (!model)
       throw new Error('Model is not loaded')
 
     if (request.kind === 'dispose') {
       stopReports?.()
       stopReports = undefined
-      await stream.dispose()
+      await stream?.dispose()
       stream = undefined
+      await model.dispose()
+      model = undefined
       return { probabilities: new Float32Array(0), computeMs: 0 }
     }
+
+    if (request.kind === 'benchmark')
+      return { probabilities: new Float32Array(0), computeMs: 0, speeds: await model.benchmark() }
+
+    if (request.kind === 'start') {
+      await stream?.dispose()
+      stream = model.createStream({ profile: profiles[request.profile], profiling })
+      return { probabilities: new Float32Array(0), computeMs: 0 }
+    }
+
+    if (!stream)
+      throw new Error('Stream is not started')
 
     if (request.kind === 'reset') {
       stream.reset()

@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import type { Recognizer } from '../features/asr/protocol'
 import type { NemotronClient } from '../features/nemotron/client'
+import type { ProfileName, ProfileSpeed } from '../features/nemotron/stream'
 import type { NemotronTurn } from '../features/nemotron/turns'
 
 import { createTokenTimeline } from '@sherpaw/asr/tokens'
@@ -13,7 +14,7 @@ import { asrModels } from '../features/asr/catalog'
 import { createRecognizer } from '../features/asr/recognizer'
 import { startMicrophone } from '../features/audio/microphone'
 import { createNemotronClient } from '../features/nemotron/client'
-import { SPEAKERS } from '../features/nemotron/stream'
+import { profiles, recommendProfile, SPEAKERS } from '../features/nemotron/stream'
 import { activeSpeakers, turnsOf } from '../features/nemotron/turns'
 
 interface Row extends NemotronTurn {
@@ -27,14 +28,12 @@ const transcriptOptions = [
   ...asrModels.filter(model => model.id !== 'x-asr-fp32').map(model => ({ value: model.id, label: `${model.label} · ${Math.round(model.modelBytes / 1e6)} MB` })),
   { value: 'none', label: 'No transcripts' },
 ]
-const latencyOptions = [
-  { value: 'low', label: 'Low · 1.04 s' },
-  { value: 'veryLow', label: 'Very low · 0.64 s' },
-]
+const latencyNames: Record<ProfileName, string> = { low: 'Low', veryLow: 'Very low' }
 
 const audioFile = useTemplateRef<HTMLInputElement>('audioFile')
 const transcriptModel = ref('x-asr')
-const latency = ref<'low' | 'veryLow'>('low')
+const latency = ref<ProfileName>('low')
+const speeds = ref<ProfileSpeed[]>([])
 const ready = ref(false)
 const listening = ref(false)
 const busy = ref('')
@@ -55,6 +54,7 @@ let microphone: AbortController | undefined
 let diarizerQueue = Promise.resolve()
 let recognizerQueue = Promise.resolve()
 let disposed = false
+let latencyChanged = false
 /** The diarizer decided the rest of the audio: more audio needs a new session. */
 let flushed = false
 
@@ -62,10 +62,20 @@ const frames = computed(() => probabilities.value.length / SPEAKERS)
 const active = computed(() => activeSpeakers(probabilities.value, frames.value, 0.5))
 const audioSeconds = computed(() => audioSamples.value / sampleRate)
 const realTimeFactor = computed(() => audioSeconds.value ? computeMs.value / 1000 / audioSeconds.value : 0)
+const latencyOptions = computed(() => (Object.keys(latencyNames) as ProfileName[]).map((profile) => {
+  const speed = speeds.value.find(value => value.profile === profile)
+  const label = `${latencyNames[profile]} · ${((profiles[profile].chunk + profiles[profile].right) * 0.08).toFixed(2)} s`
+
+  return { value: profile, label: speed ? `${label} · RTF ${speed.realTimeFactor.toFixed(2)}` : label }
+}))
 
 function reportError(cause: unknown) {
   if (!disposed)
     error.value = cause instanceof Error ? cause.message : String(cause)
+}
+
+function markLatencyChanged() {
+  latencyChanged = true
 }
 
 function time(seconds: number) {
@@ -99,23 +109,45 @@ async function initialize() {
   error.value = ''
 
   try {
-    await diarizer?.dispose()
     message.value = 'Loading models…'
-    ;[diarizer] = await Promise.all([
-      createNemotronClient(latency.value, { profiling }),
-      createTranscript(),
-    ])
+
+    if (!diarizer) {
+      const [client] = await Promise.all([
+        createNemotronClient({ profiling }),
+        createTranscript(),
+      ])
+
+      diarizer = client
+      speeds.value = await diarizer.benchmark()
+
+      if (!latencyChanged)
+        latency.value = recommendProfile(speeds.value) ?? 'low'
+    }
+    else {
+      await createTranscript()
+    }
+
+    await diarizer.start(latency.value)
     ready.value = true
     computeBaseMs = 0
     probabilities.value = new Float32Array(0)
     rows.value = []
     audioSamples.value = 0
     computeMs.value = 0
-    message.value = 'Models ready. Start the microphone or test an audio file.'
+    const recommended = recommendProfile(speeds.value)
+    const fastest = speeds.value.reduce<ProfileSpeed | undefined>((best, speed) => !best || speed.realTimeFactor < best.realTimeFactor ? speed : best, undefined)
+
+    message.value = recommended
+      ? `Models ready. Recommended: ${latencyNames[recommended]}. Start the microphone or test an audio file.`
+      : `This device may not keep up in real time. Fastest: RTF ${fastest?.realTimeFactor.toFixed(2) ?? '-'}.`
   }
   catch (cause) {
     reportError(cause)
     message.value = 'Could not load the models. Try again.'
+    // A failed worker cannot take more requests: the next try loads the model again.
+    await diarizer?.dispose().catch(() => {})
+    diarizer = undefined
+    ready.value = false
   }
   finally { busy.value = '' }
 }
@@ -291,7 +323,7 @@ onBeforeUnmount(() => void dispose())
     <template #setup>
       <div flex="~ wrap items-end justify-center gap-3">
         <SelectField v-model="transcriptModel" label="Transcripts" :options="transcriptOptions" :disabled="!!busy || listening" />
-        <SelectField v-model="latency" label="Latency" :options="latencyOptions" :disabled="!!busy || listening" />
+        <SelectField v-model="latency" label="Latency" :options="latencyOptions" :disabled="!!busy || listening" @update:model-value="markLatencyChanged" />
         <Button :disabled="!!busy || listening" @click="initialize">
           {{ busy === 'load' ? 'Initializing…' : 'Initialize' }}
         </Button>
