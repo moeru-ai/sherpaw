@@ -8,6 +8,9 @@ import { defineConfig } from 'vite'
 
 import { localModels } from './plugins/local-models'
 
+// A git worktree has no model submodules. SHERPAW_MODELS_DIR points the dev server at the models of another checkout.
+const modelsDirectory = env.SHERPAW_MODELS_DIR ?? fileURLToPath(new URL('../../models', import.meta.url))
+
 export default defineConfig({
   // Lazy route/Worker imports must not trigger a dev reload during model loading.
   optimizeDeps: { include: [
@@ -21,10 +24,10 @@ export default defineConfig({
   ] },
   worker: {
     format: 'es',
-    plugins: () => [localModels(fileURLToPath(new URL('../../models', import.meta.url)))],
+    plugins: () => [localModels(modelsDirectory)],
   },
   plugins: [
-    localModels(fileURLToPath(new URL('../../models', import.meta.url))),
+    localModels(modelsDirectory),
     VueRouter(),
     vue(),
     UnoCSS(),
