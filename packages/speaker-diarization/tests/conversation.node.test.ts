@@ -243,6 +243,38 @@ describe('streaming diarizer', () => {
     expect(voiceSamples(sent, 2)).toBe(1.5 * rate)
   })
 
+  for (const startBefore of [0.3, undefined]) {
+    it(`sends the held-back end of an utterance with the next one (detector start ${startBefore ?? 'unknown'})`, async () => {
+      const diarizer = createStreamingDiarizer({ tracker: fakeTracker(), speech: fakeDetector(startBefore === undefined ? {} : { startBefore }), holdBackSeconds: 0.5 })
+      const utterances: AudioEvent[][] = []
+
+      diarizer.on('speech-start', () => utterances.push([]))
+      diarizer.on('audio', event => utterances.at(-1)!.push(event))
+
+      // The first voice ends at 3 s. The detector ends the utterance at 3.5 s, and the second voice starts at 3.6 s.
+      const audio = join(voice(0, 1), voice(1, 2), voice(0, 0.6), voice(2, 1.5), voice(0, 1))
+
+      for (let at = 0; at < audio.length; at += block)
+        await diarizer.push(audio.subarray(at, at + block))
+
+      await diarizer.flush()
+
+      const [first, second] = utterances.map(runsOf).map(runs => runs[0]!)
+
+      expect(utterances.map(runsOf).map(runs => runs.length)).toEqual([1, 1])
+      // The first utterance's audio stops where its speech ends, not where the detector ended it.
+      expect(first!.time + first!.samples.length / rate).toBeCloseTo(3, 5)
+      // The second utterance's audio starts in that held-back silence, and no sample goes out twice.
+      expect(second!.time).toBeGreaterThanOrEqual(3 - 1e-9)
+      expect(second!.time).toBeLessThan(3.6)
+      expect([1, 2].map(level => voiceSamples([first!, second!], level))).toEqual([2 * rate, 1.5 * rate])
+    })
+  }
+
+  it('rejects a negative holdBackSeconds', () => {
+    expect(() => createStreamingDiarizer({ tracker: fakeTracker(), speech: fakeDetector(), holdBackSeconds: -0.1 })).toThrow(RangeError)
+  })
+
   it('cuts an utterance where the speaker changes', async () => {
     const { turns, sent } = await run(join(voice(0, 1), voice(1, 3), voice(2, 3), voice(0, 1)))
 

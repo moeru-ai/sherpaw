@@ -114,6 +114,15 @@ export interface StreamingDiarizerOptions {
   /** A cut closer than this to the previous cut or to the start of the utterance is dropped. Default: 0.5 s. */
   minCutGapSeconds?: number
   /**
+   * Without focus, the `audio` events hold back this many seconds of the newest audio while someone
+   * speaks. When the utterance ends, its audio goes out to the end of its speech, and the rest does
+   * not: Silero VAD reports the end late, and after a short pause that rest can already hold the
+   * start of the next utterance's first word. The next utterance sends it if it starts there. With
+   * 0.3 s, fewer first words of an utterance reach the recognizer with the utterance before it, and
+   * live words come 0.3 s later. Default: 0.
+   */
+  holdBackSeconds?: number
+  /**
    * Follow one speaker only, for example the enrolled owner of a voice agent. The `audio` events
    * then hold silence in place of the other voices, so a recognizer that hears them transcribes this
    * speaker only. A background voice also does not hold the recognizer when the speaker starts.
@@ -224,6 +233,7 @@ function range(chunks: Float32Array[], from: number, to: number) {
 export function createStreamingDiarizer(options: StreamingDiarizerOptions): StreamingDiarizer {
   const { tracker, speech, focus, keepAudio = false, signal } = options
   const maxLeadIn = Math.round((options.leadInSeconds ?? 1) * SAMPLE_RATE)
+  const holdBack = Math.round((options.holdBackSeconds ?? 0) * SAMPLE_RATE)
   const focusWindow = Math.round((focus?.windowSeconds ?? 1) * SAMPLE_RATE)
   const focusThreshold = focus?.threshold ?? 0.35
   const confirm = (options.confirmSeconds ?? 0.25) * SAMPLE_RATE
@@ -234,6 +244,9 @@ export function createStreamingDiarizer(options: StreamingDiarizerOptions): Stre
 
   if (!(maxLeadIn >= 0))
     throw new RangeError('leadInSeconds must be zero or more')
+
+  if (!(holdBack >= 0))
+    throw new RangeError('holdBackSeconds must be zero or more')
 
   let turns: Turn[] = []
   /** Turns by the index that `track` returned for them. Revisions use these indexes. */
@@ -601,17 +614,23 @@ export function createStreamingDiarizer(options: StreamingDiarizerOptions): Stre
       cuts = cutsOf(guess.changes.map(change => Math.round(change * SAMPLE_RATE)), guess.windowChange, 0)
     }
 
-    if (end > 0) {
-      const rest = splitAll(current, settle(current, cuts, true).filter(at => at < end))
+    let last = current
 
-      commit(rest, end - (current.length - rest.length), 'pause')
+    if (end > 0) {
+      last = splitAll(current, settle(current, cuts, true).filter(at => at < end))
+      commit(last, end - (current.length - last.length), 'pause')
     }
 
-    heard = current.start + current.length
+    // With focus, the audio of the whole part went out. Otherwise, with `holdBackSeconds`, the end of
+    // the part may not have: it becomes audio before the next utterance.
+    heard = focus ? current.start + current.length : last.start + last.sent
+
+    const rest = recentAudio(heard, current.start + current.length)
+
     part = undefined
     utterance = undefined
-    leadIn = []
-    leadInLength = 0
+    leadIn = rest.length ? [rest] : []
+    leadInLength = rest.length
     partial = undefined
     hub.emit({ type: 'speech-end', time: (segment.start + segment.samples.length) / SAMPLE_RATE })
 
@@ -687,7 +706,7 @@ export function createStreamingDiarizer(options: StreamingDiarizerOptions): Stre
       }
 
       // The audio goes out while the utterance goes on, for example for live words.
-      send(part, part.length)
+      send(part, part.length - holdBack)
 
       if (utterance && utterance.length - utterance.updated >= CHECK) {
         await updateFocus(false, session)

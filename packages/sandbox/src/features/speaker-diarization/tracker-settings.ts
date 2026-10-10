@@ -31,13 +31,14 @@ export interface PageParameters {
   vadThreshold: number
   vadSilence: number
   leadInSeconds: number
+  holdBackSeconds: number
   confirmSeconds: number
   minPieceSeconds: number
 }
 
 export type TrackingParameters = PageParameters & SpeakerTrackerTuning
 
-export const defaultPageParameters: Readonly<PageParameters> = Object.freeze({ vadThreshold: 0.5, vadSilence: 0.5, leadInSeconds: 1, confirmSeconds: 0.25, minPieceSeconds: 0.5 })
+export const defaultPageParameters: Readonly<PageParameters> = Object.freeze({ vadThreshold: 0.5, vadSilence: 0.5, leadInSeconds: 1, holdBackSeconds: 0, confirmSeconds: 0.25, minPieceSeconds: 0.5 })
 
 /** The tracker's part of the parameters. */
 export function trackerTuning(parameters: TrackingParameters): SpeakerTrackerTuning {
@@ -74,9 +75,12 @@ export const presetOptions: Array<{ value: Preset | 'custom', title: string, det
  * The Conversation preset ends an utterance after 0.3 s of silence instead of 0.5 s. In two-person
  * meetings, a turn boundary then marked 60% instead of 55% of the speaker changes with gaps under
  * 0.5 s, and there were 12 instead of 23 false cuts in 15 minutes.
+ *
+ * It also holds back 0.3 s of live audio. In the first 300 s of three AMI meetings (183 utterances),
+ * the first words of 8 instead of 14 utterances went to the row before them.
  */
 export const presets: Record<Preset, { speechDetection: SpeechDetection, useSegmentation: boolean, overrides: Partial<TrackingParameters> }> = {
-  conversation: { speechDetection: 'silero', useSegmentation: true, overrides: { borrowThreshold: 1, vadSilence: 0.3 } },
+  conversation: { speechDetection: 'silero', useSegmentation: true, overrides: { borrowThreshold: 1, vadSilence: 0.3, holdBackSeconds: 0.3 } },
   media: { speechDetection: 'segmentation', useSegmentation: true, overrides: { borrowThreshold: 1 } },
 }
 
@@ -115,6 +119,7 @@ export const parameterGroups: Array<{ title: string, fields: ParameterField[] }>
     title: 'Speech detection',
     fields: [
       { key: 'vadThreshold', label: 'Speech threshold', help: 'Raise it if music or noise starts utterances. Lower it if the page misses quiet speech.', step: 0.05, min: 0.05, max: 0.95 },
+      { key: 'holdBackSeconds', label: 'Hold back live audio', help: 'The recognizer hears the newest audio this much later. After a short pause, the first word of an utterance then stays in its own row instead of the row before it.', step: 0.05, min: 0, max: 1, unit: ' s' },
       { key: 'leadInSeconds', label: 'Audio before speech', help: 'Silero VAD reports speech up to about 1 s late. Without the segmentation model, each turn keeps this much audio from before that point. Lower values can drop the first words.', step: 0.05, min: 0, max: 2, unit: ' s', silero: true },
     ],
   },
