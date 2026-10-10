@@ -74,36 +74,44 @@ export function createEventHub<E extends { type: string }>(): EventHub<E> {
 
     [Symbol.asyncIterator]() {
       const queue: E[] = []
+      // Calls of `next` that wait for an event, oldest first. Each gets its own event.
+      const waiting: Array<(result: IteratorResult<E, undefined>) => void> = []
       let done = closed
-      let wake: (() => void) | undefined
       const stop = listen((event) => {
-        if (event === undefined)
+        if (event === undefined) {
           done = true
-        else
-          queue.push(event)
 
-        wake?.()
+          for (const resolve of waiting.splice(0))
+            resolve({ done: true, value: undefined })
+        }
+        else if (waiting.length) {
+          waiting.shift()!({ done: false, value: event })
+        }
+        else {
+          queue.push(event)
+        }
       })
 
       return {
         async next() {
-          // The listener wakes the iterator on each event and when the hub closes.
-          if (!queue.length && !done)
-            await new Promise<void>(resolve => wake = resolve)
-
-          wake = undefined
-
           if (queue.length)
             return { done: false, value: queue.shift()! }
 
-          stop()
+          if (done) {
+            stop()
 
-          return { done: true, value: undefined }
+            return { done: true, value: undefined }
+          }
+
+          return new Promise(resolve => waiting.push(resolve))
         },
         async return() {
           stop()
           queue.length = 0
           done = true
+
+          for (const resolve of waiting.splice(0))
+            resolve({ done: true, value: undefined })
 
           return { done: true, value: undefined }
         },
