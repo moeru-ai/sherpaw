@@ -1,23 +1,23 @@
 // cspell:ignore Nemotron nemotron diar
 /// <reference types="@webgpu/types" />
 
+import type { SortformerModel, SortformerStream } from '@sherpaw/speaker-diarization/sortformer'
+
 import { defineInvokeHandler } from '@moeru/eventa'
 import { createContext } from '@moeru/eventa/adapters/webworkers/worker'
+import { loadSortformer } from '@sherpaw/speaker-diarization/sortformer'
 import ortWasmMjs from 'onnxruntime-web/ort-wasm-simd-threaded.asyncify.mjs?url'
 import ortWasm from 'onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url'
 import * as ort from 'onnxruntime-web/webgpu'
 import { fetchLocalModel } from 'virtual:local-models'
 
-import type { NemotronModel, NemotronStream } from './stream'
-
 import { operation } from './protocol'
-import { loadNemotron, profiles } from './stream'
 
 const sampleRate = 16000
 const reportMs = 5000
 const { context } = createContext()
-let model: NemotronModel | undefined
-let stream: NemotronStream | undefined
+let model: SortformerModel | undefined
+let stream: SortformerStream | undefined
 let profiling = false
 let queue: Promise<{ probabilities: Float32Array, computeMs: number }> = Promise.resolve({ probabilities: new Float32Array(0), computeMs: 0 })
 /** Samples of push requests that wait in the queue or run now. */
@@ -40,7 +40,7 @@ function startReports() {
   const times = new Map<string, number[]>()
   const observer = new PerformanceObserver((list) => {
     for (const entry of list.getEntries()) {
-      const stage = entry.name.startsWith('nemotron:') ? entry.name.slice('nemotron:'.length) : undefined
+      const stage = entry.name.startsWith('sortformer:') ? entry.name.slice('sortformer:'.length) : undefined
 
       if (stage)
         times.set(stage, [...(times.get(stage) ?? []), entry.duration])
@@ -88,9 +88,9 @@ async function load(enableProfiling: boolean) {
   const response = await fetchLocalModel('nemotron-3-diarization/nemotron3_diar_v3.w8.onnx')
 
   if (!response.ok)
-    throw new Error(`Could not load the Nemotron model (${response.status}). Put nemotron3_diar_v3.w8.onnx in models/nemotron-3-diarization/.`)
+    throw new Error(`Could not load the Nemotron model (${response.status}). Run models/nemotron-3-diarization/download.sh.`)
 
-  model = await loadNemotron(ort, new Uint8Array(await response.arrayBuffer()), {
+  model = await loadSortformer(ort, new Uint8Array(await response.arrayBuffer()), {
     executionProviders: ['webgpu'],
   })
   profiling = enableProfiling
@@ -124,7 +124,7 @@ defineInvokeHandler(context, operation, (request) => {
 
     if (request.kind === 'start') {
       await stream?.dispose()
-      stream = model.createStream({ profile: profiles[request.profile], profiling })
+      stream = model.createStream({ profile: request.profile, profiling })
       return { probabilities: new Float32Array(0), computeMs: 0 }
     }
 

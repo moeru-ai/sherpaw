@@ -1,9 +1,10 @@
 // cspell:ignore Nemotron nemotron
+import type { ProfileName, ProfileSpeed } from '@sherpaw/speaker-diarization/sortformer'
+
 import { defineInvoke } from '@moeru/eventa'
 import { createContext } from '@moeru/eventa/adapters/webworkers'
 
 import type { NemotronRequest } from './protocol'
-import type { ProfileName, ProfileSpeed } from './stream'
 
 import { operation } from './protocol'
 import RuntimeWorker from './runtime.worker?worker'

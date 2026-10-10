@@ -1,11 +1,11 @@
 <!-- cspell:ignore Nemotron nemotron -->
 <script setup lang="ts">
+import type { ProfileName, ProfileSpeed, SortformerTurn } from '@sherpaw/speaker-diarization/sortformer'
 import type { Recognizer } from '../features/asr/protocol'
 import type { NemotronClient } from '../features/nemotron/client'
-import type { ProfileName, ProfileSpeed } from '../features/nemotron/stream'
-import type { NemotronTurn } from '../features/nemotron/turns'
 
 import { createTokenTimeline } from '@sherpaw/asr/tokens'
+import { activeSpeakers, profiles, recommendProfile, SPEAKERS, turnsOf } from '@sherpaw/speaker-diarization/sortformer'
 import { computed, onBeforeUnmount, ref, useTemplateRef } from 'vue'
 import Button from '../components/Button.vue'
 import SandboxLayout from '../components/SandboxLayout.vue'
@@ -14,10 +14,8 @@ import { asrModels } from '../features/asr/catalog'
 import { createRecognizer } from '../features/asr/recognizer'
 import { startMicrophone } from '../features/audio/microphone'
 import { createNemotronClient } from '../features/nemotron/client'
-import { profiles, recommendProfile, SPEAKERS } from '../features/nemotron/stream'
-import { activeSpeakers, turnsOf } from '../features/nemotron/turns'
 
-interface Row extends NemotronTurn {
+interface Row extends SortformerTurn {
   words: string
 }
 

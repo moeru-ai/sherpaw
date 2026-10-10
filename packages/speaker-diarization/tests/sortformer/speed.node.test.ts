@@ -1,7 +1,7 @@
-// cspell:ignore nemotron
+// cspell:ignore sortformer
 import { describe, expect, it } from 'vitest'
 
-import { recommendProfile } from '../../src/features/nemotron/stream'
+import { recommendProfile } from '../../src/sortformer/stream'
 
 describe('nemotron speed', () => {
   it('picks the lowest latency under the limit', () => {

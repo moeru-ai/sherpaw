@@ -1,7 +1,7 @@
 // cspell:ignore Nemotron nemotron
-import { defineInvokeEventa } from '@moeru/eventa'
+import type { ProfileName, ProfileSpeed } from '@sherpaw/speaker-diarization/sortformer'
 
-import type { ProfileName, ProfileSpeed } from './stream'
+import { defineInvokeEventa } from '@moeru/eventa'
 
 export type NemotronRequest
   = | { kind: 'load', profiling: boolean }

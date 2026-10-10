@@ -1,7 +1,7 @@
-// cspell:ignore nemotron
+// cspell:ignore sortformer
 import { describe, expect, it } from 'vitest'
 
-import { activeSpeakers, turnsOf } from '../../src/features/nemotron/turns'
+import { activeSpeakers, turnsOf } from '../../src/sortformer/turns'
 
 const speakers = 8
 
@@ -20,7 +20,7 @@ function probabilities(labels: Array<number | number[] | undefined>) {
   return values
 }
 
-describe('nemotron turns', () => {
+describe('sortformer turns', () => {
   it('uses the highest speaker above the threshold for each frame', () => {
     const values = probabilities(Array.from({ length: 30 }, () => [0, 1]))
 
@@ -79,5 +79,29 @@ describe('nemotron turns', () => {
 
   it('returns all speakers active in the requested recent frames', () => {
     expect(activeSpeakers(probabilities([0, 1, [1, 2]]), 3, 0.02)).toEqual([1, 2])
+  })
+
+  it('accepts a custom threshold', () => {
+    const values = probabilities(repeat(0, 30))
+
+    values.fill(0.6)
+    expect(turnsOf(values, 30, { threshold: 0.7 })).toEqual([])
+  })
+
+  it('keeps the first leading frame when crossing is false', () => {
+    const values = new Float32Array(240 * speakers)
+
+    for (let frame = 0; frame < 240; frame++)
+      values[frame * speakers + (frame < 140 ? 0 : 1)] = 0.9
+
+    expect(turnsOf(values, 240, { crossing: false }).map(turn => turn.start)).toEqual([0, 140 * 0.01])
+  })
+
+  it('rejects invalid values', () => {
+    expect(() => turnsOf(new Float32Array(8), 1, { threshold: 1.1 })).toThrow(RangeError)
+    expect(() => turnsOf(new Float32Array(8), 1, { minTurnSeconds: -1 })).toThrow(RangeError)
+    expect(() => turnsOf(new Float32Array(8), 1, { crossing: { floor: Number.NaN } })).toThrow(TypeError)
+    expect(() => turnsOf(new Float32Array(7), 1)).toThrow(RangeError)
+    expect(() => activeSpeakers(new Float32Array(8), 1, -1)).toThrow(RangeError)
   })
 })

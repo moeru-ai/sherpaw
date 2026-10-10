@@ -2,9 +2,11 @@
 import type * as Ort from 'onnxruntime-web/webgpu'
 
 /**
- * Nemotron 3 Diarization (Streaming Sortformer v3) in onnxruntime-web, fed block by block. A port of
- * the research prototype in `.local/scripts/2026-10-02-sortformer`, which follows parakeet-rs
- * `src/sortformer.rs`. Experimental: only the sandbox uses it.
+ * NVIDIA Nemotron 3 Diarization (Streaming Sortformer v3) as exported to ONNX by parakeet-rs.
+ * The streaming loop and the features are ported from parakeet-rs `src/sortformer.rs` (MIT, see
+ * NOTICE). The model takes the inputs `chunk`, `chunk_lengths`, `spkcache`, `spkcache_lengths`,
+ * `fifo` and `fifo_lengths`, returns `preds_diar` (80 ms), `preds_hires` (10 ms) and
+ * `chunk_pre_encode_embs`, and stores the silence embedding in the `learnable_sil_emb` metadata.
  */
 
 const N_FFT = 512
@@ -210,7 +212,7 @@ function onnxMetadata(bytes: Uint8Array) {
   return metadata
 }
 
-export interface NemotronStream {
+export interface SortformerStream {
   /** Adds 16 kHz mono PCM. Resolves to the speaker probabilities of the newly decided 10 ms frames, `SPEAKERS` per frame. */
   push: (samples: Float32Array) => Promise<Float32Array>
   /** Decides the rest of the audio. Call `reset` before more audio. */
@@ -223,10 +225,10 @@ export interface NemotronStream {
   dispose: () => Promise<void>
 }
 
-export interface NemotronStreamOptions {
-  profile?: Profile
+export interface SortformerStreamOptions {
+  profile?: ProfileName | Profile
   executionProviders?: string[]
-  /** Records each step's stages as User Timing measures (`nemotron:features`, `nemotron:run`, `nemotron:update`), which DevTools shows in the Performance panel. */
+  /** Records each step's stages as User Timing measures (`sortformer:features`, `sortformer:run`, `sortformer:update`), which DevTools shows in the Performance panel. */
   profiling?: boolean
 }
 
@@ -237,13 +239,15 @@ export interface ProfileSpeed {
   realTimeFactor: number
 }
 
-export interface NemotronModel {
-  createStream: (options?: { profile?: Profile, profiling?: boolean }) => NemotronStream
+export interface SortformerModel {
+  /** A stream with its own state. `profile` is a name from `profiles` or a custom profile. Default: 'low'. */
+  createStream: (options?: { profile?: ProfileName | Profile, profiling?: boolean }) => SortformerStream
   benchmark: (options?: { warmup?: number, runs?: number }) => Promise<ProfileSpeed[]>
   dispose: () => Promise<void>
 }
 
-function createStream(ort: typeof Ort, session: Ort.InferenceSession, silEmb: Float32Array, { profile = profiles.low, profiling = false }: { profile?: Profile, profiling?: boolean } = {}): NemotronStream {
+function createStream(ort: typeof Ort, session: Ort.InferenceSession, silEmb: Float32Array, { profile: chosen = 'low', profiling = false }: { profile?: ProfileName | Profile, profiling?: boolean } = {}): SortformerStream {
+  const profile = typeof chosen === 'string' ? profiles[chosen] : chosen
   const { chunk: chunkLen, right, fifo: fifoMax, update, cache: cacheMax } = profile
   const stride = chunkLen * SUBSAMPLING
   const feed = (chunkLen + right) * SUBSAMPLING
@@ -269,7 +273,7 @@ function createStream(ort: typeof Ort, session: Ort.InferenceSession, silEmb: Fl
 
   function measure(stage: string, start: number) {
     if (profiling)
-      performance.measure(`nemotron:${stage}`, { start, end: performance.now() })
+      performance.measure(`sortformer:${stage}`, { start, end: performance.now() })
   }
 
   function reset() {
@@ -599,9 +603,9 @@ async function benchmark(ort: typeof Ort, session: Ort.InferenceSession, { warmu
 }
 
 /**
- * Loads a Nemotron model once. Streams share its session.
+ * Loads a Sortformer model once. Streams share its session.
  */
-export async function loadNemotron(ort: typeof Ort, bytes: Uint8Array, { executionProviders = ['webgpu'] }: Pick<NemotronStreamOptions, 'executionProviders'> = {}): Promise<NemotronModel> {
+export async function loadSortformer(ort: typeof Ort, bytes: Uint8Array, { executionProviders = ['webgpu'] }: Pick<SortformerStreamOptions, 'executionProviders'> = {}): Promise<SortformerModel> {
   const metadata = onnxMetadata(bytes)
   const silEmb = Float32Array.from((metadata.learnable_sil_emb ?? '').split(',').filter(Boolean).map(Number))
 
@@ -618,8 +622,8 @@ export async function loadNemotron(ort: typeof Ort, bytes: Uint8Array, { executi
 }
 
 /** Creates a stream that releases its loaded model when disposed. */
-export async function createNemotronStream(ort: typeof Ort, bytes: Uint8Array, options: NemotronStreamOptions = {}): Promise<NemotronStream> {
-  const model = await loadNemotron(ort, bytes, options)
+export async function createSortformerStream(ort: typeof Ort, bytes: Uint8Array, options: SortformerStreamOptions = {}): Promise<SortformerStream> {
+  const model = await loadSortformer(ort, bytes, options)
   const stream = model.createStream(options)
 
   return {
