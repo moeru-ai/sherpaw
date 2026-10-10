@@ -5,7 +5,7 @@ import type { Segment } from './segmentation'
 import type { EnrollOptions, SimilarityOptions, SpeakerConfidence, SpeakerGuess, SpeakerMap, SpeakerRevision, SpeakerTrackerResetOptions, SpeakerTrackerTuning, SpeakerTurn } from './types'
 
 import { centroid, clusterEmbeddings, dot, maximumAssignment, normalize } from './clustering'
-import { decode, findChanges, MIN_SEGMENTATION_SAMPLES, overlapSeconds, SEGMENTATION_SAMPLE_RATE } from './segmentation'
+import { decode, findChanges, MIN_SEGMENTATION_SAMPLES, overlapSeconds, SEGMENT_MIN_PIECE_SECONDS, SEGMENT_WINDOW_SECONDS, SEGMENTATION_SAMPLE_RATE } from './segmentation'
 import { resolveTuning } from './tuning'
 
 export interface NativeSpeakerTrackerConfig {
@@ -50,13 +50,6 @@ const CONSISTENT = 0.5
 /** Otherwise, runs of neighboring windows at or above this cosine become units. */
 const NEIGHBOR = 0.4
 const MIXED_SHARE = 0.8
-/**
- * Segmentation-based speaker changes, from simulations of the sandbox page on AliMeeting, AMI and
- * MagicData Mandarin conversations: each call looks at the last 10 s. The tracker ignores changes
- * closer than 0.3 s to either end of the audio.
- */
-const SEGMENT_WINDOW_SECONDS = 10
-const SEGMENT_MIN_PIECE_SECONDS = 0.3
 /** Enrollment needs at least this much audio. The evaluated enrollments used 5-30 s of speech. */
 const MIN_ENROLL_SECONDS = 5
 /**
@@ -97,8 +90,13 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
   if (!Number.isInteger(historyLimit) || historyLimit < 2)
     throw new RangeError('historyLimit must be an integer of at least 2')
 
+  // Clustering reaches only the last `historyLimit` units and the utterances that own them. `forget`
+  // drops older units and utterances, so that memory does not grow with the session. Indexes stay
+  // absolute: `units[0]` is unit `unitBase`, and the per-utterance arrays start at utterance `turnBase`.
   let units: Unit[] = []
   let labels: number[] = []
+  let unitBase = 0
+  let turnBase = 0
   /** Per utterance: the indexes of its units, in order. */
   let unitsOf: number[][] = []
   /** Established speakers by id; ids are internal until first reported. */
@@ -122,6 +120,8 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
   function reset(forgetEnrolled = false) {
     units = []
     labels = []
+    unitBase = 0
+    turnBase = 0
     unitsOf = []
     pendingClusters = new Map()
     reported = []
@@ -199,7 +199,7 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
       + WEIGHTS.pending * Number(features.pending)
       + WEIGHTS.split * Number(features.split)
       + WEIGHTS.consistency * features.consistency
-      + WEIGHTS.logUnits * Math.log1p(units.length)
+      + WEIGHTS.logUnits * Math.log1p(unitBase + units.length)
 
     return 1 / (1 + Math.exp(-z))
   }
@@ -259,17 +259,17 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
 
   /** Re-clusters recent units and gives every cluster a stable id. */
   function clusterRecent(): number {
-    const first = Math.max(0, units.length - historyLimit)
-    const recent = units.slice(first)
-    const clusters = clusterEmbeddings(recent.map(unit => unit.embedding), clustering)
+    const first = Math.max(0, unitBase + units.length - historyLimit)
+    const recent = units.slice(first - unitBase)
+    const embeddings = recent.map(unit => unit.embedding)
+    const clusters = clusterEmbeddings(embeddings, clustering)
     const ids = [...new Set(clusters)]
     const members = ids.map(() => new Set<number>())
 
     clusters.forEach((cluster, i) => members[ids.indexOf(cluster)]!.add(first + i))
 
-    const embeddings = units.map(unit => unit.embedding)
-    const centers = members.map(set => centroid(embeddings, set))
-    const sizes = members.map(set => [...set].reduce((sum, i) => sum + units[i]!.seconds, 0))
+    const centers = members.map(set => centroid(embeddings, [...set].map(i => i - first)))
+    const sizes = members.map(set => [...set].reduce((sum, i) => sum + recent[i - first]!.seconds, 0))
     const established = sizes.map(size => size >= tuning.establishedSeconds)
 
     if (!established.includes(true))
@@ -346,17 +346,49 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
       assigned[i] = id
     }
 
-    clusters.forEach((cluster, i) => labels[first + i] = assigned[ids.indexOf(cluster)]!)
+    clusters.forEach((cluster, i) => labels[first - unitBase + i] = assigned[ids.indexOf(cluster)]!)
 
     return first
+  }
+
+  /**
+   * Drops the units before `first` that clustering will not reach again, with the utterances that own
+   * them. The utterance that owns unit `first` can still be revised, so all its units stay. The arrays
+   * shrink only after `historyLimit` units can go, so that the copying costs O(1) per unit.
+   */
+  function forget(first: number) {
+    const owner = units[first - unitBase]!.turn
+    const keep = unitsOf[owner - turnBase]![0]!
+
+    if (keep - unitBase < historyLimit)
+      return
+
+    units = units.slice(keep - unitBase)
+    labels = labels.slice(keep - unitBase)
+    unitsOf = unitsOf.slice(owner - turnBase)
+    reported = reported.slice(owner - turnBase)
+    candidates = candidates.slice(owner - turnBase)
+    unitBase = keep
+    turnBase = owner
+
+    // A pending cluster matches new clusters by shared units, and those are all recent.
+    for (const [id, members] of pendingClusters) {
+      for (const member of members) {
+        if (member < keep)
+          members.delete(member)
+      }
+
+      if (!members.size)
+        pendingClusters.delete(id)
+    }
   }
 
   /** Majority speaker of an utterance's units, weighted by seconds. */
   function vote(turn: number): { id: number, share: number, count: number } {
     const votes = new Map<number, number>()
 
-    for (const i of unitsOf[turn] ?? [])
-      votes.set(labels[i]!, (votes.get(labels[i]!) ?? 0) + units[i]!.seconds)
+    for (const i of unitsOf[turn - turnBase] ?? [])
+      votes.set(labels[i - unitBase]!, (votes.get(labels[i - unitBase]!) ?? 0) + units[i - unitBase]!.seconds)
 
     let id = -1
     let most = -Infinity
@@ -465,7 +497,7 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
 
       live()
 
-      const index = reported.length
+      const index = turnBase + reported.length
 
       if (seconds < MIN_WINDOWED_SECONDS) {
         const embedding = seconds >= MIN_EMBEDDED_SECONDS ? embed(samples, sampleRate) : undefined
@@ -486,7 +518,7 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
       if (!added.length)
         return { index, speaker: number(previous), score: 0, confidence: 'low', pending: false, mixed: false, overlap, revisions: [] }
 
-      unitsOf[index] = added.map((_, i) => units.length + i)
+      unitsOf[index - turnBase] = added.map((_, i) => unitBase + units.length + i)
       units.push(...added)
       labels.push(...added.map(() => -1))
 
@@ -498,30 +530,33 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
 
       // Earlier utterances in the clustered range may have moved to another speaker.
       const revisions: SpeakerRevision[] = []
-      const touched = new Set(units.slice(first).map(unit => unit.turn))
+      const touched = new Set(units.slice(first - unitBase).map(unit => unit.turn))
 
       touched.delete(index)
 
       for (const turn of [...touched].sort((a, b) => a - b)) {
         const current = vote(turn).id
-        const candidate = candidates[turn]
+        const candidate = candidates[turn - turnBase]
 
-        if (current === reported[turn]) {
-          candidates[turn] = undefined
+        if (current === reported[turn - turnBase]) {
+          candidates[turn - turnBase] = undefined
           continue
         }
 
-        candidates[turn] = { id: current, count: candidate?.id === current ? candidate.count + 1 : 1 }
+        const next = { id: current, count: candidate?.id === current ? candidate.count + 1 : 1 }
 
-        if (candidates[turn].count >= STABLE_REVISIONS) {
-          reported[turn] = current
-          candidates[turn] = undefined
+        candidates[turn - turnBase] = next
+
+        if (next.count >= STABLE_REVISIONS) {
+          reported[turn - turnBase] = current
+          candidates[turn - turnBase] = undefined
           revisions.push({ index: turn, speaker: number(current) })
         }
       }
 
-      reported[index] = id
+      reported[index - turnBase] = id
       previous = id
+      forget(first)
 
       return { index, speaker: number(id), score: value, confidence: level(value), pending, mixed: share < MIXED_SHARE, overlap, revisions }
     },

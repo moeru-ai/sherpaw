@@ -9,6 +9,13 @@ export const SEGMENTATION_SAMPLE_RATE = 16000
 const FRAME_SHIFT = 270
 const RECEPTIVE_FIELD = 991
 const CLASSES = 7
+/**
+ * Segmentation-based speaker changes, from simulations of the sandbox page on AliMeeting, AMI and
+ * MagicData Mandarin conversations: each call looks at the last 10 s. The tracker ignores changes
+ * closer than 0.3 s to either end of the audio.
+ */
+export const SEGMENT_WINDOW_SECONDS = 10
+export const SEGMENT_MIN_PIECE_SECONDS = 0.3
 /** Shorter input produces no frames. */
 export const MIN_SEGMENTATION_SAMPLES = 2 * RECEPTIVE_FIELD
 /** Seconds between two frames: 16.875 ms. */

@@ -3,6 +3,14 @@ import type { SpeakerTracker } from './types'
 
 import { createSpeechDetector } from './speech-detector'
 
+/**
+ * sherpa-onnx's VAD counts samples in int32, which breaks after 2^31 samples (37 hours at 16 kHz).
+ * `sileroUtterances` restarts it in a silence once it has counted this many samples.
+ */
+const VAD_RESTART_SAMPLES = 2 ** 30
+/** Audio that `sileroUtterances` keeps for `tracker.speech`. */
+const RECENT_SAMPLES = 4 * 16000
+
 /** Finds utterances in 16 kHz mono audio for `createStreamingDiarizer`. */
 export interface UtteranceDetector {
   /** Adds a block of audio and resolves to the utterances that ended. */
@@ -52,6 +60,8 @@ export function sileroUtterances(vad: SileroVad, options: SileroUtteranceOptions
     throw new RangeError('onsetThreshold must be between 0 and 1')
 
   let received = 0
+  /** Samples before the VAD's last restart. The VAD counts from 0 after a restart. */
+  let base = 0
   let previousEnd = 0
   let speechStart: number | undefined
   /** The last 4 seconds of accepted audio. */
@@ -59,10 +69,18 @@ export function sileroUtterances(vad: SileroVad, options: SileroUtteranceOptions
   let offset = 0
 
   function append(block: Float32Array) {
-    chunks.push(block.slice())
+    // Copy at most the last 4 s of the block: the loop below drops older audio anyway.
+    const tail = block.subarray(Math.max(0, block.length - RECENT_SAMPLES))
+
+    if (tail.length < block.length) {
+      chunks = []
+      offset = received + block.length - tail.length
+    }
+
+    chunks.push(tail.slice())
     received += block.length
 
-    const keep = Math.max(0, received - 4 * 16000)
+    const keep = Math.max(0, received - RECENT_SAMPLES)
 
     while (chunks.length && offset + chunks[0]!.length <= keep)
       offset += chunks.shift()!.length
@@ -127,7 +145,7 @@ export function sileroUtterances(vad: SileroVad, options: SileroUtteranceOptions
     if (!tracker?.segmentation)
       return
 
-    const start = Math.max(previousEnd, received - 4 * 16000)
+    const start = Math.max(previousEnd, received - RECENT_SAMPLES)
     const samples = range(start, received)
 
     if (samples.length < 1982)
@@ -148,8 +166,8 @@ export function sileroUtterances(vad: SileroVad, options: SileroUtteranceOptions
       const { start, samples } = vad.front()
 
       vad.pop()
-      ended.push({ start, samples })
-      previousEnd = start + samples.length
+      ended.push({ start: base + start, samples })
+      previousEnd = base + start + samples.length
     }
 
     if (ended.length)
@@ -172,6 +190,11 @@ export function sileroUtterances(vad: SileroVad, options: SileroUtteranceOptions
       if (!wasDetected && vad.isDetected())
         await locateStart()
 
+      if (received - base >= VAD_RESTART_SAMPLES && !vad.isDetected() && vad.isEmpty()) {
+        vad.reset()
+        base = received
+      }
+
       return ended
     },
     async flush() {
@@ -190,6 +213,7 @@ export function sileroUtterances(vad: SileroVad, options: SileroUtteranceOptions
     reset() {
       vad.reset()
       received = 0
+      base = 0
       previousEnd = 0
       speechStart = undefined
       chunks = []

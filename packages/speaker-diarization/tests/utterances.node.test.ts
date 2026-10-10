@@ -11,7 +11,7 @@ class FakeVad implements SileroVad {
   segments: Array<{ start: number, samples: Float32Array }> = []
   nextDetected = false
 
-  acceptWaveform() {
+  acceptWaveform(_samples?: Float32Array) {
     this.detected = this.nextDetected
   }
 
@@ -153,6 +153,46 @@ describe('silero utterances', () => {
     await start(detector, vad)
     detector.reset()
     expect(detector.speechStart()).toBeUndefined()
+  })
+
+  it('restarts the VAD in a silence before its int32 sample count overflows, and keeps positions', async () => {
+    // Like sherpa-onnx's VAD: positions count from its last reset, and 2^31 samples break it.
+    class CountingVad extends FakeVad {
+      count = 0
+      resets = 0
+
+      override acceptWaveform(samples: Float32Array) {
+        super.acceptWaveform()
+        this.count += samples.length
+
+        if (this.count >= 2 ** 31)
+          throw new Error('int32 overflow')
+      }
+
+      override reset() {
+        super.reset()
+        this.count = 0
+        this.resets++
+      }
+    }
+
+    const vad = new CountingVad()
+    const detector = sileroUtterances(vad)
+    const block = new Float32Array(2 ** 24)
+
+    // 3 * 2^30 samples of silence, more than the VAD can count: it restarts after every 2^30.
+    for (let i = 0; i < 193; i++)
+      await detector.accept(block)
+
+    expect(vad.resets).toBe(3)
+    expect(detector.decided()).toBe(3 * 2 ** 30 + 2 ** 24)
+
+    // An utterance that the restarted VAD reports 1 s before its own count.
+    vad.segments.push({ start: vad.count - rate, samples: new Float32Array(rate / 2) })
+
+    const [utterance] = await detector.accept(new Float32Array(rate / 10))
+
+    expect(utterance!.start).toBe(3 * 2 ** 30 + 2 ** 24 - rate)
   })
 
   it('validates the onset threshold', () => {

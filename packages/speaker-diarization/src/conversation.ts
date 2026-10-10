@@ -3,6 +3,7 @@ import type { SpeakerGuess, SpeakerTracker, SpeakerTurn } from './types'
 import type { UtteranceDetector } from './utterances'
 
 import { createEventHub } from './event-hub'
+import { SEGMENT_MIN_PIECE_SECONDS, SEGMENT_WINDOW_SECONDS } from './segmentation'
 
 export type { SileroUtteranceOptions, SileroVad, UtteranceDetector } from './utterances'
 
@@ -14,6 +15,11 @@ const SAMPLE_RATE = 16000
 const CHECK = 0.75 * SAMPLE_RATE
 /** Audio kept for a detector that finds the start of speech late, such as the segmentation model. */
 const RECENT = 4 * SAMPLE_RATE
+/**
+ * A segmentation check uses only the last 10 s of a part. The 0.3 s before them keep the tracker's
+ * rule for changes near the start of its input as it was with the whole part.
+ */
+const SEGMENTED = (SEGMENT_WINDOW_SECONDS + SEGMENT_MIN_PIECE_SECONDS) * SAMPLE_RATE
 /** Focus decisions come in steps of this many samples (0.25 s). */
 const STEP = SAMPLE_RATE / 4
 /** With focus, a speaker cut this close to a start or a stop of the focus speaker marks the same change. */
@@ -535,8 +541,8 @@ export function createStreamingDiarizer(options: StreamingDiarizerOptions): Stre
 
   /** Triggering workflow: {@link handle} every 0.75 s of speech -> {@link check} -> tracker.peek -> a speaker guess, and cuts at speaker changes. */
   async function check(current: Part, session: number) {
-    // The segmentation model looks at the audio since the last cut. The embedding check looks at its last 3 s.
-    const from = tracker.segmentation ? 0 : Math.max(0, current.length - 3 * SAMPLE_RATE)
+    // The segmentation model looks at the last 10 s since the last cut. The embedding check looks at its last 3 s.
+    const from = Math.max(0, current.length - (tracker.segmentation ? SEGMENTED : 3 * SAMPLE_RATE))
 
     current.checked = current.length
 
