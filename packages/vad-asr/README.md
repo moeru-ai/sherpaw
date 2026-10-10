@@ -10,7 +10,7 @@ import { CircularBuffer, createVad, initVADASRModule, OfflineRecognizer } from '
 const module = await initVADASRModule()
 
 const vad = createVad(module, {
-  sileroVad: { model: './silero_vad.onnx' },
+  sileroVad: { model: './silero_vad_v5.onnx', windowSize: 512 },
   sampleRate: 16000,
   numThreads: 1,
   provider: 'cpu',
@@ -33,6 +33,12 @@ const recognizer = new OfflineRecognizer(
 
 const circularBuffer = new CircularBuffer(30 * 16000, module)
 ```
+
+## Models
+
+Use Silero VAD v5 ([`silero_vad_v5.onnx`](https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad_v5.onnx), 2.3 MB, MIT) with `windowSize: 512` at 16 kHz. The runtime detects v5 from the model's inputs. With any other window size, the native code exits and the WASM module stops working.
+
+The older v4 export (`silero_vad.onnx`) and TEN VAD (`ten-vad.onnx`, `windowSize: 256`) also load. In a test with three sung songs playing alone, v4 marked up to 64% and TEN VAD up to 94% of the song as speech; v5 marked at most 3%. No VAD rejects speech from a video playing in the background, because that audio is also speech.
 
 ## Notes
 

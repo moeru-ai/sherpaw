@@ -4,7 +4,7 @@ import { expect, it } from 'vitest'
 import { CircularBuffer, createVad, initVADASRModule, OfflineRecognizer } from '../src'
 import { decodeWavPcm16, encodeWavPcm16 } from './helpers/wav'
 
-const vadModelPath = new URL('./models/silero_vad.onnx', import.meta.url)
+const vadModelPath = new URL('./models/silero_vad_v5.onnx', import.meta.url)
 
 async function fetchBytes(url: URL): Promise<Uint8Array> {
   const res = await fetch(url)
@@ -75,7 +75,7 @@ it('transcribes wav samples with the browser vad-asr pipeline', async () => {
   const filenames = loadVirtualData({
     module,
     virtualData: {
-      'silero_vad.onnx': silero,
+      'silero_vad_v5.onnx': silero,
       'encoder_model.ort': encoder,
       'decoder_model_merged.ort': decoder,
       'tokens.txt': tokens,
@@ -94,7 +94,24 @@ it('transcribes wav samples with the browser vad-asr pipeline', async () => {
   }, module)
   expect(recognizer).toBeDefined()
 
-  const vad = createVad(module)
+  // createVad replaces the whole default config, so pass every field.
+  // Silero VAD v5 requires a 512-sample window at 16 kHz.
+  const windowSize = 512
+  const vad = createVad(module, {
+    sileroVad: {
+      model: filenames['silero_vad_v5.onnx'],
+      threshold: 0.5,
+      minSilenceDuration: 0.5,
+      minSpeechDuration: 0.25,
+      maxSpeechDuration: 20,
+      windowSize,
+    },
+    sampleRate: 16000,
+    numThreads: 1,
+    provider: 'cpu',
+    debug: 0,
+    bufferSizeInSeconds: 30,
+  })
   const circularBuffer = new CircularBuffer(30 * 16000, module)
   expect(vad).toBeDefined()
 
@@ -104,7 +121,6 @@ it('transcribes wav samples with the browser vad-asr pipeline', async () => {
   circularBuffer.push(samples)
 
   const transcripts: string[] = []
-  const windowSize = vad.config.sileroVad.windowSize
 
   function decodeDetectedSegments() {
     while (!vad.isEmpty()) {
