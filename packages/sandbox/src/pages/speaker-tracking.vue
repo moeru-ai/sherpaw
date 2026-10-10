@@ -511,6 +511,7 @@ function startConversation() {
     confirmSeconds: active.confirmSeconds,
     minCutGapSeconds: active.minPieceSeconds,
     leadInSeconds: active.leadInSeconds,
+    holdBackSeconds: active.holdBackSeconds,
     keepAudio: true,
     signal: lifetime.signal,
   })
