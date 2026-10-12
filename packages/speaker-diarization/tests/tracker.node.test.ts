@@ -72,6 +72,47 @@ describe('speaker tracker', () => {
     expect(x! / y!).toBeCloseTo(mean[0]! / mean[1]!, 4)
   })
 
+  it('saves an enrolled voice and enrolls it again in another tracker without the audio', async () => {
+    // `nearOwner` (cosine 0.35) can join the owner's enrollment at this threshold.
+    const tuning = { enrollThreshold: 0.3 }
+    const first = createSpeakerTracker(extractor, { tuning })
+    const owner = first.enroll(audio('owner', 12), 16000)
+    const other = first.enroll(audio('other', 6), 16000)
+    // Saved as JSON, as an app would.
+    const saved = JSON.parse(JSON.stringify([owner, other].map((speaker) => {
+      const { embedding, seconds } = first.voiceprint(speaker)
+
+      return { embedding: Array.from(embedding), seconds }
+    }))) as Array<{ embedding: number[], seconds: number }>
+    const second = createSpeakerTracker(extractor, { tuning })
+
+    // In the old order, the voiceprints get the old numbers.
+    expect(saved.map(item => second.enrollVoiceprint({ embedding: new Float32Array(item.embedding), seconds: item.seconds }))).toEqual([owner, other])
+    expect(second.inspect().speakers).toEqual(first.inspect().speakers)
+    expect(saved.map(item => item.seconds)).toEqual([12, 6])
+    expect(await second.track(audio('owner', 5), 16000)).toMatchObject({ speaker: owner, pending: false })
+
+    // Speech added later is weighted against the saved seconds, as with the original enrollment.
+    first.enroll(audio('nearOwner', 6), 16000, { speaker: owner })
+    second.enroll(audio('nearOwner', 6), 16000, { speaker: owner })
+    expect([...second.voiceprint(owner).embedding]).toEqual([...first.voiceprint(owner).embedding])
+    expect(second.voiceprint(owner).seconds).toBe(18)
+  })
+
+  it('rejects a voiceprint of a speaker who is not enrolled, and invalid voiceprints', async () => {
+    const tracker = createSpeakerTracker(extractor)
+
+    await tracker.track(audio('owner', 5), 16000)
+    expect(() => tracker.voiceprint(0)).toThrow('not enrolled')
+    expect(() => tracker.enrollVoiceprint({ embedding: new Float32Array(3).fill(1), seconds: 5 })).toThrow('4 values')
+    expect(() => tracker.enrollVoiceprint({ embedding: new Float32Array(4), seconds: 5 })).toThrow('not all zero')
+    expect(() => tracker.enrollVoiceprint({ embedding: new Float32Array([1, 0, 0, Number.NaN]), seconds: 5 })).toThrow('finite')
+    expect(() => tracker.enrollVoiceprint({ embedding: new Float32Array([1, 0, 0, 0]), seconds: 0 })).toThrow('seconds')
+    // A voiceprint that is not unit length becomes one.
+    tracker.enrollVoiceprint({ embedding: new Float32Array([2, 0, 0, 0]), seconds: 5 })
+    expect([...tracker.inspect().speakers.find(speaker => speaker.enrolled)!.embedding]).toEqual([1, 0, 0, 0])
+  })
+
   it('compares windows of audio with a speaker\'s voice', async () => {
     const tracker = createSpeakerTracker(extractor)
     const owner = tracker.enroll(audio('owner', 6), 16000)

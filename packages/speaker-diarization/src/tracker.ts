@@ -2,7 +2,7 @@ import type { Extractor } from '@sherpaw/speaker-identification'
 
 import type { ClusteringOptions } from './clustering'
 import type { Segment } from './segmentation'
-import type { EnrollOptions, SimilarityOptions, SpeakerConfidence, SpeakerGuess, SpeakerMap, SpeakerRevision, SpeakerTrackerResetOptions, SpeakerTrackerTuning, SpeakerTurn } from './types'
+import type { EnrollOptions, SimilarityOptions, SpeakerConfidence, SpeakerGuess, SpeakerMap, SpeakerRevision, SpeakerTrackerResetOptions, SpeakerTrackerTuning, SpeakerTurn, SpeakerVoiceprint } from './types'
 
 import { centroid, clusterEmbeddings, dot, maximumAssignment, normalize } from './clustering'
 import { decode, findChanges, MIN_SEGMENTATION_SAMPLES, overlapSeconds, SEGMENT_MIN_PIECE_SECONDS, SEGMENT_WINDOW_SECONDS, SEGMENTATION_SAMPLE_RATE } from './segmentation'
@@ -26,6 +26,10 @@ export interface NativeSpeakerTracker {
   peek: (samples: Float32Array, sampleRate: number, options?: { final?: boolean }) => Promise<SpeakerGuess>
   /** Adds a known speaker from at least 5 s of their speech, or adds the speech to `options.speaker`, and returns their speaker number. */
   enroll: (samples: Float32Array, sampleRate: number, options?: EnrollOptions) => number
+  /** The enrolled embedding and its seconds of speech. Throws for a speaker who is not enrolled. */
+  voiceprint: (speaker: number) => SpeakerVoiceprint
+  /** Enrolls a speaker from a saved voiceprint and returns their speaker number. */
+  enrollVoiceprint: (voiceprint: SpeakerVoiceprint) => number
   /** Copies of the recently clustered units and the numbered speakers' references. Changes nothing. */
   inspect: () => SpeakerMap
   /** Per segmentation frame of at most 10 s of 16 kHz audio: the probability that anyone speaks. Needs `segment`. */
@@ -202,6 +206,17 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
       + WEIGHTS.logUnits * Math.log1p(unitBase + units.length)
 
     return 1 / (1 + Math.exp(-z))
+  }
+
+  /** Enrolls a new speaker with this embedding and seconds of speech, and returns their number. */
+  function addEnrolled(embedding: Float32Array, seconds: number): number {
+    const id = nextId++
+
+    anchors.set(id, embedding)
+    enrolledSeconds.set(id, seconds)
+    profiles.set(id, embedding)
+
+    return number(id)!
   }
 
   /** Splits an utterance into windows, then into units that should hold one speaker each. */
@@ -659,15 +674,8 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
       const embedding = embed(main, sampleRate) ?? centroid(windows, [...groups.keys()].filter(i => groups[i] === largest))
       const seconds = main.length / sampleRate
 
-      if (id === undefined) {
-        const added = nextId++
-
-        anchors.set(added, embedding)
-        enrolledSeconds.set(added, seconds)
-        profiles.set(added, embedding)
-
-        return number(added)!
-      }
+      if (id === undefined)
+        return addEnrolled(embedding, seconds)
 
       const earlier = anchors.get(id)!
       const cosine = dot(earlier, embedding)
@@ -687,6 +695,34 @@ export function createSpeakerTracker(extractor: Extractor, config: NativeSpeaker
         profiles.set(id, combined)
 
       return options.speaker!
+    },
+
+    voiceprint(speaker) {
+      live()
+
+      const id = [...numbers].find(([, value]) => value === speaker)?.[0]
+
+      if (id === undefined || !anchors.has(id))
+        throw new RangeError(`Speaker ${speaker} is not enrolled`)
+
+      return { embedding: anchors.get(id)!.slice(), seconds: enrolledSeconds.get(id)! }
+    },
+
+    enrollVoiceprint(voiceprint) {
+      live()
+
+      const { embedding, seconds } = voiceprint ?? {}
+
+      if (!(embedding instanceof Float32Array) || embedding.length !== extractor.dimension)
+        throw new RangeError(`A voiceprint embedding must be a Float32Array of ${extractor.dimension} values from the tracker's embedding model`)
+
+      if (!embedding.every(Number.isFinite) || !embedding.some(value => value !== 0))
+        throw new RangeError('A voiceprint embedding must be finite and not all zero')
+
+      if (!(seconds > 0) || !Number.isFinite(seconds))
+        throw new RangeError('A voiceprint needs a positive number of seconds')
+
+      return addEnrolled(normalize(embedding), seconds)
     },
 
     async speech(samples, sampleRate) {

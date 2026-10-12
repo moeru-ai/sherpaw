@@ -215,10 +215,28 @@ describe('published Node worker', () => {
       await expect(tracker.enroll(other, 16000, { speaker: 0 })).rejects.toThrow('does not sound like speaker 0')
       expect(await tracker.enroll(enrollment, 16000, { speaker: 0 })).toBe(0)
 
+      const voiceprint = await tracker.voiceprint(0)
       const turns = []
 
       for (const segment of reference)
         turns.push(await tracker.track(utterance(segment), 16000))
+
+      // A tracker that enrolls the saved voiceprint, without the audio, labels the same utterances the same way.
+      const restored = await createSpeakerTracker({ model: model.embedding })
+
+      try {
+        expect(await restored.enrollVoiceprint(voiceprint)).toBe(0)
+
+        const again = []
+
+        for (const segment of reference)
+          again.push((await restored.track(utterance(segment), 16000)).speaker)
+
+        expect(again).toEqual(turns.map(turn => turn.speaker))
+      }
+      finally {
+        restored.dispose()
+      }
 
       // Speaker 1 has the enrolled number from the first utterance. The others follow it in order of
       // appearance. Speaker 3 first borrows speaker 0's number, and a later revision corrects it.
