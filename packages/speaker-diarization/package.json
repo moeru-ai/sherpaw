@@ -2,8 +2,7 @@
   "name": "@sherpaw/speaker-diarization",
   "type": "module",
   "version": "0.2.1",
-  "private": true,
-  "description": "Offline speaker diarization and streaming speaker tracking with Sherpa-ONNX WASM",
+  "description": "Offline and streaming speaker diarization, speaker tracking and enrollment with Sherpa-ONNX WASM",
   "author": "Makito <i@maki.to>",
   "license": "Apache-2.0",
   "repository": {

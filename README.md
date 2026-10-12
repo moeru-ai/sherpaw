@@ -44,7 +44,7 @@ Speaker identification is available in [`@sherpaw/speaker-identification`](packa
 
 Streaming keyword spotting is available in [`@sherpaw/kws`](packages/kws/README.md). It runs in a Worker, accepts PCM audio and encoded keyword tokens, and supports replacing keywords while listening. Try the [sandbox playground](packages/sandbox/README.md#keyword-spotting-playground) at `/kws` with a microphone or an audio file.
 
-Offline speaker diarization is available in [`@sherpaw/speaker-diarization`](packages/speaker-diarization/README.md). It combines pyannote-segmentation-3.0 with any supported speaker embedding model, such as the CAM++ pack above, and returns speaker turns for a complete recording.
+Speaker diarization is available in [`@sherpaw/speaker-diarization`](packages/speaker-diarization/README.md). It combines pyannote-segmentation-3.0 with any supported speaker embedding model, such as the CAM++ pack above. It returns speaker turns for a complete recording, or labels live audio as it arrives, with enrolled people and saved voiceprints. Try it at `/speaker-tracking` in the sandbox.
 
 ## Development at the WASM/C level
 
