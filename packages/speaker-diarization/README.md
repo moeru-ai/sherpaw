@@ -10,6 +10,8 @@ A pyannote segmentation model finds local speaker activity in 10-second windows,
 pnpm add @sherpaw/speaker-diarization
 ```
 
+The browser entry starts its own module Worker, so a bundler must emit module Workers. With Vite, set `worker: { format: 'es' }`; the default format fails to build.
+
 Download the [models](#models) and serve them. The embedding model is a preload pack with `preload.data` and `preload.js.metadata`. A single ONNX file becomes a pack with a one-entry manifest:
 
 ```ts
