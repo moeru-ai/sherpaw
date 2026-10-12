@@ -97,6 +97,8 @@ export function registerWorkerHandlers<Options extends { raw?: unknown }>(contex
   defineInvokeHandler(context, events.track, ({ samples, sampleRate }) => enqueue(() => tracker.track(samples, sampleRate)))
   defineInvokeHandler(context, events.peek, ({ samples, sampleRate, final }) => enqueue(() => tracker.peek(samples, sampleRate, { final })))
   defineInvokeHandler(context, events.enroll, ({ samples, sampleRate, options }) => enqueue(() => tracker.enroll(samples, sampleRate, options)))
+  defineInvokeHandler(context, events.voiceprint, speaker => enqueue(() => tracker.voiceprint(speaker!)))
+  defineInvokeHandler(context, events.enrollVoiceprint, voiceprint => enqueue(() => tracker.enrollVoiceprint(voiceprint!)))
   defineInvokeHandler(context, events.inspect, () => enqueue(() => tracker.inspect()))
   defineInvokeHandler(context, events.speech, ({ samples, sampleRate }) => enqueue(() => tracker.speech(samples, sampleRate)))
   defineInvokeHandler(context, events.similarity, ({ samples, sampleRate, speaker, options }) => enqueue(() => tracker.similarity(samples, sampleRate, speaker, options)))

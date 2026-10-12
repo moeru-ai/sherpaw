@@ -98,6 +98,8 @@ export async function createWorkerSpeakerTracker<Options>(context: EventContext<
   const peek = defineInvoke(context, events.peek)
   const reset = defineInvoke(context, events.resetTracker)
   const enroll = defineInvoke(context, events.enroll)
+  const voiceprint = defineInvoke(context, events.voiceprint)
+  const enrollVoiceprint = defineInvoke(context, events.enrollVoiceprint)
   const inspect = defineInvoke(context, events.inspect)
   const speech = defineInvoke(context, events.speech)
   const similarity = defineInvoke(context, events.similarity)
@@ -146,6 +148,21 @@ export async function createWorkerSpeakerTracker<Options>(context: EventContext<
       const copy = copySamples(samples)
 
       return enroll({ samples: copy, sampleRate, ...(options ? { options } : {}) }, { transfer: [copy.buffer] })
+    },
+
+    async voiceprint(speaker) {
+      context.signal.throwIfAborted()
+
+      return voiceprint(speaker)
+    },
+
+    async enrollVoiceprint(saved) {
+      context.signal.throwIfAborted()
+
+      if (!(saved?.embedding instanceof Float32Array))
+        throw new TypeError('A voiceprint embedding must be a Float32Array')
+
+      return enrollVoiceprint({ embedding: saved.embedding.slice(), seconds: saved.seconds })
     },
 
     async inspect() {

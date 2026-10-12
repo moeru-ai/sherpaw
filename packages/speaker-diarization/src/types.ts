@@ -229,6 +229,20 @@ export interface EnrollOptions {
   speaker?: number
 }
 
+/**
+ * An enrolled speaker's voice without the audio, for example to save the owner of a device and
+ * enroll them again in the next session.
+ */
+export interface SpeakerVoiceprint {
+  /**
+   * Unit-length embedding from the tracker's embedding model. Save the model's name and version with
+   * it: an embedding from another model does not match, even when it has the same length.
+   */
+  embedding: Float32Array
+  /** Seconds of enrollment speech behind the embedding. Speech added later is weighted against them. */
+  seconds: number
+}
+
 export interface SimilarityOptions {
   /** Length of the compared windows. Shorter windows place a voice more precisely but compare less reliably. Default: 1 second. */
   windowSeconds?: number
@@ -262,6 +276,17 @@ export interface SpeakerTracker {
    * next `reset`. Pass speech only. Long silence weakens the embedding. Copies the samples.
    */
   enroll: (samples: Float32Array, sampleRate: number, options?: EnrollOptions) => Promise<number>
+  /**
+   * The voiceprint of an enrolled speaker, to save and enroll again later with `enrollVoiceprint`,
+   * without keeping their audio. Rejects a speaker who is not enrolled. Changes nothing.
+   */
+  voiceprint: (speaker: number) => Promise<SpeakerVoiceprint>
+  /**
+   * Enrolls a speaker from a saved voiceprint and resolves to their speaker number, as `enroll` does
+   * from audio. Voiceprints enrolled in their old order get their old numbers. Rejects an embedding
+   * whose length differs from the model's. Copies the embedding.
+   */
+  enrollVoiceprint: (voiceprint: SpeakerVoiceprint) => Promise<number>
   /** Copies of the embeddings that the tracker clusters and compares, for example to plot them. Changes nothing. */
   inspect: () => Promise<SpeakerMap>
   /**

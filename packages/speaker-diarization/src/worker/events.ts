@@ -1,6 +1,6 @@
 import { defineInvokeEventa } from '@moeru/eventa'
 
-import type { Clustering, DiarizerConfig, EnrollOptions, SimilarityOptions, SpeakerGuess, SpeakerMap, SpeakerSegment, SpeakerTrackerConfig, SpeakerTrackerResetOptions, SpeakerTurn } from '../types'
+import type { Clustering, DiarizerConfig, EnrollOptions, SimilarityOptions, SpeakerGuess, SpeakerMap, SpeakerSegment, SpeakerTrackerConfig, SpeakerTrackerResetOptions, SpeakerTurn, SpeakerVoiceprint } from '../types'
 
 /** Resolves to the sample rate that the segmentation model requires. */
 export const initialize = defineInvokeEventa<number, Omit<DiarizerConfig, 'signal'>>('sherpaw:speaker-diarization:initialize')
@@ -10,6 +10,8 @@ export const initializeTracker = defineInvokeEventa<void, Omit<SpeakerTrackerCon
 export const track = defineInvokeEventa<SpeakerTurn, { samples: Float32Array, sampleRate: number }>('sherpaw:speaker-diarization:track')
 export const peek = defineInvokeEventa<SpeakerGuess, { samples: Float32Array, sampleRate: number, final?: boolean }>('sherpaw:speaker-diarization:peek')
 export const enroll = defineInvokeEventa<number, { samples: Float32Array, sampleRate: number, options?: EnrollOptions }>('sherpaw:speaker-diarization:enroll')
+export const voiceprint = defineInvokeEventa<SpeakerVoiceprint, number>('sherpaw:speaker-diarization:voiceprint')
+export const enrollVoiceprint = defineInvokeEventa<number, SpeakerVoiceprint>('sherpaw:speaker-diarization:enroll-voiceprint')
 export const inspect = defineInvokeEventa<SpeakerMap, undefined>('sherpaw:speaker-diarization:inspect')
 export const speech = defineInvokeEventa<Float32Array, { samples: Float32Array, sampleRate: number }>('sherpaw:speaker-diarization:speech')
 export const similarity = defineInvokeEventa<Float32Array, { samples: Float32Array, sampleRate: number, speaker: number, options?: SimilarityOptions }>('sherpaw:speaker-diarization:similarity')

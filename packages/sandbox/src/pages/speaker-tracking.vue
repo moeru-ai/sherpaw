@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SpeakerMap, SpeakerTracker, SpeakerTurn } from '@sherpaw/speaker-diarization'
+import type { SpeakerMap, SpeakerTracker, SpeakerTurn, SpeakerVoiceprint } from '@sherpaw/speaker-diarization'
 import type { ConversationPartial, ConversationTurn, SileroVad, StreamingDiarizer, TurnChange, UtteranceDetector } from '@sherpaw/speaker-diarization/conversation'
 
 import type { Recognizer } from '../features/asr/protocol'
@@ -59,14 +59,26 @@ interface Utterance {
 interface KnownSpeaker {
   speaker: number
   name: string
-  /** The enrollment recordings, in order, kept to enroll the person again in a new tracker. */
+  /** The person's voiceprint, which a new tracker with the same embedding model enrolls again. */
+  voiceprint: SpeakerVoiceprint
+  /** The embedding model of the voiceprint. A voiceprint does not fit another model. */
+  model: EmbeddingModel
+  /** This visit's enrollment recordings, in order, to enroll the person with another embedding model. Empty after a reload. */
   recordings: Float32Array[]
+}
+
+/** A known speaker as the page saves it in this browser: the voiceprint, not the audio. */
+interface SavedSpeaker {
+  name: string
+  model: EmbeddingModel
+  embedding: number[]
+  seconds: number
 }
 
 const sampleRate = 16000
 const minEnrollSeconds = 5
 const maxEnrollSeconds = 30
-/** For a new tracker, the page keeps the latest recordings of a known person up to this much speech. */
+/** For another embedding model, the page keeps the latest recordings of a known person up to this much speech. */
 const maxKeptSeconds = 60
 const colors = ['#2f6f9f', '#c2410c', '#15803d', '#7e22ce', '#b45309', '#0e7490', '#be123c', '#4d7c0f']
 // Streaming transducers with endpoint detection. Each utterance ends with a final result. `none` turns
@@ -103,8 +115,11 @@ const parameters = ref<TrackingParameters>(presetParameters('conversation', 'cam
 /** The values that the sliders mark: the preset's, with the speech threshold of the chosen detector. */
 const defaults = computed(() => ({ ...presetParameters(lastPreset.value, embeddingModel.value), vadThreshold: speechThresholds[speechDetection.value] }))
 const applied = ref<string>()
-/** Known speakers. The page keeps their enrollment audio to enroll them again in a new tracker. */
-const known = ref<KnownSpeaker[]>([])
+/** Known speakers, saved in this browser as voiceprints so that they stay after a reload. */
+const savedKnown = useLocalStorage<SavedSpeaker[]>('sherpaw:speaker-tracking:known', [])
+const known = ref<KnownSpeaker[]>((Array.isArray(savedKnown.value) ? savedKnown.value : [])
+  .filter(entry => typeof entry?.name === 'string' && Array.isArray(entry.embedding) && entry.seconds > 0)
+  .map((entry, i) => ({ speaker: i, name: entry.name, model: entry.model, voiceprint: { embedding: new Float32Array(entry.embedding), seconds: entry.seconds }, recordings: [] })))
 const enrollName = ref('Owner')
 /** The known speaker whose words the page transcribes, or 'everyone'. */
 const transcribeOnly = ref('everyone')
@@ -334,12 +349,36 @@ async function setupTracking() {
 
   activeDetection = speechDetection.value === 'segmentation' && models.segmentation ? 'segmentation' : 'silero'
 
-  for (const entry of known.value) {
-    entry.speaker = await tracker.enroll(entry.recordings[0]!, sampleRate)
+  const kept: KnownSpeaker[] = []
+  const lost: string[] = []
 
-    for (const recording of entry.recordings.slice(1))
-      await tracker.enroll(recording, sampleRate, { speaker: entry.speaker })
+  for (const entry of known.value) {
+    if (entry.model === embeddingModel.value) {
+      entry.speaker = await tracker.enrollVoiceprint(entry.voiceprint)
+    }
+    else if (entry.recordings.length) {
+      // The voiceprint fits only its own model. This visit's recordings enroll the person with the new one.
+      entry.speaker = await tracker.enroll(entry.recordings[0]!, sampleRate)
+
+      for (const recording of entry.recordings.slice(1))
+        await tracker.enroll(recording, sampleRate, { speaker: entry.speaker })
+
+      entry.voiceprint = await tracker.voiceprint(entry.speaker)
+      entry.model = embeddingModel.value
+    }
+    else {
+      lost.push(entry.name)
+      continue
+    }
+
+    kept.push(entry)
   }
+
+  known.value = kept
+  saveKnown()
+
+  if (lost.length)
+    error.value = `${lost.join(', ')} ${lost.length > 1 ? 'were' : 'was'} enrolled with another speaker embedding model. Enroll again to use this one.`
 
   segmenting.value = !!models.segmentation
   applied.value = JSON.stringify([parameters.value, embeddingModel.value, changeDetection.value, speechDetection.value])
@@ -409,10 +448,13 @@ async function enroll(samples: Float32Array) {
       await tracker!.enroll(samples, sampleRate, { speaker: existing.speaker }).catch((cause: unknown) => {
         throw new Error(`Not added to ${name}. ${cause instanceof Error ? cause.message : String(cause)}`)
       })
+      existing.voiceprint = await tracker!.voiceprint(existing.speaker)
       existing.recordings.push(samples)
 
-      while (existing.recordings.length > 1 && seconds(existing) > maxKeptSeconds)
+      while (existing.recordings.length > 1 && recordedSeconds(existing) > maxKeptSeconds)
         existing.recordings.shift()
+
+      saveKnown()
 
       message.value = `Added this voice to ${name}. Later utterances use it.`
 
@@ -421,7 +463,8 @@ async function enroll(samples: Float32Array) {
 
     const speaker = await tracker!.enroll(samples, sampleRate)
 
-    known.value.push({ speaker, name: name || `Speaker ${speaker + 1}`, recordings: [samples] })
+    known.value.push({ speaker, name: name || `Speaker ${speaker + 1}`, voiceprint: await tracker!.voiceprint(speaker), model: embeddingModel.value, recordings: [samples] })
+    saveKnown()
     message.value = `Enrolled ${name || `Speaker ${speaker + 1}`}. Rows already shown keep their labels. Start a new session to use the name from the start.`
   }
   catch (cause) {
@@ -429,9 +472,14 @@ async function enroll(samples: Float32Array) {
   }
 }
 
-/** Seconds of enrollment speech that the page keeps for a known person. */
-function seconds(entry: KnownSpeaker) {
+/** Seconds of this visit's enrollment recordings of a known person. */
+function recordedSeconds(entry: KnownSpeaker) {
   return entry.recordings.reduce((sum, recording) => sum + recording.length, 0) / sampleRate
+}
+
+/** Triggering workflow: enrollment / {@link setupTracking} / {@link forgetKnown} -> {@link saveKnown} -> this browser's saved known speakers. */
+function saveKnown() {
+  savedKnown.value = known.value.map(entry => ({ name: entry.name, model: entry.model, embedding: Array.from(entry.voiceprint.embedding), seconds: entry.voiceprint.seconds }))
 }
 
 /** The enrollment buttons add to a known person when a known person already has the name. */
@@ -482,6 +530,7 @@ async function finishEnrollment() {
 /** Triggering workflow: "Forget known speakers" button -> {@link forgetKnown} -> tracker.reset without enrollments. */
 async function forgetKnown() {
   known.value = []
+  saveKnown()
   transcribeOnly.value = 'everyone'
 
   try {
@@ -936,12 +985,12 @@ onBeforeUnmount(dispose)
                   Known speakers
                 </h2>
                 <p text-xs text-neutral-500>
-                  Record one person talking alone for {{ minEnrollSeconds }}–{{ maxEnrollSeconds }} s, or enroll a selected row of at least {{ minEnrollSeconds }} s. They then show their name from their first utterance. Use a new name for each person; the same name adds more speech to that person.
+                  Record one person talking alone for {{ minEnrollSeconds }}–{{ maxEnrollSeconds }} s, or enroll a selected row of at least {{ minEnrollSeconds }} s. They then show their name from their first utterance. Use a new name for each person; the same name adds more speech to that person. This browser keeps their voiceprints, not their audio, so they stay after a reload.
                 </p>
                 <div flex="~ wrap gap-1.5" text-sm>
                   <span v-if="!known.length" text-neutral-500>None yet.</span>
-                  <span v-for="entry in known" :key="entry.speaker" rounded-full px-2 py-0.5 text-white :style="{ background: color(entry.speaker) }">
-                    {{ entry.name }} · {{ seconds(entry).toFixed(0) }} s
+                  <span v-for="entry in known" :key="entry.name" rounded-full px-2 py-0.5 text-white :style="{ background: color(entry.speaker) }">
+                    {{ entry.name }} · {{ entry.voiceprint.seconds.toFixed(0) }} s
                   </span>
                 </div>
                 <SelectField

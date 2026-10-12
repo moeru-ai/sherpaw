@@ -115,6 +115,12 @@ function fakeTracker(): SpeakerTracker & { resets: number } {
     async enroll() {
       return 0
     },
+    async voiceprint() {
+      return { embedding: new Float32Array(0), seconds: 0 }
+    },
+    async enrollVoiceprint() {
+      return 0
+    },
     async inspect() {
       return { units: [], speakers: [] }
     },
