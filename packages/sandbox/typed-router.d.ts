@@ -44,6 +44,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/nemotron': RouteRecordInfo<
+      '/nemotron',
+      '/nemotron',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/speaker-diarization': RouteRecordInfo<
       '/speaker-diarization',
       '/speaker-diarization',
@@ -93,6 +100,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/kws.vue': {
       routes:
         | '/kws'
+      views:
+        | never
+    }
+    'src/pages/nemotron.vue': {
+      routes:
+        | '/nemotron'
       views:
         | never
     }

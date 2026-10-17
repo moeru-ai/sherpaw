@@ -34,6 +34,7 @@ export default defineConfig([
       'conversation': 'src/conversation.ts',
       'node': 'src/node/index.ts',
       'node-worker': 'src/node/entry.ts',
+      'sortformer': 'src/sortformer/index.ts',
     },
     copy: [{ from: 'src/prebuilt/sherpa-onnx-wasm-main-speaker-diarization.wasm', to: 'dist/prebuilt/sherpa-onnx-wasm-main-speaker-diarization.wasm' }, ...ortAssets],
     dts: true,

@@ -128,6 +128,26 @@ for await (const event of diarizer) {
 
 The diarizer does not transcribe. For the words of each turn, send the `audio` events to a streaming recognizer from `@sherpaw/asr`. After each `speech-end`, also send about 2 seconds of silence. `createTokenTimeline` from `@sherpaw/asr/tokens` then puts each word into the turn whose audio produced it. The speaker tracking demo does this in `packages/sandbox/src/features/speaker-diarization/transcript.ts`.
 
+## Streaming Sortformer diarization
+
+`@sherpaw/speaker-diarization/sortformer` runs NVIDIA Nemotron 3 Diarization (Streaming Sortformer v3) in ONNX Runtime Web. It returns probabilities for up to eight speakers every 10 ms, with 0.64 s or 1.04 s latency, and marks overlapping speech.
+
+Callers pass `import * as ort from 'onnxruntime-web/webgpu'`. Hardware WebGPU is required for real time. On an Apple M4, the WebGPU real-time factor is 0.37 at 1.04 s latency and 0.54 at 0.64 s latency. WebAssembly with four threads has a 1.26 real-time factor, so it is too slow for live audio.
+
+```ts
+import { loadSortformer, recommendProfile, turnsOf } from '@sherpaw/speaker-diarization/sortformer'
+import * as ort from 'onnxruntime-web/webgpu'
+
+const model = await loadSortformer(ort, new Uint8Array(await (await fetch('/nemotron3_diar_v3.w8.onnx')).arrayBuffer()))
+// Steady-state speed of each latency profile on this device.
+const stream = model.createStream({ profile: recommendProfile(await model.benchmark()) ?? 'low' })
+// Each push of 16 kHz mono PCM returns the frames decided so far. Keep them for the whole session.
+const decided = await stream.push(samples)
+const turns = turnsOf(allProbabilities, allProbabilities.length / 8)
+```
+
+`TurnOptions` controls the threshold, minimum turn length, joined gaps and crossing adjustment. Read its documentation in [src/sortformer/turns.ts](src/sortformer/turns.ts).
+
 ## Other entrypoints
 
 - `@sherpaw/speaker-diarization/node`: the same async interface using Node worker threads.
@@ -148,6 +168,8 @@ The diarizer does not transcribe. For the words of each turn, send the `audio` e
 | [pyannote-segmentation-3.0](https://huggingface.co/pyannote/segmentation-3.0), [ONNX export](https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0) | 6.0 MB | MIT |
 | [CAM++ Chinese/English advanced](https://huggingface.co/moeru-ai/sherpaw-campplus-zh-en-advanced) | 28 MB | Apache-2.0 |
 
-`models/sherpa-onnx-pyannote-segmentation-3-0/download.sh` downloads the ONNX export and checks its SHA-256. Any embedding pack that `@sherpaw/speaker-identification` supports also works.
+| [Nemotron 3 Diarization](https://huggingface.co/nvidia/Nemotron-3-Diarization), [ONNX export](https://huggingface.co/altunenes/parakeet-rs/tree/main/nemotron-3-diarization) (for `/sortformer`) | 104 MB | OpenMDW-1.1 |
+
+`models/sherpa-onnx-pyannote-segmentation-3-0/download.sh` downloads the ONNX export and checks its SHA-256. `models/nemotron-3-diarization/download.sh` downloads the fp32 ONNX export of Nemotron 3 Diarization and writes int8 weights; the package does not include that model. Any embedding pack that `@sherpaw/speaker-identification` supports also works.
 
 Try file upload and clustering, and live speaker tracking from the microphone, in the [sandbox playground](../sandbox/README.md).

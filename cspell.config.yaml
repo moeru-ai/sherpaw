@@ -117,6 +117,7 @@ words:
   - moeru
   - Neko
   - Nemo
+  - Nemotron
   - noloop
   - nums
   - NNAPI
@@ -163,5 +164,10 @@ words:
   - xlink
   - xsai
   - zipformer
+  - Altun
+  - diar
+  - Enes
+  - sortformer
+  - Sortformer
 ignoreWords: []
 import: []

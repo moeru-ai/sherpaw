@@ -1,3 +1,4 @@
+<!-- cspell:ignore Nemotron nemotron -->
 <template>
   <div
     h-dvh w-full font-sans
@@ -29,6 +30,9 @@
     </RouterLink>
     <RouterLink to="/speaker-tracking" text-3xl underline>
       Speaker tracking
+    </RouterLink>
+    <RouterLink to="/nemotron" text-3xl underline>
+      Nemotron diarization
     </RouterLink>
   </div>
 </template>
